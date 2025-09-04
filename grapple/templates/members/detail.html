@@ -1,0 +1,394 @@
+<!-- Member Detail Template -->
+{% extends "base.html" %}
+{% from "_macros.html" import belt_badge %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header Section -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center">
+                    <div class="avatar-lg me-3">
+                        {{ member.first_name[0] }}{{ member.last_name[0] }}
+                    </div>
+                    <div>
+                        <h1 class="h2 mb-1">{{ member.full_name() }}</h1>
+                        {% if member.nickname %}
+                        <p class="text-muted mb-0">"{{ member.nickname }}"</p>
+                        {% endif %}
+                        <div class="mt-2">
+                            {{ belt_badge(member.belt_rank, member.stripes) }}
+                            <span class="badge bg-{{ 'success' if member.is_active else 'secondary' }} ms-2">
+                                {{ 'Active' if member.is_active else 'Inactive' }}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="btn-group">
+                    <a href="{{ url_for('members.edit', id=member.id) }}" 
+                       class="btn btn-primary">
+                        <i class="fas fa-edit me-2"></i>Edit
+                    </a>
+                    <a href="{{ url_for('members.promote', id=member.id) }}" 
+                       class="btn btn-success">
+                        <i class="fas fa-medal me-2"></i>Promote
+                    </a>
+                    <div class="dropdown">
+                        <button class="btn btn-outline-secondary dropdown-toggle" 
+                                data-bs-toggle="dropdown">
+                            More Actions
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li>
+                                <a href="mailto:{{ member.email }}" class="dropdown-item">
+                                    <i class="fas fa-envelope me-2"></i>Send Email
+                                </a>
+                            </li>
+                            <li>
+                                <a href="{{ url_for('billing.member_payments', member_id=member.id) }}" 
+                                   class="dropdown-item">
+                                    <i class="fas fa-credit-card me-2"></i>Payment History
+                                </a>
+                            </li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <a href="#" class="dropdown-item text-danger" 
+                                   onclick="confirmDeactivate({{ member.id }})">
+                                    <i class="fas fa-user-times me-2"></i>Deactivate
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <!-- Main Content -->
+        <div class="col-lg-8">
+            <!-- Personal Information -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-user me-2"></i>Personal Information
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="info-group mb-3">
+                                <label class="info-label">Email</label>
+                                <p class="info-value">
+                                    <a href="mailto:{{ member.email }}">{{ member.email }}</a>
+                                </p>
+                            </div>
+                            <div class="info-group mb-3">
+                                <label class="info-label">Phone</label>
+                                <p class="info-value">
+                                    {% if member.phone %}
+                                    <a href="tel:{{ member.phone }}">{{ member.phone }}</a>
+                                    {% else %}
+                                    <span class="text-muted">Not provided</span>
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="info-group mb-3">
+                                <label class="info-label">Date of Birth</label>
+                                <p class="info-value">
+                                    {% if member.date_of_birth %}
+                                    {{ member.date_of_birth.strftime('%B %d, %Y') }}
+                                    <small class="text-muted">({{ member.age() }} years old)</small>
+                                    {% else %}
+                                    <span class="text-muted">Not provided</span>
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="info-group mb-3">
+                                <label class="info-label">Address</label>
+                                <p class="info-value">
+                                    {% if member.address %}
+                                    {{ member.address }}<br>
+                                    {{ member.city }}, {{ member.state }} {{ member.zip_code }}
+                                    {% else %}
+                                    <span class="text-muted">Not provided</span>
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="info-group mb-3">
+                                <label class="info-label">Emergency Contact</label>
+                                <p class="info-value">
+                                    {% if member.emergency_contact_name %}
+                                    {{ member.emergency_contact_name }}<br>
+                                    <a href="tel:{{ member.emergency_contact_phone }}">
+                                        {{ member.emergency_contact_phone }}
+                                    </a>
+                                    {% else %}
+                                    <span class="text-muted">Not provided</span>
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="info-group mb-3">
+                                <label class="info-label">Join Date</label>
+                                <p class="info-value">
+                                    {{ member.join_date.strftime('%B %d, %Y') }}
+                                    <small class="text-muted">({{ member.days_since_joining() }} days ago)</small>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    {% if member.notes %}
+                    <div class="mt-4">
+                        <label class="info-label">Notes</label>
+                        <div class="bg-light p-3 rounded">
+                            {{ member.notes|nl2br }}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Recent Activity -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-history me-2"></i>Recent Activity
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if recent_activities %}
+                    <div class="activity-timeline">
+                        {% for activity in recent_activities %}
+                        <div class="activity-item">
+                            <div class="activity-icon bg-{{ activity.type_color }}">
+                                <i class="fas fa-{{ activity.icon }}"></i>
+                            </div>
+                            <div class="activity-content">
+                                <h6 class="mb-1">{{ activity.title }}</h6>
+                                <p class="text-muted mb-1">{{ activity.description }}</p>
+                                <small class="text-muted">{{ activity.created_at.strftime('%B %d, %Y at %I:%M %p') }}</small>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-muted text-center py-4">No recent activity recorded.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Sidebar -->
+        <div class="col-lg-4">
+            <!-- Status Card -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-info-circle me-2"></i>Status
+                    </h5>
+                </div>
+                <div class="card-body text-center">
+                    <div class="mb-3">
+                        <span class="badge bg-{{ 'success' if member.is_active else 'secondary' }} fs-6 px-3 py-2">
+                            <i class="fas fa-{{ 'check' if member.is_active else 'times' }} me-2"></i>
+                            {{ 'Active Member' if member.is_active else 'Inactive Member' }}
+                        </span>
+                    </div>
+                    {% if member.current_membership() %}
+                    <p class="mb-2">
+                        <strong>Current Plan:</strong><br>
+                        {{ member.current_membership().plan.name }}
+                    </p>
+                    <p class="mb-0">
+                        <strong>Next Payment:</strong><br>
+                        <span class="text-{{ 'danger' if member.payment_overdue() else 'success' }}">
+                            {{ member.next_payment_date().strftime('%B %d, %Y') if member.next_payment_date() else 'N/A' }}
+                        </span>
+                    </p>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Quick Stats -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-bar me-2"></i>Quick Stats
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="stat-item">
+                        <span class="stat-label">Total Classes:</span>
+                        <span class="stat-value">{{ member.total_classes_attended() }}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">This Month:</span>
+                        <span class="stat-value">{{ member.classes_this_month() }}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Last Class:</span>
+                        <span class="stat-value">
+                            {% if member.last_class_date() %}
+                            {{ member.last_class_date().strftime('%m/%d') }}
+                            {% else %}
+                            Never
+                            {% endif %}
+                        </span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Total Paid:</span>
+                        <span class="stat-value">${{ "%.2f"|format(member.total_payments()) }}</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Quick Actions -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-bolt me-2"></i>Quick Actions
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{{ url_for('billing.add_payment', member_id=member.id) }}" 
+                           class="btn btn-outline-success">
+                            <i class="fas fa-plus me-2"></i>Record Payment
+                        </a>
+                        <a href="{{ url_for('members.add_note', id=member.id) }}" 
+                           class="btn btn-outline-info">
+                            <i class="fas fa-sticky-note me-2"></i>Add Note
+                        </a>
+                        <a href="{{ url_for('classes.enroll', member_id=member.id) }}" 
+                           class="btn btn-outline-primary">
+                            <i class="fas fa-calendar-plus me-2"></i>Enroll in Class
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block styles %}
+<style>
+.avatar-lg {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: bold;
+    font-size: 24px;
+}
+
+.info-label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #6c757d;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.25rem;
+}
+
+.info-value {
+    font-size: 1rem;
+    color: #212529;
+    margin-bottom: 0;
+}
+
+.activity-timeline {
+    position: relative;
+    padding-left: 30px;
+}
+
+.activity-item {
+    position: relative;
+    margin-bottom: 20px;
+}
+
+.activity-icon {
+    position: absolute;
+    left: -30px;
+    top: 0;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 12px;
+}
+
+.activity-timeline::before {
+    content: '';
+    position: absolute;
+    left: -18px;
+    top: 12px;
+    bottom: 0;
+    width: 2px;
+    background: #dee2e6;
+}
+
+.stat-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid #f8f9fa;
+}
+
+.stat-item:last-child {
+    border-bottom: none;
+}
+
+.stat-label {
+    color: #6c757d;
+    font-size: 0.875rem;
+}
+
+.stat-value {
+    font-weight: 600;
+    color: #212529;
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function confirmDeactivate(memberId) {
+    if (confirm('Are you sure you want to deactivate this member? This action can be reversed later.')) {
+        fetch(`/members/${memberId}/deactivate`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('meta[name=csrf-token]').getAttribute('content')
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error deactivating member: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while deactivating the member.');
+        });
+    }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,305 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Member: {{ member.full_name() }}{% endblock %}
+
+{% block content %}
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #e9ecef;
+        }
+        .step-content {
+            display: none;
+        }
+        .step-content.active {
+            display: block;
+        }
+        .card {
+            border-radius: 1rem;
+        }
+        .btn {
+            border-radius: 0.5rem;
+        }
+        .pagination-step-circle {
+            width: 4rem;
+            height: 4rem;
+            border-radius: 50%;
+            background-color: #0d6efd;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body class="d-flex align-items-center justify-content-center min-vh-100 p-4">
+    <div class="card shadow-lg p-4 w-100" style="max-width: 600px;">
+        <div class="card-body">
+            
+            <!-- Pagination Indicator -->
+            <div class="mb-4">
+                <div id="pagination-indicator" class="d-flex justify-content-between align-items-center text-secondary">
+                    <!-- Step circles will be dynamically generated here -->
+                </div>
+            </div>
+
+            <!-- Form Container -->
+            <form id="multi-step-form" class="space-y-4" method="POST" action="{{ url_for('members.add') }}">
+                {{ form.hidden_tag() }}
+                <!-- Step 1 Content -->
+                <div id="step-1" class="step-content phone active">
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="form-group">
+                            {{ form.first_name.label(class="form-label") }}
+                            {{ form.first_name(class="form-input", required=true) }}
+                            {% for error in form.first_name.errors %}
+                            <div class="error-message">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        
+                        <div class="form-group">
+                            {{ form.last_name.label(class="form-label") }}
+                            {{ form.last_name(class="form-input", required=true) }}
+                            {% for error in form.last_name.errors %}
+                            <div class="error-message">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        
+                        <div class="form-group">
+                            {{ form.date_of_birth.label(class="form-label") }}
+                            {{ form.date_of_birth(class="form-input", type="date") }}
+                        </div>
+                        
+                        <div class="form-group">
+                            {{ form.gender.label(class="form-label") }}
+                            {{ form.gender(class="form-input form-select") }}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 2 Content -->
+                <div id="step-2" class="step-content">        
+                    <!-- Contact Information -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="form-group">
+                            {{ form.email.label(class="form-label") }}
+                            {{ form.email(class="form-input", type="email", required=true) }}
+                            {% for error in form.email.errors %}
+                            <div class="error-message">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        
+                        <div class="form-group">
+                            {{ form.phone.label(class="form-label") }}
+                            {{ form.phone(class="form-input", type="tel") }}
+                        </div>
+                        
+                        <div class="form-group col-span-full">
+                            {{ form.address.label(class="form-label") }}
+                            {{ form.address(class="form-input") }}
+                        </div>
+                        
+                        <div class="form-group">
+                            {{ form.city.label(class="form-label") }}
+                            {{ form.city(class="form-input") }}
+                        </div>
+                        
+                        <div class="form-group">
+                            {{ form.state.label(class="form-label") }}
+                            {{ form.state(class="form-input, form-select") }}
+                        </div>
+                        <div class="form-group">
+                            {{ form.zip_code.label(class="form-label") }}
+                            {{ form.zip_code(class="form-input") }}
+                        </div>
+                    </div>      
+                </div>
+                <!-- Step 3 Content -->
+                <div id="step-3" class="step-content">
+                    <div class="form-group">
+                        {{ form.belt_rank.label(class="form-label") }}
+                        {{ form.belt_rank(class="form-input") }}
+                    </div>
+                    <div class="form-group">
+                        {{ form.stripes.label(class="form-label") }}
+                        {{ form.stripes(class="form-input") }}
+                    </div>
+                    
+                    <div class="form-group">
+                        {{ form.join_date.label(class="form-label") }}
+                        {{ form.join_date(class="form-input", type="date", required=true) }}
+                        {% for error in form.join_date.errors %}
+                        <div class="error-message">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                    
+                    <div class="form-group col-span-full">
+                        {{ form.photo.label(class="form-label") }}
+                        {{ form.photo(class="form-input", placeholder="e.g. https://example.com/photo.jpg") }}
+                    </div>
+                </div>
+
+                <!-- Step 4 Content -->
+                <div id="step-4" class="step-content">
+                    <div class="p-8">   
+                        <div>
+                            <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                                <i class="fas fa-heartbeat mr-2 text-red-500"></i> Emergency Contact
+                            </h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div class="form-group">
+                                    {{ form.emergency_contact_name.label(class="form-label") }}
+                                    {{ form.emergency_contact_name(class="form-input") }}
+                                </div>
+                                <div class="form-group">
+                                    {{ form.emergency_contact_phone.label(class="form-label") }}
+                                    {{ form.emergency_contact_phone(class="form-input") }}
+                                </div>
+                                
+                                <div class="form-group">
+                                    {{ form.emergency_contact_relationship.label(class="form-label") }}
+                                    {{ form.emergency_contact_relationship(class="form-input") }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 5 Content -->
+                <div id="step-5" class="step-content">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="form-group">
+                            {{ form.membership_plan.label(class="form-label") }}
+                            {{ form.membership_plan(class="form-input") }}
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="form-group">
+                            {{ form.membership_start_date.label(class="form-label") }}
+                            {{ form.membership_start_date(class="form-input", type="date") }}
+                        </div>
+                        <div class="form-group">
+                            {{ form.membership_end_date.label(class="form-label") }}
+                            {{ form.membership_end_date(class="form-input", type="date") }}
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="form-group">
+                            {{ form.membership_status.label(class="form-label") }}
+                            {{ form.membership_status(class="form-input") }}
+                        </div>
+                        <div class="form-group">
+                            {{ form.membership_notes.label(class="form-label") }}
+                            {{ form.membership_notes(class="form-input") }}
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="form-group">
+                            {{ form.waivers_signed.label(class="form-label") }}
+                            {{ form.waivers_signed(class="form-input") }}
+                        </div>
+                        <div class="form-group">
+                            {{ form.waiver_notes.label(class="form-label") }}
+                            {{ form.waiver_notes(class="form-input") }}
+                        </div>
+                    </div>
+                </div>
+
+
+                <!-- Form Buttons -->
+                <div class="d-flex justify-content-between pt-3">
+                    <button type="button" id="prev-btn" class="btn btn-secondary">Previous</button>
+                    <button type="button" id="next-btn" class="btn btn-primary">Next</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" xintegrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const form = document.getElementById('multi-step-form');
+            const prevBtn = document.getElementById('prev-btn');
+            const nextBtn = document.getElementById('next-btn');
+            const paginationIndicator = document.getElementById('pagination-indicator');
+            const steps = document.querySelectorAll('.step-content');
+            let currentStep = 0;
+
+            const stepData = [
+                { title: 'Personal Information', description: 'Your basic details' },
+                { title: 'Contact Information', description: 'How to reach you' },
+                { title: 'Additional Information', description: 'Any other details' },
+                { title: 'Emergency Contact', description: 'In case of emergency' },
+                { title: 'Membership Selection', description: 'Choose a plan' }
+
+            ];
+
+
+            function updateForm() {
+                // Show/hide steps
+                steps.forEach((step, index) => {
+                    step.classList.toggle('active', index === currentStep);
+                });
+
+                // Show/hide buttons
+                prevBtn.style.visibility = currentStep === 0 ? 'hidden' : 'visible';
+                nextBtn.textContent = currentStep === steps.length - 1 ? 'Submit' : 'Next';
+                
+                // Update pagination indicator
+                paginationIndicator.innerHTML = `
+                    <div class="d-flex align-items-center">
+                        <span class="pagination-step-circle me-2">${currentStep + 1}</span>
+                        <span class="fw-bold fs-5 text-primary">${stepData[currentStep].title}</span>
+                    </div>
+                    <span class="text-secondary">${stepData[currentStep].description}</span>
+                `;
+            }
+
+            function validateStep(stepIndex) {
+                const step = steps[stepIndex];
+                const inputs = step.querySelectorAll('input');
+                let isValid = true;
+                inputs.forEach(input => {
+                    if (input.type !== 'radio' && input.type !== 'checkbox' && !input.value) {
+                        isValid = false;
+                        input.classList.add('is-invalid');
+                        input.insertAdjacentHTML('afterend', '<div class="invalid-feedback">This field is required.</div>');
+
+                    }
+                });
+                return isValid;
+            }
+
+            nextBtn.addEventListener('click', () => {
+                if (currentStep < steps.length - 1) {
+                    if (validateStep(currentStep)) {
+                        currentStep++;
+                        updateForm();
+                    } else {
+                        // Using a simple alert for demonstration purposes.
+                        
+                        alert('Please fill out all fields before proceeding.');
+                    }
+                } else {
+                    // Final submission
+                    form.submit();
+                        }
+            });
+
+            prevBtn.addEventListener('click', () => {
+                if (currentStep > 0) {
+                    currentStep--;
+                    updateForm();
+                }
+            });
+
+            // Initialize the form
+            updateForm();
+        });
+    </script>
+</body>
+{% endblock %}

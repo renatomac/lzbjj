@@ -1,0 +1,99 @@
+<!-- ========================================================================= -->
+<!-- grapple/templates/reports/membership.html -->
+<!-- This template displays membership growth and retention data. -->
+{% extends "base.html" %}
+
+{% block title %}Membership Report{% endblock %}
+{% block header_title %}Membership Report{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Key Metrics Card -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-6 col-lg-3">
+            <div class="card shadow-sm rounded-lg h-100 text-center">
+                <div class="card-body p-4">
+                    <div class="text-secondary mb-2">Total Members</div>
+                    <h2 class="h1 fw-bold text-dark">{{ total_members }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+            <div class="card shadow-sm rounded-lg h-100 text-center">
+                <div class="card-body p-4">
+                    <div class="text-secondary mb-2">Active Members</div>
+                    <h2 class="h1 fw-bold text-dark">{{ active_members }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+            <div class="card shadow-sm rounded-lg h-100 text-center">
+                <div class="card-body p-4">
+                    <div class="text-secondary mb-2">New Signups (Last 30 Days)</div>
+                    <h2 class="h1 fw-bold text-dark">{{ new_signups }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+            <div class="card shadow-sm rounded-lg h-100 text-center">
+                <div class="card-body p-4">
+                    <div class="text-secondary mb-2">Membership Churn Rate</div>
+                    <h2 class="h1 fw-bold text-dark">{{ churn_rate }}%</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Monthly Signups Chart -->
+    <div class="card shadow-sm rounded-lg p-4 mb-4">
+        <h2 class="h5 fw-bold mb-3">Monthly Signups</h2>
+        <div class="placeholder-chart text-muted text-center py-5">
+            <i class="fas fa-users fa-3x mb-3"></i>
+            <p>Chart of new signups per month will be displayed here.</p>
+        </div>
+    </div>
+
+    <!-- Retention Data Table -->
+    <div class="card shadow-sm rounded-lg p-4">
+        <h2 class="h5 fw-bold mb-3">Member Retention</h2>
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th scope="col">Cohort</th>
+                        <th scope="col">Active Members</th>
+                        <th scope="col">Total Members</th>
+                        <th scope="col">Retention Rate</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>0-3 Months</td>
+                        <td>{{ retention_data['0-3'].active }}</td>
+                        <td>{{ retention_data['0-3'].total }}</td>
+                        <td>{{ retention_data['0-3'].retention_rate }}%</td>
+                    </tr>
+                    <tr>
+                        <td>3-6 Months</td>
+                        <td>{{ retention_data['3-6'].active }}</td>
+                        <td>{{ retention_data['3-6'].total }}</td>
+                        <td>{{ retention_data['3-6'].retention_rate }}%</td>
+                    </tr>
+                    <tr>
+                        <td>6-12 Months</td>
+                        <td>{{ retention_data['6-12'].active }}</td>
+                        <td>{{ retention_data['6-12'].total }}</td>
+                        <td>{{ retention_data['6-12'].retention_rate }}%</td>
+                    </tr>
+                    <tr>
+                        <td>12+ Months</td>
+                        <td>{{ retention_data['12+'].active }}</td>
+                        <td>{{ retention_data['12+'].total }}</td>
+                        <td>{{ retention_data['12+'].retention_rate }}%</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

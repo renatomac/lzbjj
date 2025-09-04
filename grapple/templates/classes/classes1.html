@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Grapple CRM - Classes Templates</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+    body { font-family: 'Inter', sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; }
+    .card { background: rgba(255,255,255,0.95); backdrop-filter: blur(10px); border-radius: 16px; box-shadow: 0 20px 40px rgba(0,0,0,.15); }
+    .tabs { display:flex; gap:.5rem; flex-wrap:wrap; }
+    .tab-btn { color:#fff; background:rgba(255,255,255,.12); border-radius:10px; padding:.6rem 1rem; font-weight:600; }
+    .tab-btn.active { background:rgba(255,255,255,.2); }
+    .section-title { display:flex; align-items:center; gap:.5rem; font-weight:800; color:#111827; }
+    .input, .select, .textarea { width:100%; border:2px solid #e5e7eb; border-radius:10px; padding:12px 14px; background:#fff; transition: box-shadow .2s, border-color .2s; }
+    .input:focus, .select:focus, .textarea:focus { outline:none; border-color:#6366f1; box-shadow:0 0 0 4px rgba(99,102,241,.15); }
+    .btn { display:inline-flex; align-items:center; gap:.5rem; border-radius:10px; font-weight:700; transition: transform .12s, box-shadow .2s; }
+    .btn:active{ transform: translateY(1px); }
+    .btn-primary{ background: linear-gradient(135deg, #22c55e, #16a34a); color:#fff; }
+    .btn-secondary{ background:#111827; color:#fff; }
+    .btn-ghost{ background:transparent; color:#111827; border:2px solid #e5e7eb; }
+    .badge { display:inline-flex; align-items:center; gap:.4rem; border-radius:9999px; padding:.3rem .65rem; font-weight:700; font-size:.75rem; }
+    .badge-blue{ background:#dbeafe; color:#1e40af; }
+    .badge-green{ background:#d1fae5; color:#065f46; }
+    .badge-amber{ background:#fef3c7; color:#92400e; }
+    .chip { border:2px solid #e5e7eb; border-radius:9999px; padding:.35rem .8rem; font-weight:600; color:#374151; }
+    .pill { border:2px solid #e5e7eb; border-radius:9999px; padding:.35rem .8rem; cursor:pointer; font-weight:600; color:#374151; }
+    .pill.active{ background:#111827; color:#fff; border-color:#111827; }
+    .row { display:grid; grid-template-columns: 1fr 1fr; gap:1rem; }
+    @media (max-width: 1024px){ .row { grid-template-columns: 1fr; } }
+    .table { width:100%; border-collapse:separate; border-spacing:0 10px; }
+    .tr { background:#fff; border-radius:12px; }
+    .tr td { padding:16px; }
+    .avatar { width:36px; height:36px; border-radius:9999px; background:#e5e7eb; display:flex; align-items:center; justify-content:center; font-weight:800; color:#374151;}
+    .switch { position:relative; width:44px; height:26px; background:#e5e7eb; border-radius:9999px; cursor:pointer; }
+    .switch-dot { position:absolute; top:3px; left:3px; width:20px; height:20px; background:#fff; border-radius:9999px; transition:left .2s; }
+    .switch.active { background:#22c55e; }
+    .switch.active .switch-dot { left:21px; }
+    .empty { border:2px dashed #e5e7eb; border-radius:12px; padding:24px; text-align:center; color:#6b7280; }
+  </style>
+</head>
+<body>
+  <div class="min-h-screen p-6">
+    <div class="max-w-7xl mx-auto">
+      <!-- Header -->
+      <div class="flex items-center justify-between mb-6">
+        <div>
+          <h1 class="text-4xl font-extrabold text-white">Classes</h1>
+          <p class="text-white/80">Schedule, manage attendees, and track check-ins</p>
+        </div>
+        <div class="tabs">
+          <button class="tab-btn active" data-tab="list"><i class="fa-solid fa-table-cells-large"></i> Class List</button>
+          <button class="tab-btn" data-tab="add"><i class="fa-solid fa-plus"></i> Add Class</button>
+          <button class="tab-btn" data-tab="detail"><i class="fa-solid fa-clipboard-list"></i> Class Detail</button>
+        </div>
+      </div>
+
+      <!-- Class List -->
+      <section id="tab-list" class="card p-6">
+        <div class="flex items-center justify-between mb-4 gap-3 flex-wrap">
+          <div class="flex items-center gap-2">
+            <div class="relative">
+              <i class="fa-solid fa-magnifying-glass text-gray-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+              <input id="search" type="text" class="input pl-10" placeholder="Search classes by name or instructor"/>
+            </div>
+            <select id="filterLevel" class="select">
+              <option value="">All Levels</option>
+              <option value="fundamentals">Fundamentals</option>
+              <option value="all">All Levels</option>
+              <option value="advanced">Advanced</option>
+              <option value="kids">Kids</option>
+              <option value="no-gi">No-Gi</option>
+            </select>
+            <select id="filterDay" class="select">
+              <option value="">Any Day</option>
+              <option>Mon</option><option>Tue</option><option>Wed</option>
+              <option>Thu</option><option>Fri</option><option>Sat</option><option>Sun</option>
+            </select>
+          </div>
+          <div class="flex items-center gap-2">
+            <button id="clearFilters" class="btn btn-ghost px-4 py-2"><i class="fa-solid fa-eraser"></i> Clear</button>
+            <button class="btn btn-primary px-4 py-2" data-tab-jump="add"><i class="fa-solid fa-plus"></i> New Class</button>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="table">
+            <tbody id="classRows">
+              <!-- rows injected -->
+            </tbody>
+          </table>
+        </div>
+
+        <div id="emptyState" class="empty mt-4 hidden">
+          <i class="fa-regular fa-calendar text-xl mb-2"></i>
+          <p>No classes match your filters.</p>
+        </div>
+      </section>
+
+      <!-- Add Class -->
+      <section id="tab-add" class="card p-6 hidden">
+        <div class="section-title mb-4"><i class="fa-solid fa-plus text-green-600"></i> Add Class</div>
+        <form id="addClassForm" class="space-y-6">
+          <div class="row">
+            <div>
+              <label class="block text-sm font-semibold text-gray-700 mb-2">Class Name</label>
+              <input id="clsName" type="text" class="input" placeholder="e.g., Fundamentals Gi"/>
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-gray-700 mb-2">Instructor</label>
+              <input id="clsInstructor" type="text" class="input" placeholder="e.g., Coach Silva"/>
+            </div>
+          </div>
+
+          <div class="row">
+            <div>
+              <label class="block text-sm font-semibold text-gray-700 mb-2">Level</label>
+              <select id="clsLevel" class="select">
+                <option value="fundamentals">Fundamentals</option>
+                <option value="all">All Levels</option>
+                <option value="advanced">Advanced</option>
+                <option value="kids">Kids</option>
+                <option value="no-gi">No-Gi</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-gray-700 mb-2">Type</label>
+              <select id="clsType" class="select">
+                <option value="gi">Gi</option>
+                <option value="nogi">No-Gi</option>
+                <option value="open-mat">Open Mat</option>
+                <option value="drills">Drills</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="row">
+            <div>
+              <label class="block text-sm font-semibold text-gray-700 mb-2">Day</label>
+              <select id="clsDay" class="select">
+                <option>Mon</option><option>Tue</option><option>Wed</option>
+                <option>Thu</option><option>Fri</option><option>Sat</option><option>Sun</option>
+              </select>
+            </div>
+            <div class="row" style="grid-template-columns: 1fr 1fr; gap: .75rem;">
+              <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-2">Start Time</label>
+                <input id="clsStart" type="time" class="input"/>
+              </div>
+              <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-2">End Time</label>
+                <input id="clsEnd" type="time" class="input"/>
+              </div>
+            </div>
+          </div>
+
+          <div class="row">
+            <div>
+              <label class="block text-sm font-semibold text-gray-700 mb-2">Capacity</label>
+              <input id="clsCapacity" type="number" min="1" class="input" placeholder="e.g., 30"/>
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-gray-700 mb-2">Active</label>
+              <div id="clsActive" class="switch"><div class="switch-dot"></div></div>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-2">Description</label>
+            <textarea id="clsDesc" rows="3" class="textarea" placeholder="Short description of the class..."></textarea>
+          </div>
+
+          <div class="flex items-center justify-between">
+            <button type="button" class="btn btn-ghost px-4 py-2" id="previewAdd"><i class="fa-solid fa-eye"></i> Preview</button>
+            <div class="flex items-center gap-3">
+              <button type="button" class="btn btn-secondary px-4 py-2" id="saveDraftAdd"><i class="fa-solid fa-save"></i> Save Draft</button>
+              <button type="submit" class="btn btn-primary px-4 py-2"><i class="fa-solid fa-check"></i> Create Class</button>
+            </div>
+          </div>
+        </form>
+      </section>
+
+      <!-- Class Detail -->
+      <section id="tab-detail" class="card p-6 hidden">
+        <div class="flex items-center justify-between mb-4">
+          <div class="section-title"><i class="fa-solid fa-clipboard-list text-indigo-600"></i> Class Detail</div>
+          <button class="btn btn-ghost px-4 py-2" data-tab-jump="list"><i class="fa-solid fa-arrow-left"></i> Back to List</button>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <!-- Info -->
+          <div class="lg:col-span-2">
+            <div class="border-2 border-gray-100 rounded-xl p-4 mb-4">
+              <div class="flex items-center justify-between">
+                <div>
+                  <h3 id="dName" class="text-lg font-extrabold text-gray-900">Fundamentals Gi</h3>
+                  <div class="flex items-center gap-2 text-sm text-gray-600">
+                    <span id="dLevel" class="badge badge-blue">Fundamentals</span>
+                    <span id="dType" class="badge badge-amber">Gi</span>
+                    <span id="dDayTime">Mon • 6:00 PM - 7:00 PM</span>
+                  </div>
+                </div>
+                <span id="dStatus" class="badge badge-green"><i class="fa-solid fa-circle-check"></i> Active</span>
+              </div>
+              <p id="dDesc" class="text-gray-700 mt-3">A fundamentals-focused class covering core positions and movements.</p>
+            </div>
+
+            <!-- Attendees -->
+            <div class="border-2 border-gray-100 rounded-xl p-4">
+              <div class="flex items-center justify-between mb-3">
+                <h4 class="font-bold text-gray-900">Attendees</h4>
+                <div class="flex items-center gap-2">
+                  <input id="attSearch" type="text" class="input" placeholder="Search attendees..."/>
+                  <button id="addAttendee" class="btn btn-ghost px-4 py-2"><i class="fa-solid fa-user-plus"></i> Add</button>
+                </div>
+              </div>
+              <div id="attendeeList" class="space-y-3">
+                <!-- attendee rows -->
+              </div>
+              <div id="attEmpty" class="empty mt-3 hidden">
+                <i class="fa-regular fa-user text-xl mb-2"></i>
+                <p>No attendees yet. Add your first attendee.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Actions -->
+          <div>
+            <div class="border-2 border-gray-100 rounded-xl p-4 mb-4">
+              <h4 class="font-bold text-gray-900 mb-3">Quick Actions</h4>
+              <div class="grid grid-cols-1 gap-2">
+                <button id="checkinAll" class="btn btn-secondary w-full py-2"><i class="fa-solid fa-user-check"></i> Check-in All</button>
+                <button id="exportRoster" class="btn btn-ghost w-full py-2"><i class="fa-solid fa-download"></i> Export Roster</button>
+                <button id="toggleActive" class="btn btn-ghost w-full py-2"><i class="fa-solid fa-toggle-on"></i> Toggle Active</button>
+              </div>
+            </div>
+            <div class="border-2 border-gray-100 rounded-xl p-4">
+              <h4 class="font-bold text-gray-900 mb-3">Stats</h4>
+              <div class="flex items-center justify-between">
+                <div>
+                  <div class="text-2xl font-extrabold text-gray-900" id="statCount">0</div>
+                  <div class="text-xs text-gray-500">attendees</div>
+                </div>
+                <div>
+                  <div class="text-2xl font-extrabold text-gray-900" id="statCapacity">30</div>
+                  <div class="text-xs text-gray-500">capacity</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Modal -->
+      <div id="modal" class="hidden fixed inset-0 bg-black/50 z-50 items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-xl w-full p-6">
+          <div class="flex items-center justify-between mb-4">
+            <h3 id="modalTitle" class="text-lg font-bold text-gray-900">Preview</h3>
+            <button class="text-gray-500 hover:text-gray-700" onclick="toggleModal(false)">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+          <div id="modalBody" class="space-y-4"></div>
+          <div class="mt-6 flex items-center justify-end gap-3">
+            <button class="btn btn-ghost px-4 py-2" onclick="toggleModal(false)">Cancel</button>
+            <button id="modalConfirm" class="btn btn-primary px-4 py-2">Confirm</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Toast -->
+      <div id="toast" class="hidden fixed bottom-4 right-4 bg-white rounded-xl shadow-xl border border-gray-200 px-4 py-3 z-50">
+        <div class="flex items-center gap-2 text-gray-800">
+          <i class="fa-solid fa-check-circle text-green-600"></i>
+          <span id="toastMsg">Saved</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Demo dataset
+    let classes = [
+      { id:1, name:'Fundamentals Gi', instructor:'Coach Silva', level:'fundamentals', type:'gi', day:'Mon', start:'18:00', end:'19:00', capacity:30, active:true, desc:'A fundamentals-focused class covering core positions and movements.' },
+      { id:2, name:'All Levels No-Gi', instructor:'Coach Lee', level:'all', type:'nogi', day:'Wed', start:'19:00', end:'20:15', capacity:28, active:true, desc:'All levels welcome. No-gi grappling and positional sparring.' },
+      { id:3, name:'Advanced Gi', instructor:'Coach Kim', level:'advanced', type:'gi', day:'Fri', start:'18:30', end:'20:00', capacity:24, active:false, desc:'Advanced techniques, strategy, and hard rounds.' },
+    ];
+
+    let detailClass = null;
+    let attendees = [
+      { id: 201, name:'John Doe', checked:false },
+      { id: 202, name:'Maria Santos', checked:true },
+      { id: 203, name:'Alex Chen', checked:false },
+    ];
+
+    // Tabs
+    document.querySelectorAll('.tab-btn').forEach(b=>{
+      b.addEventListener('click', ()=>{
+        document.querySelectorAll('.tab-btn').forEach(x=>x.classList.remove('active'));
+        b.classList.add('active');
+        showTab(b.dataset.tab);
+      });
+    });
+    document.querySelectorAll('[data-tab-jump]').forEach(b=>{
+      b.addEventListener('click', ()=> jumpTo(b.dataset.tabJump));
+    });
+
+    function showTab(tab){
+      ['list','add','detail'].forEach(t=>{
+        document.getElementById('tab-'+t).classList.toggle('hidden', t!==tab);
+      });
+      if(tab==='list') renderList();
+      if(tab==='detail') loadDetail(classes[0]?.id || 1);
+      if(tab==='add') presetAdd();
+    }
+
+    function jumpTo(tab){
+      document.querySelectorAll('.tab-btn').forEach(x=>{
+        x.classList.toggle('active', x.dataset.tab===tab);
+      });
+      showTab(tab);
+    }
+
+    // List rendering and filters
+    function renderList(){
+      const body = document.getElementById('classRows');
+      body.innerHTML = '';
+      const term = document.getElementById('search').value.toLowerCase();
+      const level = document.getElementById('filterLevel').value;
+      const day = document.getElementById('filterDay').value;
+
+      const filtered = classes.filter(c=>{
+        const tMatch = (c.name.toLowerCase().includes(term) || c.instructor.toLowerCase().includes(term));
+        const lMatch = !level || c.level===level;
+        const dMatch = !day || c.day===day;
+        return tMatch && lMatch && dMatch;
+      });
+
+      document.getElementById('emptyState').classList.toggle('hidden', filtered.length>0);
+
+      filtered.forEach(c=>{
+        const tr = document.createElement('tr');
+        tr.className = 'tr';
+        tr.innerHTML = `
+          <td class="w-[32%]">
+            <div class="font-extrabold text-gray-900">${c.name}</div>
+            <div class="text-sm text-gray-600">${c.instructor}</div>
+          </td>
+          <td class="w-[26%]">
+            <span class="badge ${badgeLvl(c.level)}">${labelLvl(c.level)}</span>
+            <span class="badge badge-amber capitalize">${labelType(c.type)}</span>
+          </td>
+          <td class="w-[22%]">
+            <div class="font-semibold text-gray-900">${c.day} • ${toTime(c.start)} - ${toTime(c.end)}</div>
+            <div class="text-sm text-gray-500">Capacity: ${c.capacity}</div>
+          </td>
+          <td class="w-[20%]">
+            <div class="flex items-center gap-2 justify-end">
+              <span class="badge ${c.active?'badge-green':''}">${c.active?'<i class="fa-solid fa-circle-check"></i> Active':'Inactive'}</span>
+              <button class="btn btn-ghost px-3 py-2" data-open="${c.id}"><i class="fa-solid fa-eye"></i></button>
+              <button class="btn btn-ghost px-3 py-2" data-toggle="${c.id}"><i class="fa-solid fa-toggle-on"></i></button>
+            </div>
+          </td>
+        `;
+        body.appendChild(tr);
+      });
+
+      // row actions
+      body.querySelectorAll('[data-open]').forEach(b=>{
+        b.addEventListener('click', ()=> { loadDetail(parseInt(b.dataset.open,10)); jumpTo('detail'); });
+      });
+      body.querySelectorAll('[data-toggle]').forEach(b=>{
+        b.addEventListener('click', ()=>{
+          const id = parseInt(b.dataset.toggle,10);
+          const c = classes.find(x=>x.id===id);
+          if(!c) return;
+          c.active = !c.active;
+          showToast(`Class ${c.active?'activated':'deactivated'}.`);
+          renderList();
+        });
+      });
+    }
+
+    function toTime(t){ // "18:00" -> "6:00 PM"
+      const [h,m]=t.split(':').map(x=>parseInt(x,10));
+      const ampm = h>=12?'PM':'AM';
+      const hh = ((h+11)%12+1);
+      return `${hh}:${String(m).padStart(2,'0')} ${ampm}`;
+    }
+    function badgeLvl(l){ return 'badge-blue'; }
+    function labelLvl(l){
+      switch(l){
+        case 'fundamentals': return 'Fundamentals';
+        case 'all': return 'All Levels';
+        case 'advanced': return 'Advanced';
+        case 'kids': return 'Kids';
+        case 'no-gi': return 'No-Gi';
+        default: return 'Class';
+      }
+    }
+    function labelType(t){
+      switch(t){
+        case 'gi': return 'Gi';
+        case 'nogi': return 'No-Gi';
+        case 'open-mat': return 'Open Mat';
+        case 'drills': return 'Drills';
+        default: return 'Class';
+      }
+    }
+
+    document.getElementById('search').addEventListener('input', renderList);
+    document.getElementById('filterLevel').addEventListener('change', renderList);
+    document.getElementById('filterDay').addEventListener('change', renderList);
+    document.getElementById('clearFilters').addEventListener('click', ()=>{
+      document.getElementById('search').value='';
+      document.getElementById('filterLevel').value='';
+      document.getElementById('filterDay').value='';
+      renderList();
+    });
+
+    // Add Class
+    document.getElementById('clsActive').addEventListener('click', function(){
+      this.classList.toggle('active');
+    });
+
+    function presetAdd(){
+      // sensible defaults
+      document.getElementById('clsName').value='';
+      document.getElementById('clsInstructor').value='';
+      document.getElementById('clsLevel').value='fundamentals';
+      document.getElementById('clsType').value='gi';
+      document.getElementById('clsDay').value='Mon';
+      document.getElementById('clsStart').value='18:00';
+      document.getElementById('clsEnd').value='19:00';
+      document.getElementById('clsCapacity').value=30;
+      document.getElementById('clsDesc').value='';
+      document.getElementById('clsActive').classList.add('active');
+      // load draft if any
+      loadDraftAdd();
+    }
+
+    document.getElementById('previewAdd').addEventListener('click', ()=>{
+      const p = collectAddPayload();
+      if(!validateAdd(p)) return;
+      document.getElementById('modalTitle').textContent = 'Create Class - Preview';
+      document.getElementById('modalBody').innerHTML = `
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="border-2 border-gray-100 rounded-xl p-4">
+            <div class="text-sm text-gray-500 mb-1">Name</div>
+            <div class="font-extrabold text-gray-900">${escapeHtml(p.name)}</div>
+          </div>
+          <div class="border-2 border-gray-100 rounded-xl p-4">
+            <div class="text-sm text-gray-500 mb-1">Instructor</div>
+            <div class="font-semibold">${escapeHtml(p.instructor)}</div>
+          </div>
+          <div class="border-2 border-gray-100 rounded-xl p-4">
+            <div class="text-sm text-gray-500 mb-1">Level / Type</div>
+            <div class="font-semibold">${labelLvl(p.level)} • ${labelType(p.type)}</div>
+          </div>
+          <div class="border-2 border-gray-100 rounded-xl p-4">
+            <div class="text-sm text-gray-500 mb-1">Schedule</div>
+            <div class="font-semibold">${p.day} • ${toTime(p.start)} - ${toTime(p.end)}</div>
+          </div>
+          <div class="border-2 border-gray-100 rounded-xl p-4">
+            <div class="text-sm text-gray-500 mb-1">Capacity</div>
+            <div class="font-semibold">${p.capacity}</div>
+          </div>
+          <div class="border-2 border-gray-100 rounded-xl p-4">
+            <div class="text-sm text-gray-500 mb-1">Active</div>
+            <div class="font-semibold">${p.active?'Yes':'No'}</div>
+          </div>
+        </div>
+        ${p.desc ? `
+        <div class="border-2 border-gray-100 rounded-xl p-4">
+          <div class="text-sm text-gray-500 mb-1">Description</div>
+          <div class="text-gray-800">${escapeHtml(p.desc)}</div>
+        </div>` : '' }
+      `;
+      // confirm creates
+      const confirm = document.getElementById('modalConfirm');
+      confirm.onclick = ()=> {
+        toggleModal(false);
+        createClass(p);
+      };
+      toggleModal(true);
+    });
+
+    document.getElementById('addClassForm').addEventListener('submit', (e)=>{
+      e.preventDefault();
+      const p = collectAddPayload();
+      if(!validateAdd(p)) return;
+      createClass(p);
+    });
+
+    document.getElementById('saveDraftAdd').addEventListener('click', ()=>{
+      const p = collectAddPayload();
+      localStorage.setItem('classDraft', JSON.stringify(p));
+      showToast('Draft saved');
+    });
+
+    function collectAddPayload(){
+      return {
+        name: document.getElementById('clsName').value.trim(),
+        instructor: document.getElementById('clsInstructor').value.trim(),
+        level: document.getElementById('clsLevel').value,
+        type: document.getElementById('clsType').value,
+        day: document.getElementById('clsDay').value,
+        start: document.getElementById('clsStart').value,
+        end: document.getElementById('clsEnd').value,
+        capacity: parseInt(document.getElementById('clsCapacity').value || '0',10),
+        active: document.getElementById('clsActive').classList.contains('active'),
+        desc: document.getElementById('clsDesc').value.trim()
+      };
+    }
+
+    function validateAdd(p){
+      if(!p.name){ showToast('Please enter a class name.'); return false; }
+      if(!p.instructor){ showToast('Please enter an instructor.'); return false; }
+      if(!p.start || !p.end){ showToast('Please set start and end times.'); return false; }
+      if(p.capacity<=0){ showToast('Capacity must be greater than 0.'); return false; }
+      return true;
+    }
+
+    function createClass(p){
+      const id = Math.max(0, ...classes.map(c=>c.id)) + 1;
+      classes.push({ id, ...p });
+      showToast('Class created!');
+      localStorage.removeItem('classDraft');
+      document.getElementById('addClassForm').reset();
+      document.getElementById('clsActive').classList.add('active');
+      jumpTo('list');
+      renderList();
+    }
+
+    function loadDraftAdd(){
+      const raw = localStorage.getItem('classDraft');
+      if(!raw) return;
+      try{
+        const d = JSON.parse(raw);
+        document.getElementById('clsName').value = d.name || '';
+        document.getElementById('clsInstructor').value = d.instructor || '';
+        document.getElementById('clsLevel').value = d.level || 'fundamentals';
+        document.getElementById('clsType').value = d.type || 'gi';
+        document.getElementById('clsDay').value = d.day || 'Mon';
+        document.getElementById('clsStart').value = d.start || '18:00';
+        document.getElementById('clsEnd').value = d.end || '19:00';
+        document.getElementById('clsCapacity').value = d.capacity || 30;
+        document.getElementById('clsDesc').value = d.desc || '';
+        document.getElementById('clsActive').classList.toggle('active', !!d.active);
+        showToast('Draft loaded');
+      }catch(e){}
+    }
+
+    // Detail view
+    function loadDetail(id){
+      detailClass = classes.find(c=>c.id===id) || classes[0];
+      if(!detailClass) return;
+      document.getElementById('dName').textContent = detailClass.name;
+      document.getElementById('dLevel').textContent = labelLvl(detailClass.level);
+      document.getElementById('dType').textContent = labelType(detailClass.type);
+      document.getElementById('dDayTime').textContent = `${detailClass.day} • ${toTime(detailClass.start)} - ${toTime(detailClass.end)}`;
+      document.getElementById('dStatus').innerHTML = detailClass.active ? '<i class="fa-solid fa-circle-check"></i> Active' : 'Inactive';
+      document.getElementById('dStatus').className = 'badge ' + (detailClass.active ? 'badge-green' : '');
+      document.getElementById('dDesc').textContent = detailClass.desc || 'No description.';
+      document.getElementById('statCapacity').textContent = detailClass.capacity;
+
+      renderAttendees();
+    }
+
+    function renderAttendees(){
+      const list = document.getElementById('attendeeList');
+      const empty = document.getElementById('attEmpty');
+      list.innerHTML = '';
+      const term = document.getElementById('attSearch').value?.toLowerCase() || '';
+      const filtered = attendees.filter(a=> a.name.toLowerCase().includes(term) );
+      empty.classList.toggle('hidden', filtered.length>0);
+      filtered.forEach(a=>{
+        const row = document.createElement('div');
+        row.className = 'flex items-center justify-between border-2 border-gray-100 rounded-xl p-3';
+        row.innerHTML = `
+          <div class="flex items-center gap-3">
+            <div class="avatar">${initials(a.name)}</div>
+            <div class="font-semibold text-gray-900">${a.name}</div>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="chip ${a.checked?'bg-green-50 border-green-300 text-green-700':''}">${a.checked?'Checked-in':'Not checked-in'}</span>
+            <button class="btn btn-ghost px-3 py-2" data-toggle-att="${a.id}"><i class="fa-solid fa-user-check"></i></button>
+            <button class="btn btn-ghost px-3 py-2" data-remove-att="${a.id}"><i class="fa-solid fa-user-minus"></i></button>
+          </div>
+        `;
+        list.appendChild(row);
+      });
+      document.getElementById('statCount').textContent = attendees.length;
+      list.querySelectorAll('[data-toggle-att]').forEach(b=>{
+        b.addEventListener('click', ()=>{
+          const id = parseInt(b.dataset.toggleAtt,10);
+          const a = attendees.find(x=>x.id===id);
+          if(!a) return;
+          a.checked = !a.checked;
+          renderAttendees();
+        });
+      });
+      list.querySelectorAll('[data-remove-att]').forEach(b=>{
+        b.addEventListener('click', ()=>{
+          const id = parseInt(b.dataset.removeAtt,10);
+          attendees = attendees.filter(x=>x.id!==id);
+          renderAttendees();
+        });
+      });
+    }
+
+    document.getElementById('attSearch').addEventListener('input', renderAttendees);
+    document.getElementById('addAttendee').addEventListener('click', ()=>{
+      // simple prompt flow
+      const name = prompt('Enter attendee name:');
+      if(!name) return;
+      const id = Math.max(200, ...attendees.map(a=>a.id)) + 1;
+      attendees.push({ id, name: name.trim(), checked:false });
+      renderAttendees();
+    });
+
+    document.getElementById('checkinAll').addEventListener('click', ()=>{
+      attendees = attendees.map(a=> ({...a, checked:true}));
+      renderAttendees();
+      showToast('All attendees checked in.');
+    });
+
+    document.getElementById('exportRoster').addEventListener('click', ()=>{
+      // simple CSV export client-side
+      if(attendees.length===0){ showToast('No attendees to export.'); return; }
+      const rows = [['Name','Checked In']].concat(attendees.map(a=>[a.name, a.checked?'Yes':'No']));
+      const csv = rows.map(r=> r.map(cell=> `"${String(cell).replace(/"/g,'""')}"`).join(',')).join('\n');
+      const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `${(detailClass?.name||'class').replace(/\s+/g,'_')}_roster.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    document.getElementById('toggleActive').addEventListener('click', ()=>{
+      if(!detailClass) return;
+      detailClass.active = !detailClass.active;
+      loadDetail(detailClass.id);
+      renderList();
+      showToast(`Class ${detailClass.active?'activated':'deactivated'}.`);
+    });
+
+    // Modal / Toast helpers
+    function toggleModal(show){
+      const m = document.getElementById('modal');
+      if(show){ m.classList.remove('hidden'); m.classList.add('flex'); }
+      else { m.classList.add('hidden'); m.classList.remove('flex'); }
+    }
+    function showToast(msg){
+      const t = document.getElementById('toast');
+      document.getElementById('toastMsg').textContent = msg;
+      t.classList.remove('hidden');
+      setTimeout(()=> t.classList.add('hidden'), 2200);
+    }
+    function initials(n){
+      const parts = n.trim().split(/\s+/);
+      return (parts[0]?.[0]||'') + (parts[1]?.[0]||'');
+    }
+    function escapeHtml(str){ return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+    // Init
+    document.addEventListener('DOMContentLoaded', ()=>{
+      renderList();
+      // default times on add
+      presetAdd();
+      // open list by default
+      showTab('list');
+    });
+  </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9716c736475914ce',t:'MTc1NTU3NjM4NS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>

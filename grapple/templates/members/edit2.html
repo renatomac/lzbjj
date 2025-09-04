@@ -1,0 +1,1162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Member - Grapple CRM</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .form-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        }
+        
+        .member-header {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border-radius: 16px 16px 0 0;
+            padding: 24px;
+            border-bottom: 2px solid #dee2e6;
+        }
+        
+        .avatar-lg {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 28px;
+            margin-right: 20px;
+        }
+        
+        .section-header {
+            background: #f8fafc;
+            padding: 16px 24px;
+            border-bottom: 1px solid #e2e8f0;
+            margin: 0 -24px 24px -24px;
+        }
+        
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        
+        .form-label {
+            display: block;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 0.5rem;
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .form-input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            background: white;
+        }
+        
+        .form-input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .form-input.error {
+            border-color: #ef4444;
+            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+        }
+        
+        .form-input.changed {
+            border-color: #f59e0b;
+            background: #fef3c7;
+        }
+        
+        .form-select {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
+            background-position: right 12px center;
+            background-repeat: no-repeat;
+            background-size: 16px;
+            padding-right: 40px;
+        }
+        
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 16px;
+            background: #f8fafc;
+            border-radius: 8px;
+            border: 2px solid #e2e8f0;
+            transition: all 0.3s ease;
+        }
+        
+        .checkbox-group:hover {
+            background: #f1f5f9;
+            border-color: #cbd5e1;
+        }
+        
+        .checkbox-input {
+            width: 20px;
+            height: 20px;
+            accent-color: #667eea;
+        }
+        
+        .belt-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-right: 8px;
+            margin-bottom: 8px;
+        }
+        
+        .belt-white { background: #f8f9fa; color: #212529; border: 2px solid #dee2e6; }
+        .belt-blue { background: #0d6efd; color: white; }
+        .belt-purple { background: #6f42c1; color: white; }
+        .belt-brown { background: #795548; color: white; }
+        .belt-black { background: #212529; color: white; }
+        
+        .status-badge {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        .status-active { background: #d1fae5; color: #065f46; }
+        .status-inactive { background: #f3f4f6; color: #374151; }
+        
+        .btn {
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            border: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(102, 126, 234, 0.3);
+        }
+        
+        .btn-secondary {
+            background: #6b7280;
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background: #4b5563;
+            transform: translateY(-2px);
+        }
+        
+        .btn-success {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+        }
+        
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(16, 185, 129, 0.3);
+        }
+        
+        .btn-warning {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            color: white;
+        }
+        
+        .btn-warning:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(245, 158, 11, 0.3);
+        }
+        
+        .btn-outline {
+            background: transparent;
+            border: 2px solid #e5e7eb;
+            color: #374151;
+        }
+        
+        .btn-outline:hover {
+            background: #f9fafb;
+            border-color: #d1d5db;
+        }
+        
+        .error-message {
+            color: #ef4444;
+            font-size: 0.875rem;
+            margin-top: 0.5rem;
+            display: none;
+        }
+        
+        .change-indicator {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            width: 16px;
+            height: 16px;
+            background: #f59e0b;
+            border-radius: 50%;
+            display: none;
+        }
+        
+        .field-wrapper {
+            position: relative;
+        }
+        
+        .changes-summary {
+            background: #fef3c7;
+            border: 2px solid #f59e0b;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 24px;
+            display: none;
+        }
+        
+        .changes-list {
+            list-style: none;
+            padding: 0;
+            margin: 12px 0 0 0;
+        }
+        
+        .changes-list li {
+            padding: 8px 0;
+            border-bottom: 1px solid #fde68a;
+        }
+        
+        .changes-list li:last-child {
+            border-bottom: none;
+        }
+        
+        .sidebar-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+        }
+        
+        .activity-item {
+            display: flex;
+            align-items: flex-start;
+            padding: 12px 0;
+            border-bottom: 1px solid #f3f4f6;
+        }
+        
+        .activity-item:last-child {
+            border-bottom: none;
+        }
+        
+        .activity-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: #e5e7eb;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 12px;
+            flex-shrink: 0;
+        }
+        
+        .floating-actions {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            z-index: 1000;
+        }
+        
+        @media (max-width: 768px) {
+            .floating-actions {
+                bottom: 1rem;
+                right: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="min-h-screen p-6">
+        <div class="max-w-7xl mx-auto">
+            <!-- Header -->
+            <div class="text-center mb-8">
+                <h1 class="text-4xl font-bold text-white mb-2">Edit Member</h1>
+                <p class="text-white/80 text-lg">Update member information and settings</p>
+            </div>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
+                <!-- Main Form -->
+                <div class="lg:col-span-3">
+                    <form id="editMemberForm" class="form-card">
+                        <!-- Member Header -->
+                        <div class="member-header">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center">
+                                    <div class="avatar-lg" id="memberAvatar">JD</div>
+                                    <div>
+                                        <h2 class="text-2xl font-bold text-gray-800 mb-1" id="memberName">John Doe</h2>
+                                        <div class="flex items-center gap-3">
+                                            <span class="belt-badge belt-blue" id="currentBelt">Blue Belt (2 stripes)</span>
+                                            <span class="status-badge status-active" id="currentStatus">Active</span>
+                                        </div>
+                                        <p class="text-gray-600 text-sm mt-1">Member since March 15, 2023</p>
+                                    </div>
+                                </div>
+                                <div class="flex gap-3">
+                                    <a href="#" class="btn btn-outline">
+                                        <i class="fas fa-eye"></i> View Profile
+                                    </a>
+                                    <a href="#" class="btn btn-secondary">
+                                        <i class="fas fa-arrow-left"></i> Back to Members
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Changes Summary -->
+                        <div class="changes-summary" id="changesSummary">
+                            <div class="flex items-center mb-2">
+                                <i class="fas fa-exclamation-triangle text-amber-600 mr-2"></i>
+                                <h3 class="font-semibold text-amber-800">Unsaved Changes</h3>
+                            </div>
+                            <p class="text-amber-700 text-sm">You have made changes to the following fields:</p>
+                            <ul class="changes-list" id="changesList"></ul>
+                        </div>
+                        
+                        <div class="p-8">
+                            <!-- Personal Information -->
+                            <div class="mb-8">
+                                <div class="section-header">
+                                    <h3 class="text-lg font-semibold text-gray-800 flex items-center">
+                                        <i class="fas fa-user mr-2 text-blue-600"></i>
+                                        Personal Information
+                                    </h3>
+                                </div>
+                                
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div class="field-wrapper">
+                                        <div class="form-group">
+                                            <label class="form-label" for="firstName">First Name *</label>
+                                            <input type="text" id="firstName" name="firstName" class="form-input" value="John" required data-original="John">
+                                            <div class="error-message" id="firstNameError">First name is required</div>
+                                        </div>
+                                        <div class="change-indicator"></div>
+                                    </div>
+                                    
+                                    <div class="field-wrapper">
+                                        <div class="form-group">
+                                            <label class="form-label" for="lastName">Last Name *</label>
+                                            <input type="text" id="lastName" name="lastName" class="form-input" value="Doe" required data-original="Doe">
+                                            <div class="error-message" id="lastNameError">Last name is required</div>
+                                        </div>
+                                        <div class="change-indicator"></div>
+                                    </div>
+                                    
+                                    <div class="field-wrapper">
+                                        <div class="form-group">
+                                            <label class="form-label" for="nickname">Nickname</label>
+                                            <input type="text" id="nickname" name="nickname" class="form-input" value="Johnny" data-original="Johnny">
+                                        </div>
+                                        <div class="change-indicator"></div>
+                                    </div>
+                                    
+                                    <div class="field-wrapper">
+                                        <div class="form-group">
+                                            <label class="form-label" for="dateOfBirth">Date of Birth</label>
+                                            <input type="date" id="dateOfBirth" name="dateOfBirth" class="form-input" value="1990-05-15" data-original="1990-05-15">
+                                        </div>
+                                        <div class="change-indicator"></div>
+                                    </div>
+                                    
+                                    <div class="field-wrapper">
+                                        <div class="form-group">
+                                            <label class="form-label" for="gender">Gender</label>
+                                            <select id="gender" name="gender" class="form-input form-select" data-original="male">
+                                                <option value="">Select Gender</option>
+                                                <option value="male" selected>Male</option>
+                                                <option value="female">Female</option>
+                                                <option value="other">Other</option>
+                                                <option value="prefer-not-to-say">Prefer not to say</option>
+                                            </select>
+                                        </div>
+                                        <div class="change-indicator"></div>
+                                    </div>
+                                    
+                                    <div class="field-wrapper">
+                                        <div class="form-group">
+                                            <label class="form-label" for="joinDate">Join Date *</label>
+                                            <input type="date" id="joinDate" name="joinDate" class="form-input" value="2023-03-15" required data-original="2023-03-15">
+                                            <div class="error-message" id="joinDateError">Join date is required</div>
+                                        </div>
+                                        <div class="change-indicator"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Contact Information -->
+                            <div class="mb-8">
+                                <div class="section-header">
+                                    <h3 class="text-lg font-semibold text-gray-800 flex items-center">
+                                        <i class="fas fa-address-book mr-2 text-green-600"></i>
+                                        Contact Information
+                                    </h3>
+                                </div>
+                                
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div class="field-wrapper">
+                                        <div class="form-group">
+                                            <label class="form-label" for="email">Email Address *</label>
+                                            <input type="email" id="email" name="email" class="form-input" value="john.doe@email.com" required data-original="john.doe@email.com">
+                                            <div class="error-message" id="emailError">Valid email is required</div>
+                                        </div>
+                                        <div class="change-indicator"></div>
+                                    </div>
+                                    
+                                    <div class="field-wrapper">
+                                        <div class="form-group">
+                                            <label class="form-label" for="phone">Phone Number</label>
+                                            <input type="tel" id="phone" name="phone" class="form-input" value="(555) 123-4567" data-original="(555) 123-4567">
+                                        </div>
+                                        <div class="change-indicator"></div>
+                                    </div>
+                                    
+                                    <div class="field-wrapper md:col-span-2">
+                                        <div class="form-group">
+                                            <label class="form-label" for="address">Street Address</label>
+                                            <input type="text" id="address" name="address" class="form-input" value="123 Main Street" data-original="123 Main Street">
+                                        </div>
+                                        <div class="change-indicator"></div>
+                                    </div>
+                                    
+                                    <div class="field-wrapper">
+                                        <div class="form-group">
+                                            <label class="form-label" for="city">City</label>
+                                            <input type="text" id="city" name="city" class="form-input" value="Anytown" data-original="Anytown">
+                                        </div>
+                                        <div class="change-indicator"></div>
+                                    </div>
+                                    
+                                    <div class="field-wrapper">
+                                        <div class="form-group">
+                                            <label class="form-label" for="state">State</label>
+                                            <select id="state" name="state" class="form-input form-select" data-original="CA">
+                                                <option value="">Select State</option>
+                                                <option value="CA" selected>California</option>
+                                                <option value="NY">New York</option>
+                                                <option value="TX">Texas</option>
+                                                <option value="FL">Florida</option>
+                                                <!-- Add more states as needed -->
+                                            </select>
+                                        </div>
+                                        <div class="change-indicator"></div>
+                                    </div>
+                                    
+                                    <div class="field-wrapper">
+                                        <div class="form-group">
+                                            <label class="form-label" for="zipCode">ZIP Code</label>
+                                            <input type="text" id="zipCode" name="zipCode" class="form-input" value="12345" data-original="12345">
+                                        </div>
+                                        <div class="change-indicator"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Emergency Contact -->
+                            <div class="mb-8">
+                                <div class="section-header">
+                                    <h3 class="text-lg font-semibold text-gray-800 flex items-center">
+                                        <i class="fas fa-phone mr-2 text-red-600"></i>
+                                        Emergency Contact
+                                    </h3>
+                                </div>
+                                
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div class="field-wrapper">
+                                        <div class="form-group">
+                                            <label class="form-label" for="emergencyName">Contact Name</label>
+                                            <input type="text" id="emergencyName" name="emergencyName" class="form-input" value="Jane Doe" data-original="Jane Doe">
+                                        </div>
+                                        <div class="change-indicator"></div>
+                                    </div>
+                                    
+                                    <div class="field-wrapper">
+                                        <div class="form-group">
+                                            <label class="form-label" for="emergencyPhone">Contact Phone</label>
+                                            <input type="tel" id="emergencyPhone" name="emergencyPhone" class="form-input" value="(555) 987-6543" data-original="(555) 987-6543">
+                                        </div>
+                                        <div class="change-indicator"></div>
+                                    </div>
+                                    
+                                    <div class="field-wrapper md:col-span-2">
+                                        <div class="form-group">
+                                            <label class="form-label" for="emergencyRelationship">Relationship</label>
+                                            <select id="emergencyRelationship" name="emergencyRelationship" class="form-input form-select" data-original="spouse">
+                                                <option value="">Select Relationship</option>
+                                                <option value="parent">Parent</option>
+                                                <option value="spouse" selected>Spouse</option>
+                                                <option value="sibling">Sibling</option>
+                                                <option value="child">Child</option>
+                                                <option value="friend">Friend</option>
+                                                <option value="other">Other</option>
+                                            </select>
+                                        </div>
+                                        <div class="change-indicator"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Belt & Membership -->
+                            <div class="mb-8">
+                                <div class="section-header">
+                                    <h3 class="text-lg font-semibold text-gray-800 flex items-center">
+                                        <i class="fas fa-medal mr-2 text-purple-600"></i>
+                                        Belt Rank & Membership
+                                    </h3>
+                                </div>
+                                
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div class="field-wrapper">
+                                        <div class="form-group">
+                                            <label class="form-label" for="beltRank">Current Belt</label>
+                                            <select id="beltRank" name="beltRank" class="form-input form-select" onchange="updateBeltPreview()" data-original="blue">
+                                                <option value="white">White Belt</option>
+                                                <option value="blue" selected>Blue Belt</option>
+                                                <option value="purple">Purple Belt</option>
+                                                <option value="brown">Brown Belt</option>
+                                                <option value="black">Black Belt</option>
+                                            </select>
+                                        </div>
+                                        <div class="change-indicator"></div>
+                                    </div>
+                                    
+                                    <div class="field-wrapper">
+                                        <div class="form-group">
+                                            <label class="form-label" for="stripes">Stripes</label>
+                                            <select id="stripes" name="stripes" class="form-input form-select" onchange="updateBeltPreview()" data-original="2">
+                                                <option value="0">No Stripes</option>
+                                                <option value="1">1 Stripe</option>
+                                                <option value="2" selected>2 Stripes</option>
+                                                <option value="3">3 Stripes</option>
+                                                <option value="4">4 Stripes</option>
+                                            </select>
+                                        </div>
+                                        <div class="change-indicator"></div>
+                                    </div>
+                                    
+                                    <div class="form-group md:col-span-2">
+                                        <label class="form-label">Belt Preview</label>
+                                        <div id="beltPreview">
+                                            <span class="belt-badge belt-blue">Blue Belt (2 stripes)</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="field-wrapper">
+                                        <div class="form-group">
+                                            <label class="form-label" for="membershipPlan">Membership Plan</label>
+                                            <select id="membershipPlan" name="membershipPlan" class="form-input form-select" data-original="unlimited">
+                                                <option value="">Choose a membership plan</option>
+                                                <option value="unlimited" selected>Unlimited Monthly - $150/month</option>
+                                                <option value="8-classes">8 Classes/Month - $120/month</option>
+                                                <option value="4-classes">4 Classes/Month - $80/month</option>
+                                                <option value="drop-in">Drop-in Rate - $25/class</option>
+                                                <option value="student">Student Discount - $100/month</option>
+                                                <option value="family">Family Plan - $250/month</option>
+                                            </select>
+                                        </div>
+                                        <div class="change-indicator"></div>
+                                    </div>
+                                    
+                                    <div class="field-wrapper">
+                                        <div class="form-group">
+                                            <label class="form-label">Member Status</label>
+                                            <div class="checkbox-group">
+                                                <input type="checkbox" id="isActive" name="isActive" class="checkbox-input" checked data-original="true">
+                                                <label for="isActive" class="text-gray-700 font-medium">Active Member</label>
+                                            </div>
+                                        </div>
+                                        <div class="change-indicator"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Medical & Notes -->
+                            <div class="mb-8">
+                                <div class="section-header">
+                                    <h3 class="text-lg font-semibold text-gray-800 flex items-center">
+                                        <i class="fas fa-heartbeat mr-2 text-red-600"></i>
+                                        Medical Information & Notes
+                                    </h3>
+                                </div>
+                                
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div class="field-wrapper">
+                                        <div class="form-group">
+                                            <label class="form-label" for="medicalConditions">Medical Conditions</label>
+                                            <textarea id="medicalConditions" name="medicalConditions" class="form-input" rows="3" data-original="None reported">None reported</textarea>
+                                        </div>
+                                        <div class="change-indicator"></div>
+                                    </div>
+                                    
+                                    <div class="field-wrapper">
+                                        <div class="form-group">
+                                            <label class="form-label" for="allergies">Allergies</label>
+                                            <textarea id="allergies" name="allergies" class="form-input" rows="3" data-original="Peanuts">Peanuts</textarea>
+                                        </div>
+                                        <div class="change-indicator"></div>
+                                    </div>
+                                    
+                                    <div class="field-wrapper md:col-span-2">
+                                        <div class="form-group">
+                                            <label class="form-label" for="notes">Additional Notes</label>
+                                            <textarea id="notes" name="notes" class="form-input" rows="4" data-original="Very dedicated student. Excellent technique.">Very dedicated student. Excellent technique.</textarea>
+                                        </div>
+                                        <div class="change-indicator"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Waivers -->
+                            <div class="mb-8">
+                                <div class="section-header">
+                                    <h3 class="text-lg font-semibold text-gray-800 flex items-center">
+                                        <i class="fas fa-file-contract mr-2 text-blue-600"></i>
+                                        Waivers & Agreements
+                                    </h3>
+                                </div>
+                                
+                                <div class="space-y-4">
+                                    <div class="field-wrapper">
+                                        <div class="checkbox-group">
+                                            <input type="checkbox" id="liabilityWaiver" name="liabilityWaiver" class="checkbox-input" checked data-original="true">
+                                            <label for="liabilityWaiver" class="text-gray-700">
+                                                <strong>Liability Waiver</strong><br>
+                                                Member has signed the liability waiver
+                                            </label>
+                                        </div>
+                                        <div class="change-indicator"></div>
+                                    </div>
+                                    
+                                    <div class="field-wrapper">
+                                        <div class="checkbox-group">
+                                            <input type="checkbox" id="photoConsent" name="photoConsent" class="checkbox-input" checked data-original="true">
+                                            <label for="photoConsent" class="text-gray-700">
+                                                <strong>Photo/Video Consent</strong><br>
+                                                Member consents to photos and videos for promotional purposes
+                                            </label>
+                                        </div>
+                                        <div class="change-indicator"></div>
+                                    </div>
+                                    
+                                    <div class="field-wrapper">
+                                        <div class="checkbox-group">
+                                            <input type="checkbox" id="emailConsent" name="emailConsent" class="checkbox-input" checked data-original="true">
+                                            <label for="emailConsent" class="text-gray-700">
+                                                <strong>Email Communications</strong><br>
+                                                Member agrees to receive academy updates and promotional emails
+                                            </label>
+                                        </div>
+                                        <div class="change-indicator"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Form Actions -->
+                            <div class="flex justify-between items-center pt-6 border-t border-gray-200">
+                                <div class="flex gap-3">
+                                    <button type="button" class="btn btn-outline" onclick="resetForm()">
+                                        <i class="fas fa-undo"></i> Reset Changes
+                                    </button>
+                                    <button type="button" class="btn btn-secondary" onclick="previewChanges()">
+                                        <i class="fas fa-eye"></i> Preview Changes
+                                    </button>
+                                </div>
+                                <div class="flex gap-3">
+                                    <a href="#" class="btn btn-secondary">
+                                        <i class="fas fa-times"></i> Cancel
+                                    </a>
+                                    <button type="submit" class="btn btn-success" id="saveButton">
+                                        <i class="fas fa-save"></i> Save Changes
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                
+                <!-- Sidebar -->
+                <div class="lg:col-span-1">
+                    <!-- Quick Stats -->
+                    <div class="sidebar-card">
+                        <h4 class="font-semibold text-gray-800 mb-4 flex items-center">
+                            <i class="fas fa-chart-bar mr-2 text-blue-600"></i>
+                            Quick Stats
+                        </h4>
+                        <div class="space-y-3">
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Total Classes:</span>
+                                <span class="font-semibold">127</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">This Month:</span>
+                                <span class="font-semibold">12</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Last Class:</span>
+                                <span class="font-semibold">Yesterday</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Total Paid:</span>
+                                <span class="font-semibold">$1,800</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Recent Activity -->
+                    <div class="sidebar-card">
+                        <h4 class="font-semibold text-gray-800 mb-4 flex items-center">
+                            <i class="fas fa-history mr-2 text-green-600"></i>
+                            Recent Activity
+                        </h4>
+                        <div class="space-y-3">
+                            <div class="activity-item">
+                                <div class="activity-icon">
+                                    <i class="fas fa-dumbbell text-blue-600"></i>
+                                </div>
+                                <div>
+                                    <p class="text-sm font-medium">Attended class</p>
+                                    <p class="text-xs text-gray-500">Yesterday, 7:00 PM</p>
+                                </div>
+                            </div>
+                            <div class="activity-item">
+                                <div class="activity-icon">
+                                    <i class="fas fa-credit-card text-green-600"></i>
+                                </div>
+                                <div>
+                                    <p class="text-sm font-medium">Payment received</p>
+                                    <p class="text-xs text-gray-500">3 days ago</p>
+                                </div>
+                            </div>
+                            <div class="activity-item">
+                                <div class="activity-icon">
+                                    <i class="fas fa-medal text-purple-600"></i>
+                                </div>
+                                <div>
+                                    <p class="text-sm font-medium">Promoted to Blue Belt</p>
+                                    <p class="text-xs text-gray-500">2 months ago</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Quick Actions -->
+                    <div class="sidebar-card">
+                        <h4 class="font-semibold text-gray-800 mb-4 flex items-center">
+                            <i class="fas fa-bolt mr-2 text-yellow-600"></i>
+                            Quick Actions
+                        </h4>
+                        <div class="space-y-2">
+                            <button class="w-full btn btn-outline text-left">
+                                <i class="fas fa-plus mr-2"></i> Record Payment
+                            </button>
+                            <button class="w-full btn btn-outline text-left">
+                                <i class="fas fa-sticky-note mr-2"></i> Add Note
+                            </button>
+                            <button class="w-full btn btn-outline text-left">
+                                <i class="fas fa-medal mr-2"></i> Promote Belt
+                            </button>
+                            <button class="w-full btn btn-outline text-left">
+                                <i class="fas fa-envelope mr-2"></i> Send Email
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Floating Actions -->
+            <div class="floating-actions">
+                <button type="button" class="btn btn-warning" onclick="saveDraft()" title="Save Draft">
+                    <i class="fas fa-save"></i>
+                </button>
+                <button type="button" class="btn btn-primary" onclick="scrollToTop()" title="Back to Top">
+                    <i class="fas fa-arrow-up"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let originalData = {};
+        let hasChanges = false;
+        
+        // Initialize form
+        document.addEventListener('DOMContentLoaded', function() {
+            // Store original values
+            storeOriginalValues();
+            
+            // Setup change tracking
+            setupChangeTracking();
+            
+            // Phone number formatting
+            setupPhoneFormatting();
+            
+            // Form submission
+            document.getElementById('editMemberForm').addEventListener('submit', handleSubmit);
+            
+            // Warn before leaving if there are unsaved changes
+            window.addEventListener('beforeunload', function(e) {
+                if (hasChanges) {
+                    e.preventDefault();
+                    e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
+                }
+            });
+        });
+        
+        function storeOriginalValues() {
+            const form = document.getElementById('editMemberForm');
+            const inputs = form.querySelectorAll('input, select, textarea');
+            
+            inputs.forEach(input => {
+                if (input.type === 'checkbox') {
+                    originalData[input.name] = input.checked;
+                } else {
+                    originalData[input.name] = input.value;
+                }
+            });
+        }
+        
+        function setupChangeTracking() {
+            const form = document.getElementById('editMemberForm');
+            const inputs = form.querySelectorAll('input, select, textarea');
+            
+            inputs.forEach(input => {
+                input.addEventListener('change', function() {
+                    trackFieldChange(this);
+                });
+                
+                input.addEventListener('input', function() {
+                    trackFieldChange(this);
+                });
+            });
+        }
+        
+        function trackFieldChange(field) {
+            const fieldWrapper = field.closest('.field-wrapper');
+            const changeIndicator = fieldWrapper?.querySelector('.change-indicator');
+            const originalValue = field.dataset.original;
+            let currentValue;
+            
+            if (field.type === 'checkbox') {
+                currentValue = field.checked.toString();
+            } else {
+                currentValue = field.value;
+            }
+            
+            const hasChanged = currentValue !== originalValue;
+            
+            if (hasChanged) {
+                field.classList.add('changed');
+                if (changeIndicator) {
+                    changeIndicator.style.display = 'block';
+                }
+            } else {
+                field.classList.remove('changed');
+                if (changeIndicator) {
+                    changeIndicator.style.display = 'none';
+                }
+            }
+            
+            updateChangesSummary();
+            updateSaveButton();
+        }
+        
+        function updateChangesSummary() {
+            const changedFields = document.querySelectorAll('.form-input.changed');
+            const summary = document.getElementById('changesSummary');
+            const changesList = document.getElementById('changesList');
+            
+            if (changedFields.length > 0) {
+                hasChanges = true;
+                summary.style.display = 'block';
+                
+                changesList.innerHTML = '';
+                changedFields.forEach(field => {
+                    const label = document.querySelector(`label[for="${field.id}"]`)?.textContent || field.name;
+                    const li = document.createElement('li');
+                    li.innerHTML = `<strong>${label}:</strong> "${field.dataset.original}" → "${field.value}"`;
+                    changesList.appendChild(li);
+                });
+            } else {
+                hasChanges = false;
+                summary.style.display = 'none';
+            }
+        }
+        
+        function updateSaveButton() {
+            const saveButton = document.getElementById('saveButton');
+            if (hasChanges) {
+                saveButton.classList.remove('btn-success');
+                saveButton.classList.add('btn-warning');
+                saveButton.innerHTML = '<i class="fas fa-save"></i> Save Changes';
+            } else {
+                saveButton.classList.remove('btn-warning');
+                saveButton.classList.add('btn-success');
+                saveButton.innerHTML = '<i class="fas fa-save"></i> Save Changes';
+            }
+        }
+        
+        function updateBeltPreview() {
+            const beltRank = document.getElementById('beltRank').value;
+            const stripes = parseInt(document.getElementById('stripes').value);
+            const preview = document.getElementById('beltPreview');
+            const currentBelt = document.getElementById('currentBelt');
+            
+            let beltText = beltRank.charAt(0).toUpperCase() + beltRank.slice(1) + ' Belt';
+            if (stripes > 0) {
+                beltText += ` (${stripes} stripe${stripes > 1 ? 's' : ''})`;
+            }
+            
+            preview.innerHTML = `<span class="belt-badge belt-${beltRank}">${beltText}</span>`;
+            currentBelt.innerHTML = beltText;
+            currentBelt.className = `belt-badge belt-${beltRank}`;
+        }
+        
+        function setupPhoneFormatting() {
+            const phoneInputs = document.querySelectorAll('input[type="tel"]');
+            phoneInputs.forEach(input => {
+                input.addEventListener('input', function(e) {
+                    let value = e.target.value.replace(/\D/g, '');
+                    if (value.length >= 6) {
+                        value = value.replace(/(\d{3})(\d{3})(\d{4})/, '($1) $2-$3');
+                    } else if (value.length >= 3) {
+                        value = value.replace(/(\d{3})(\d{0,3})/, '($1) $2');
+                    }
+                    e.target.value = value;
+                });
+            });
+        }
+        
+        function resetForm() {
+            if (confirm('Are you sure you want to reset all changes? This cannot be undone.')) {
+                const form = document.getElementById('editMemberForm');
+                const inputs = form.querySelectorAll('input, select, textarea');
+                
+                inputs.forEach(input => {
+                    const originalValue = input.dataset.original;
+                    if (input.type === 'checkbox') {
+                        input.checked = originalValue === 'true';
+                    } else {
+                        input.value = originalValue;
+                    }
+                    
+                    input.classList.remove('changed');
+                    const fieldWrapper = input.closest('.field-wrapper');
+                    const changeIndicator = fieldWrapper?.querySelector('.change-indicator');
+                    if (changeIndicator) {
+                        changeIndicator.style.display = 'none';
+                    }
+                });
+                
+                hasChanges = false;
+                updateChangesSummary();
+                updateSaveButton();
+                updateBeltPreview();
+            }
+        }
+        
+        function previewChanges() {
+            const changedFields = document.querySelectorAll('.form-input.changed');
+            
+            if (changedFields.length === 0) {
+                alert('No changes to preview.');
+                return;
+            }
+            
+            let changesList = '';
+            changedFields.forEach(field => {
+                const label = document.querySelector(`label[for="${field.id}"]`)?.textContent || field.name;
+                changesList += `<li class="py-2 border-b border-gray-200"><strong>${label}:</strong><br>
+                    <span class="text-red-600">"${field.dataset.original}"</span> → 
+                    <span class="text-green-600">"${field.value}"</span></li>`;
+            });
+            
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+            modal.innerHTML = `
+                <div class="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-96 overflow-y-auto">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-semibold">Preview Changes</h3>
+                        <button onclick="this.closest('.fixed').remove()" class="text-gray-500 hover:text-gray-700">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <p class="text-gray-600 mb-4">The following changes will be saved:</p>
+                    <ul class="list-none">${changesList}</ul>
+                    <div class="flex justify-end gap-3 mt-6">
+                        <button onclick="this.closest('.fixed').remove()" class="btn btn-secondary">Cancel</button>
+                        <button onclick="document.getElementById('editMemberForm').submit()" class="btn btn-success">
+                            <i class="fas fa-save"></i> Save Changes
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+        }
+        
+        function saveDraft() {
+            const formData = new FormData(document.getElementById('editMemberForm'));
+            const data = {};
+            for (let [key, value] of formData.entries()) {
+                data[key] = value;
+            }
+            
+            localStorage.setItem('memberEditDraft', JSON.stringify(data));
+            
+            // Show success feedback
+            const btn = event.target;
+            const originalHTML = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-check"></i>';
+            btn.classList.remove('btn-warning');
+            btn.classList.add('btn-success');
+            
+            setTimeout(() => {
+                btn.innerHTML = originalHTML;
+                btn.classList.remove('btn-success');
+                btn.classList.add('btn-warning');
+            }, 2000);
+        }
+        
+        function scrollToTop() {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+        
+        function handleSubmit(e) {
+            e.preventDefault();
+            
+            // Validate required fields
+            const requiredFields = ['firstName', 'lastName', 'email', 'joinDate'];
+            let isValid = true;
+            
+            requiredFields.forEach(fieldId => {
+                const field = document.getElementById(fieldId);
+                const errorEl = document.getElementById(fieldId + 'Error');
+                
+                if (!field.value.trim()) {
+                    field.classList.add('error');
+                    if (errorEl) errorEl.style.display = 'block';
+                    isValid = false;
+                } else {
+                    field.classList.remove('error');
+                    if (errorEl) errorEl.style.display = 'none';
+                }
+            });
+            
+            // Email validation
+            const emailField = document.getElementById('email');
+            const emailError = document.getElementById('emailError');
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            
+            if (emailField.value && !emailRegex.test(emailField.value)) {
+                emailField.classList.add('error');
+                emailError.style.display = 'block';
+                isValid = false;
+            }
+            
+            if (!isValid) {
+                alert('Please fix the errors before saving.');
+                return;
+            }
+            
+            // Show loading state
+            const submitBtn = document.getElementById('saveButton');
+            const originalText = submitBtn.innerHTML;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+            submitBtn.disabled = true;
+            
+            // Simulate form submission
+            setTimeout(() => {
+                // Clear draft
+                localStorage.removeItem('memberEditDraft');
+                
+                // Show success message
+                const successDiv = document.createElement('div');
+                successDiv.className = 'fixed top-4 right-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded z-50';
+                successDiv.innerHTML = `
+                    <div class="flex items-center">
+                        <i class="fas fa-check-circle mr-2"></i>
+                        <span>Member updated successfully!</span>
+                        <button onclick="this.parentElement.parentElement.remove()" class="ml-4 text-green-700 hover:text-green-900">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                `;
+                
+                document.body.appendChild(successDiv);
+                
+                // Reset form state
+                hasChanges = false;
+                updateChangesSummary();
+                updateSaveButton();
+                
+                // Update original values
+                storeOriginalValues();
+                
+                // Remove change indicators
+                document.querySelectorAll('.form-input').forEach(input => {
+                    input.classList.remove('changed');
+                });
+                document.querySelectorAll('.change-indicator').forEach(indicator => {
+                    indicator.style.display = 'none';
+                });
+                
+                // Reset button
+                submitBtn.innerHTML = originalText;
+                submitBtn.disabled = false;
+                
+                // Auto-remove success message
+                setTimeout(() => {
+                    if (successDiv.parentNode) {
+                        successDiv.remove();
+                    }
+                }, 5000);
+                
+            }, 2000);
+        }
+    </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'97169f5264f21e95',t:'MTc1NTU3NDc1MS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>

@@ -1,0 +1,899 @@
+{% extends "base.html" %}
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    {% block title %}Add New Member{% endblock %}
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .form-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        }
+        
+        .section-header {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border-radius: 12px 12px 0 0;
+            padding: 20px;
+            border-bottom: 2px solid #dee2e6;
+        }
+        
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        
+        .form-label {
+            display: block;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 0.5rem;
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .form-input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            background: white;
+        }
+        
+        .form-input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .form-input.error {
+            border-color: #ef4444;
+            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+        }
+        
+        .form-select {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
+            background-position: right 12px center;
+            background-repeat: no-repeat;
+            background-size: 16px;
+            padding-right: 40px;
+        }
+        
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 16px;
+            background: #f8fafc;
+            border-radius: 8px;
+            border: 2px solid #e2e8f0;
+            transition: all 0.3s ease;
+        }
+        
+        .checkbox-group:hover {
+            background: #f1f5f9;
+            border-color: #cbd5e1;
+        }
+        
+        .checkbox-input {
+            width: 20px;
+            height: 20px;
+            accent-color: #667eea;
+        }
+        
+        .belt-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-right: 8px;
+            margin-bottom: 8px;
+        }
+        
+        .belt-white { background: #f8f9fa; color: #212529; border: 2px solid #dee2e6; }
+        .belt-blue { background: #0d6efd; color: white; }
+        .belt-purple { background: #6f42c1; color: white; }
+        .belt-brown { background: #795548; color: white; }
+        .belt-black { background: #212529; color: white; }
+        
+        .btn {
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            border: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(102, 126, 234, 0.3);
+        }
+        
+        .btn-secondary {
+            background: #6b7280;
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background: #4b5563;
+            transform: translateY(-2px);
+        }
+        
+        .btn-success {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+        }
+        
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(16, 185, 129, 0.3);
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e5e7eb;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 2rem;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            transition: width 0.3s ease;
+        }
+        
+        .error-message {
+            color: #ef4444;
+            font-size: 0.875rem;
+            margin-top: 0.5rem;
+            display: none;
+        }
+        
+        .success-message {
+            background: #d1fae5;
+            color: #065f46;
+            padding: 16px;
+            border-radius: 8px;
+            border-left: 4px solid #10b981;
+            margin-bottom: 2rem;
+        }
+        
+        .step-indicator {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 2rem;
+        }
+        
+        .step {
+            display: flex;
+            align-items: center;
+            margin: 0 1rem;
+        }
+        
+        .step-number {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #e5e7eb;
+            color: #6b7280;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            margin-right: 12px;
+        }
+        
+        .step.active .step-number {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .step.completed .step-number {
+            background: #10b981;
+            color: white;
+        }
+        
+        .floating-save {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            z-index: 1000;
+        }
+        
+        @media (max-width: 768px) {
+            .floating-save {
+                bottom: 1rem;
+                right: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="min-h-screen p-6">
+        <div class="max-w-4xl mx-auto">
+            <!-- Header -->
+            <div class="text-center mb-8">
+                <h1 class="text-4xl font-bold text-white mb-2">Add New Member</h1>
+                <p class="text-white/80 text-lg">Welcome a new student to your BJJ academy JORGE</p>
+            </div>
+            
+            <!-- Progress Bar -->
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+            </div>
+            
+            <!-- Step Indicator -->
+            <div class="step-indicator">
+                <div class="step active" id="step1">
+                    <div class="step-number">1</div>
+                    <span class="text-white font-medium">Personal Info</span>
+                </div>
+                <div class="step" id="step2">
+                    <div class="step-number">2</div>
+                    <span class="text-white font-medium">Contact & Emergency</span>
+                </div>
+                <div class="step" id="step3">
+                    <div class="step-number">3</div>
+                    <span class="text-white font-medium">Membership & Waivers</span>
+                </div>
+            </div>
+            
+            <!-- Form -->
+            <form id="addMemberForm" class="form-card">
+                <!-- Step 1: Personal Information -->
+                <div class="form-step active" id="formStep1">
+                    <div class="section-header">
+                        <h2 class="text-2xl font-bold text-gray-800 flex items-center">
+                            <i class="fas fa-user mr-3 text-blue-600"></i>
+                            Personal Information
+                        </h2>
+                        <p class="text-gray-600 mt-2">Basic details about the new member</p>
+                    </div>
+                    
+                    <div class="p-8">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div class="form-group">
+                                <label class="form-label" for="firstName">First Name *</label>
+                                <input type="text" id="firstName" name="firstName" class="form-input" required>
+                                <div class="error-message" id="firstNameError">First name is required</div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label" for="lastName">Last Name *</label>
+                                <input type="text" id="lastName" name="lastName" class="form-input" required>
+                                <div class="error-message" id="lastNameError">Last name is required</div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label" for="nickname">Nickname</label>
+                                <input type="text" id="nickname" name="nickname" class="form-input" placeholder="Optional">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label" for="dateOfBirth">Date of Birth</label>
+                                <input type="date" id="dateOfBirth" name="dateOfBirth" class="form-input">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label" for="gender">Gender</label>
+                                <select id="gender" name="gender" class="form-input form-select">
+                                    <option value="">Select Gender</option>
+                                    <option value="male">Male</option>
+                                    <option value="female">Female</option>
+                                    <option value="other">Other</option>
+                                    <option value="prefer-not-to-say">Prefer not to say</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label" for="joinDate">Join Date *</label>
+                                <input type="date" id="joinDate" name="joinDate" class="form-input" required>
+                                <div class="error-message" id="joinDateError">Join date is required</div>
+                            </div>
+                        </div>
+                        
+                        <div class="flex justify-end mt-8">
+                            <button type="button" class="btn btn-primary" onclick="nextStep(1)">
+                                Next Step <i class="fas fa-arrow-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Step 2: Contact & Emergency Information -->
+                <div class="form-step" id="formStep2">
+                    <div class="section-header">
+                        <h2 class="text-2xl font-bold text-gray-800 flex items-center">
+                            <i class="fas fa-address-book mr-3 text-green-600"></i>
+                            Contact & Emergency Information
+                        </h2>
+                        <p class="text-gray-600 mt-2">How to reach the member and emergency contacts</p>
+                    </div>
+                    
+                    <div class="p-8">
+                        <!-- Contact Information -->
+                        <div class="mb-8">
+                            <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                                <i class="fas fa-phone mr-2 text-blue-500"></i>
+                                Contact Information
+                            </h3>
+                            
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div class="form-group">
+                                    <label class="form-label" for="email">Email Address *</label>
+                                    <input type="email" id="email" name="email" class="form-input" required>
+                                    <div class="error-message" id="emailError">Valid email is required</div>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label class="form-label" for="phone">Phone Number</label>
+                                    <input type="tel" id="phone" name="phone" class="form-input" placeholder="(555) 123-4567">
+                                </div>
+                                
+                                <div class="form-group md:col-span-2">
+                                    <label class="form-label" for="address">Street Address</label>
+                                    <input type="text" id="address" name="address" class="form-input" placeholder="123 Main Street">
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label class="form-label" for="city">City</label>
+                                    <input type="text" id="city" name="city" class="form-input">
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label class="form-label" for="state">State</label>
+                                    <select id="state" name="state" class="form-input form-select">
+                                        <option value="">Select State</option>
+                                        <option value="AL">Alabama</option>
+                                        <option value="AK">Alaska</option>
+                                        <option value="AZ">Arizona</option>
+                                        <option value="AR">Arkansas</option>
+                                        <option value="CA">California</option>
+                                        <option value="CO">Colorado</option>
+                                        <option value="CT">Connecticut</option>
+                                        <option value="DE">Delaware</option>
+                                        <option value="FL">Florida</option>
+                                        <option value="GA">Georgia</option>
+                                        <option value="HI">Hawaii</option>
+                                        <option value="ID">Idaho</option>
+                                        <option value="IL">Illinois</option>
+                                        <option value="IN">Indiana</option>
+                                        <option value="IA">Iowa</option>
+                                        <option value="KS">Kansas</option>
+                                        <option value="KY">Kentucky</option>
+                                        <option value="LA">Louisiana</option>
+                                        <option value="ME">Maine</option>
+                                        <option value="MD">Maryland</option>
+                                        <option value="MA">Massachusetts</option>
+                                        <option value="MI">Michigan</option>
+                                        <option value="MN">Minnesota</option>
+                                        <option value="MS">Mississippi</option>
+                                        <option value="MO">Missouri</option>
+                                        <option value="MT">Montana</option>
+                                        <option value="NE">Nebraska</option>
+                                        <option value="NV">Nevada</option>
+                                        <option value="NH">New Hampshire</option>
+                                        <option value="NJ">New Jersey</option>
+                                        <option value="NM">New Mexico</option>
+                                        <option value="NY">New York</option>
+                                        <option value="NC">North Carolina</option>
+                                        <option value="ND">North Dakota</option>
+                                        <option value="OH">Ohio</option>
+                                        <option value="OK">Oklahoma</option>
+                                        <option value="OR">Oregon</option>
+                                        <option value="PA">Pennsylvania</option>
+                                        <option value="RI">Rhode Island</option>
+                                        <option value="SC">South Carolina</option>
+                                        <option value="SD">South Dakota</option>
+                                        <option value="TN">Tennessee</option>
+                                        <option value="TX">Texas</option>
+                                        <option value="UT">Utah</option>
+                                        <option value="VT">Vermont</option>
+                                        <option value="VA">Virginia</option>
+                                        <option value="WA">Washington</option>
+                                        <option value="WV">West Virginia</option>
+                                        <option value="WI">Wisconsin</option>
+                                        <option value="WY">Wyoming</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label class="form-label" for="zipCode">ZIP Code</label>
+                                    <input type="text" id="zipCode" name="zipCode" class="form-input" placeholder="12345">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Emergency Contact -->
+                        <div class="mb-8">
+                            <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                                <i class="fas fa-exclamation-triangle mr-2 text-red-500"></i>
+                                Emergency Contact
+                            </h3>
+                            
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div class="form-group">
+                                    <label class="form-label" for="emergencyName">Contact Name</label>
+                                    <input type="text" id="emergencyName" name="emergencyName" class="form-input">
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label class="form-label" for="emergencyPhone">Contact Phone</label>
+                                    <input type="tel" id="emergencyPhone" name="emergencyPhone" class="form-input" placeholder="(555) 123-4567">
+                                </div>
+                                
+                                <div class="form-group md:col-span-2">
+                                    <label class="form-label" for="emergencyRelationship">Relationship</label>
+                                    <select id="emergencyRelationship" name="emergencyRelationship" class="form-input form-select">
+                                        <option value="">Select Relationship</option>
+                                        <option value="parent">Parent</option>
+                                        <option value="spouse">Spouse</option>
+                                        <option value="sibling">Sibling</option>
+                                        <option value="child">Child</option>
+                                        <option value="friend">Friend</option>
+                                        <option value="other">Other</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="flex justify-between mt-8">
+                            <button type="button" class="btn btn-secondary" onclick="prevStep(2)">
+                                <i class="fas fa-arrow-left"></i> Previous
+                            </button>
+                            <button type="button" class="btn btn-primary" onclick="nextStep(2)">
+                                Next Step <i class="fas fa-arrow-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Step 3: Membership & Waivers -->
+                <div class="form-step" id="formStep3">
+                    <div class="section-header">
+                        <h2 class="text-2xl font-bold text-gray-800 flex items-center">
+                            <i class="fas fa-medal mr-3 text-purple-600"></i>
+                            Membership & Waivers
+                        </h2>
+                        <p class="text-gray-600 mt-2">Belt rank, membership plan, and required agreements</p>
+                    </div>
+                    
+                    <div class="p-8">
+                        <!-- Belt Information -->
+                        <div class="mb-8">
+                            <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                                <i class="fas fa-medal mr-2 text-yellow-500"></i>
+                                Belt Rank
+                            </h3>
+                            
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div class="form-group">
+                                    <label class="form-label" for="beltRank">Current Belt</label>
+                                    <select id="beltRank" name="beltRank" class="form-input form-select" onchange="updateBeltPreview()">
+                                        <option value="white">White Belt</option>
+                                        <option value="blue">Blue Belt</option>
+                                        <option value="purple">Purple Belt</option>
+                                        <option value="brown">Brown Belt</option>
+                                        <option value="black">Black Belt</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label class="form-label" for="stripes">Stripes</label>
+                                    <select id="stripes" name="stripes" class="form-input form-select" onchange="updateBeltPreview()">
+                                        <option value="0">No Stripes</option>
+                                        <option value="1">1 Stripe</option>
+                                        <option value="2">2 Stripes</option>
+                                        <option value="3">3 Stripes</option>
+                                        <option value="4">4 Stripes</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="form-group md:col-span-2">
+                                    <label class="form-label">Belt Preview</label>
+                                    <div id="beltPreview">
+                                        <span class="belt-badge belt-white">White Belt</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Membership Plan -->
+                        <div class="mb-8">
+                            <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                                <i class="fas fa-credit-card mr-2 text-green-500"></i>
+                                Membership Plan
+                            </h3>
+                            
+                            <div class="form-group">
+                                <label class="form-label" for="membershipPlan">Select Plan</label>
+                                <select id="membershipPlan" name="membershipPlan" class="form-input form-select">
+                                    <option value="">Choose a membership plan</option>
+                                    <option value="unlimited">Unlimited Monthly - $150/month</option>
+                                    <option value="8-classes">8 Classes/Month - $120/month</option>
+                                    <option value="4-classes">4 Classes/Month - $80/month</option>
+                                    <option value="drop-in">Drop-in Rate - $25/class</option>
+                                    <option value="student">Student Discount - $100/month</option>
+                                    <option value="family">Family Plan - $250/month</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <!-- Medical Information -->
+                        <div class="mb-8">
+                            <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                                <i class="fas fa-heartbeat mr-2 text-red-500"></i>
+                                Medical Information
+                            </h3>
+                            
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div class="form-group">
+                                    <label class="form-label" for="medicalConditions">Medical Conditions</label>
+                                    <textarea id="medicalConditions" name="medicalConditions" class="form-input" rows="3" placeholder="Any medical conditions we should be aware of..."></textarea>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label class="form-label" for="allergies">Allergies</label>
+                                    <textarea id="allergies" name="allergies" class="form-input" rows="3" placeholder="Any allergies or medications..."></textarea>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Waivers and Agreements -->
+                        <div class="mb-8">
+                            <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                                <i class="fas fa-file-contract mr-2 text-blue-500"></i>
+                                Waivers & Agreements
+                            </h3>
+                            
+                            <div class="space-y-4">
+                                <div class="checkbox-group">
+                                    <input type="checkbox" id="liabilityWaiver" name="liabilityWaiver" class="checkbox-input" required>
+                                    <label for="liabilityWaiver" class="text-gray-700">
+                                        <strong>Liability Waiver *</strong><br>
+                                        I acknowledge that Brazilian Jiu-Jitsu involves physical contact and risk of injury. I waive all claims against the academy.
+                                    </label>
+                                </div>
+                                
+                                <div class="checkbox-group">
+                                    <input type="checkbox" id="photoConsent" name="photoConsent" class="checkbox-input">
+                                    <label for="photoConsent" class="text-gray-700">
+                                        <strong>Photo/Video Consent</strong><br>
+                                        I consent to photos and videos being taken during training for promotional purposes.
+                                    </label>
+                                </div>
+                                
+                                <div class="checkbox-group">
+                                    <input type="checkbox" id="emailConsent" name="emailConsent" class="checkbox-input">
+                                    <label for="emailConsent" class="text-gray-700">
+                                        <strong>Email Communications</strong><br>
+                                        I agree to receive academy updates, class schedules, and promotional emails.
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Additional Notes -->
+                        <div class="mb-8">
+                            <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                                <i class="fas fa-sticky-note mr-2 text-yellow-500"></i>
+                                Additional Notes
+                            </h3>
+                            
+                            <div class="form-group">
+                                <label class="form-label" for="notes">Notes</label>
+                                <textarea id="notes" name="notes" class="form-input" rows="4" placeholder="Any additional information about this member..."></textarea>
+                            </div>
+                        </div>
+                        
+                        <div class="flex justify-between mt-8">
+                            <button type="button" class="btn btn-secondary" onclick="prevStep(3)">
+                                <i class="fas fa-arrow-left"></i> Previous
+                            </button>
+                            <button type="submit" class="btn btn-success">
+                                <i class="fas fa-user-plus"></i> Add Member
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </form>
+            
+            <!-- Floating Save Draft Button -->
+            <div class="floating-save">
+                <button type="button" class="btn btn-secondary" onclick="saveDraft()" title="Save Draft">
+                    <i class="fas fa-save"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let currentStep = 1;
+        const totalSteps = 3;
+        
+        // Initialize form
+        document.addEventListener('DOMContentLoaded', function() {
+            // Set default join date to today
+            document.getElementById('joinDate').value = new Date().toISOString().split('T')[0];
+            
+            // Load draft if available
+            loadDraft();
+            
+            // Phone number formatting
+            setupPhoneFormatting();
+            
+            // Form submission
+            document.getElementById('addMemberForm').addEventListener('submit', handleSubmit);
+            
+            updateProgress();
+        });
+        
+        function nextStep(step) {
+            if (validateStep(step)) {
+                currentStep++;
+                showStep(currentStep);
+                updateProgress();
+            }
+        }
+        
+        function prevStep(step) {
+            currentStep--;
+            showStep(currentStep);
+            updateProgress();
+        }
+        
+        function showStep(step) {
+            // Hide all steps
+            document.querySelectorAll('.form-step').forEach(el => {
+                el.classList.remove('active');
+                el.style.display = 'none';
+            });
+            
+            // Show current step
+            document.getElementById(`formStep${step}`).classList.add('active');
+            document.getElementById(`formStep${step}`).style.display = 'block';
+            
+            // Update step indicators
+            document.querySelectorAll('.step').forEach((el, index) => {
+                el.classList.remove('active', 'completed');
+                if (index + 1 < step) {
+                    el.classList.add('completed');
+                } else if (index + 1 === step) {
+                    el.classList.add('active');
+                }
+            });
+        }
+        
+        function updateProgress() {
+            const progress = (currentStep / totalSteps) * 100;
+            document.getElementById('progressFill').style.width = `${progress}%`;
+        }
+        
+        function validateStep(step) {
+            let isValid = true;
+            
+            if (step === 1) {
+                // Validate personal information
+                const requiredFields = ['firstName', 'lastName', 'joinDate'];
+                requiredFields.forEach(fieldId => {
+                    const field = document.getElementById(fieldId);
+                    const errorEl = document.getElementById(fieldId + 'Error');
+                    
+                    if (!field.value.trim()) {
+                        field.classList.add('error');
+                        errorEl.style.display = 'block';
+                        isValid = false;
+                    } else {
+                        field.classList.remove('error');
+                        errorEl.style.display = 'none';
+                    }
+                });
+            } else if (step === 2) {
+                // Validate email
+                const emailField = document.getElementById('email');
+                const emailError = document.getElementById('emailError');
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                
+                if (!emailField.value.trim() || !emailRegex.test(emailField.value)) {
+                    emailField.classList.add('error');
+                    emailError.style.display = 'block';
+                    isValid = false;
+                } else {
+                    emailField.classList.remove('error');
+                    emailError.style.display = 'none';
+                }
+            } else if (step === 3) {
+                // Validate liability waiver
+                const waiverField = document.getElementById('liabilityWaiver');
+                if (!waiverField.checked) {
+                    alert('Please accept the liability waiver to continue.');
+                    isValid = false;
+                }
+            }
+            
+            return isValid;
+        }
+        
+        function updateBeltPreview() {
+            const beltRank = document.getElementById('beltRank').value;
+            const stripes = parseInt(document.getElementById('stripes').value);
+            const preview = document.getElementById('beltPreview');
+            
+            let beltText = beltRank.charAt(0).toUpperCase() + beltRank.slice(1) + ' Belt';
+            if (stripes > 0) {
+                beltText += ` (${stripes} stripe${stripes > 1 ? 's' : ''})`;
+            }
+            
+            preview.innerHTML = `<span class="belt-badge belt-${beltRank}">${beltText}</span>`;
+        }
+        
+        function setupPhoneFormatting() {
+            const phoneInputs = document.querySelectorAll('input[type="tel"]');
+            phoneInputs.forEach(input => {
+                input.addEventListener('input', function(e) {
+                    let value = e.target.value.replace(/\D/g, '');
+                    if (value.length >= 6) {
+                        value = value.replace(/(\d{3})(\d{3})(\d{4})/, '($1) $2-$3');
+                    } else if (value.length >= 3) {
+                        value = value.replace(/(\d{3})(\d{0,3})/, '($1) $2');
+                    }
+                    e.target.value = value;
+                });
+            });
+        }
+        
+        function saveDraft() {
+            const formData = new FormData(document.getElementById('addMemberForm'));
+            const data = {};
+            for (let [key, value] of formData.entries()) {
+                data[key] = value;
+            }
+            data.currentStep = currentStep;
+            
+            localStorage.setItem('memberDraft', JSON.stringify(data));
+            
+            // Show success message
+            const btn = event.target;
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-check"></i>';
+            btn.classList.add('btn-success');
+            
+            setTimeout(() => {
+                btn.innerHTML = originalText;
+                btn.classList.remove('btn-success');
+            }, 2000);
+        }
+        
+        function loadDraft() {
+            const draft = localStorage.getItem('memberDraft');
+            if (draft) {
+                const data = JSON.parse(draft);
+                
+                // Populate form fields
+                Object.keys(data).forEach(key => {
+                    if (key === 'currentStep') {
+                        currentStep = data[key];
+                        showStep(currentStep);
+                        return;
+                    }
+                    
+                    const field = document.getElementById(key);
+                    if (field) {
+                        if (field.type === 'checkbox') {
+                            field.checked = data[key] === 'on';
+                        } else {
+                            field.value = data[key];
+                        }
+                    }
+                });
+                
+                updateBeltPreview();
+                
+                // Show notification
+                const notification = document.createElement('div');
+                notification.className = 'success-message';
+                notification.innerHTML = `
+                    <i class="fas fa-info-circle mr-2"></i>
+                    Draft loaded! You can continue where you left off.
+                    <button onclick="clearDraft()" class="float-right text-sm underline">Clear Draft</button>
+                `;
+                
+                document.querySelector('.max-w-4xl').insertBefore(notification, document.querySelector('.progress-bar'));
+                
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.remove();
+                    }
+                }, 5000);
+            }
+        }
+        
+        function clearDraft() {
+            localStorage.removeItem('memberDraft');
+            location.reload();
+        }
+        
+        function handleSubmit(e) {
+            e.preventDefault();
+            
+            if (!validateStep(3)) {
+                return;
+            }
+            
+            // Show loading state
+            const submitBtn = document.querySelector('button[type="submit"]');
+            const originalText = submitBtn.innerHTML;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Adding Member...';
+            submitBtn.disabled = true;
+            
+            // Simulate form submission
+            setTimeout(() => {
+                // Clear draft
+                localStorage.removeItem('memberDraft');
+                
+                // Show success message
+                const successDiv = document.createElement('div');
+                successDiv.className = 'success-message text-center';
+                successDiv.innerHTML = `
+                    <i class="fas fa-check-circle text-2xl mb-2"></i>
+                    <h3 class="text-lg font-semibold mb-2">Member Added Successfully!</h3>
+                    <p>The new member has been added to your academy.</p>
+                    <div class="mt-4">
+                        <button onclick="addAnother()" class="btn btn-primary mr-4">Add Another Member</button>
+                        <button onclick="viewMember()" class="btn btn-secondary">View Member Profile</button>
+                    </div>
+                `;
+                
+                document.querySelector('.form-card').innerHTML = '';
+                document.querySelector('.form-card').appendChild(successDiv);
+                
+                // Hide floating save button
+                document.querySelector('.floating-save').style.display = 'none';
+                
+            }, 2000);
+        }
+        
+        function addAnother() {
+            location.reload();
+        }
+        
+        function viewMember() {
+            // In a real application, this would redirect to the member's profile
+            alert('Redirecting to member profile...');
+        }
+        
+        // Initialize first step
+        showStep(1);
+    </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'96ea688046035c8f',t:'MTc1NTExMTEzMi4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
+

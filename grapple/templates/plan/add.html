@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block title %}Add Membership Plan{% endblock %}
+{% block header_title %}Add Membership Plan{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card main-card mb-4">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h3 class="fw-bold mb-0">Add Membership Plan</h3>
+                    <a href="{{ url_for('plan.index') }}" class="btn btn-custom-ghost"><i class="fa-solid fa-arrow-left"></i> Back to Membership</a>
+                </div>
+                
+                <form id="addForm" method="POST" action="{{ url_for('plan.add') }}">
+                    {{ form.hidden_tag() }}
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Plan Name</label>
+                            {{ form.name(class="form-control", required=True) }}
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Description</label>
+                            {{ form.description(class="form-control", required=True) }}
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <!-- Corrected the label tag here -->
+                            <label class="form-label fw-semibold">Enrollment Fee</label>
+                            {{ form.enroll_price(class="form-control", required=True) }}
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Membership Fee</label>
+                            {{ form.membership_price(class="form-control", required=True) }}
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Duration (in months)</label>
+                            {{ form.duration_months(class="form-control", required=True) }}
+                        </div>
+                    </div>
+
+                    <div class="text-end">
+                        <a href="{{ url_for('plan.index') }}" class="btn btn-custom-ghost me-2">Cancel</a>
+                        <button type="submit" class="btn btn-custom-primary"><i class="fa-solid fa-check"></i> Create Membership</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        </div>
+</div>
+{% endblock %}

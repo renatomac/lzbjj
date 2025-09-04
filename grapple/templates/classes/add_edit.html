@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Add' if not is_edit else 'Edit' }} Class Session{% endblock %}
+{% block header_title %}{{ 'Add' if not is_edit else 'Edit' }} Class Session{% endblock %}
+
+{% block content %}
+
+<div class="row justify-content-center">
+<div class="col-lg-8">
+<div class="card main-card">
+<div class="card-body">
+<h5 class="fw-bold mb-3">{{ 'Add' if not is_edit else 'Edit' }} Class Session</h5>
+<p class="text-muted mb-4">{{ 'Schedule a new class session with details like class type, instructor, date, and time.' if not is_edit else 'Update the details for this class session.' }}</p>
+
+            <form method="POST">
+                {{ form.hidden_tag() }}
+                <div class="mb-3">
+                    {{ form.class_type.label(class="form-label") }}
+                    {{ form.class_type(class="form-control") }}
+                    {% for error in form.class_type.errors %}
+                    <span class="text-danger">{{ error }}</span>
+                    {% endfor %}
+                </div>
+                <div class="mb-3">
+                    {{ form.instructor.label(class="form-label") }}
+                    {{ form.instructor(class="form-control") }}
+                    {% for error in form.instructor.errors %}
+                    <span class="text-danger">{{ error }}</span>
+                    {% endfor %}
+                </div>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        {{ form.date.label(class="form-label") }}
+                        {{ form.date(class="form-control", type="date") }}
+                        {% for error in form.date.errors %}
+                        <span class="text-danger">{{ error }}</span>
+                        {% endfor %}
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        {{ form.time.label(class="form-label") }}
+                        {{ form.time(class="form-control", type="time") }}
+                        {% for error in form.time.errors %}
+                        <span class="text-danger">{{ error }}</span>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="mb-3">
+                    {{ form.notes.label(class="form-label") }}
+                    {{ form.notes(class="form-control", rows="3") }}
+                    {% for error in form.notes.errors %}
+                    <span class="text-danger">{{ error }}</span>
+                    {% endfor %}
+                </div>
+                <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+                    <a href="{{ url_for('classes.index') }}" class="btn btn-secondary me-md-2">Cancel</a>
+                    {{ form.submit(class="btn btn-custom-secondary") }}
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+</div>
+{% endblock %}

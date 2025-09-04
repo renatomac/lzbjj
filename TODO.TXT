@@ -1,0 +1,27 @@
+TODO:
+
+AUTHENTICATION
+    - Create a form to create/edit/delete new users
+    - Adjsut the copyright text to stay in the bottom of the page
+
+Dashboard
+    - Fix belt distribution bars
+
+MEMBERS ADD 
+    - ADD THE EMERGENCY CONTACT Relationship OPTINOS TO THE DROPDOWN MENU
+    - ADD THE MEMBERSHIP PLAN OPTIONS TO THE DROPDOWN MENU
+    - Fix the filters in the top of the page 
+
+MEMBERS DETAILS
+    - Fix layout
+    - Create a logic to activate/deactivate members
+
+MEMBERS ADD_PROMOTION 
+    - Fix the page to use database data instead of local data
+
+
+CREATE A MEMBERSHIP ADD PAGE  
+
+
+
+

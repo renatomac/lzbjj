@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% from "_macros.html" import render_pagination %}
+
+{% block title %}Invoices{% endblock %}
+{% block header_title %}Invoices{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">
+        <i class="fas fa-file-invoice-dollar me-2"></i>Invoices
+        <span class="badge bg-primary ms-2">{{ invoices.total }}</span>
+    </h1>
+</div>
+
+<!-- Search and Filter Section -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="GET" class="row g-3">
+            <div class="col-md-6">
+                <div class="input-group">
+                    <span class="input-group-text"><i class="fas fa-search"></i></span>
+                    <input type="text" class="form-control" name="query" placeholder="Search by member name..." value="{{ request.args.get('query', '') }}">
+                </div>
+            </div>
+            <div class="col-md-6">
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="fas fa-filter me-2"></i>Filter
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Invoices Table -->
+<div class="card shadow-sm rounded-3">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="bg-light">
+                <tr>
+                    <th scope="col">Member</th>
+                    <th scope="col">Amount</th>
+                    <th scope="col">Due Date</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for invoice in invoices.items %}
+                <tr>
+                    <td>
+                        <a href="{{ url_for('members.view', member_id=invoice.member_id) }}" class="text-dark fw-bold text-decoration-none">
+                            {{ invoice.member.full_name() }}
+                        </a>
+                    </td>
+                    <td>{{ invoice.amount|format_currency }}</td>
+                    <td>{{ invoice.due_date|format_date }}</td>
+                    <td>
+                        {% if invoice.status == 'paid' %}
+                        <span class="badge bg-success">Paid</span>
+                        {% elif invoice.status == 'overdue' %}
+                        <span class="badge bg-danger">Overdue</span>
+                        {% else %}
+                        <span class="badge bg-warning text-dark">Pending</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="{{ url_for('billing.view_invoice', invoice_id=invoice.id) }}" class="btn btn-sm btn-outline-info" title="View Invoice">
+                            <i class="fas fa-eye"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" class="text-center text-muted py-5">
+                        <i class="fas fa-info-circle me-2"></i>No invoices found.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{{ render_pagination(invoices, 'billing.invoices') }}
+{% endblock %}

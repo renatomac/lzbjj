@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block title %}View Staff Member{% endblock %}
+{% block header_title %}Staff Profile{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card main-card mb-4">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h3 class="fw-bold mb-0">Staff Profile: {{ staff_member.first_name }} {{ staff_member.last_name }}</h3>
+                    <a href="{{ url_for('staff.index') }}" class="btn btn-custom-ghost"><i class="fa-solid fa-arrow-left"></i> Back to Staff List</a>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <p><strong>First Name:</strong> {{ staff_member.first_name }}</p>
+                        <p><strong>Last Name:</strong> {{ staff_member.last_name }}</p>
+                        <p><strong>Email:</strong> {{ staff_member.email }}</p>
+                        <p><strong>Phone:</strong> {{ staff_member.phone }}</p>
+                        <p><strong>Gender:</strong> {{ staff_member.gender }}</p>
+                        <p><strong>Date of Birth:</strong> {{ staff_member.date_of_birth.strftime('%Y-%m-%d') if staff_member.date_of_birth else 'N/A' }}</p>
+                        <p><strong>Join Date:</strong> {{ staff_member.join_date.strftime('%Y-%m-%d') if staff_member.join_date else 'N/A' }}</p>
+                        <p><strong>Address:</strong> {{ staff_member.address }}</p>
+                        <p><strong>City:</strong> {{ staff_member.city }}</p>
+                        <p><strong>State:</strong> {{ staff_member.state }}</p>
+                        <p><strong>Zip Code:</strong> {{ staff_member.zip_code }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <p><strong>Role:</strong> {{ staff_member.role }}</p>
+                        <p><strong>Belt Rank:</strong> {{ staff_member.belt_rank }}</p>
+                        <p><strong>Specialties:</strong> {{ staff_member.specialties }}</p>
+                        <p><strong>Status:</strong> {{ staff_member.status }}</p>
+                        <p><strong>Access:</strong> {{ staff_member.access }}</p>
+                        <p><strong>Permissions:</strong> {{ staff_member.permissions }}</p>
+                        <p><strong>Notes:</strong> {{ staff_member.notes }}</p>
+                    </div>
+                </div>
+
+                <div class="mt-4 text-end">
+                    <a href="{{ url_for('staff.edit', staff_id=staff_member.id) }}" class="btn btn-custom-secondary me-2">
+                        <i class="fa-solid fa-pen"></i> Edit Profile
+                    </a>
+                    <a href="{{ url_for('staff.delete', staff_id=staff_member.id) }}" class="btn btn-custom-danger" onclick="return confirm('Are you sure you want to delete this staff member?');">
+                        <i class="fa-solid fa-trash"></i> Delete Profile
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        {% if staff_member.photo %}
+        <div class="card main-card">
+            <div class="card-body text-center">
+                <img src="{{ staff_member.photo }}" class="img-fluid rounded-circle mb-3" alt="Staff Photo" style="width: 150px; height: 150px; object-fit: cover;">
+                <p class="fw-bold mb-0">{{ staff_member.full_name() }}</p>
+                <p class="text-muted">{{ staff_member.role }}</p>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

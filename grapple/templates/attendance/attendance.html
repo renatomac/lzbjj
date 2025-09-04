@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Grapple CRM - Attendance</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+    body { font-family: 'Inter', sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; }
+    .card { background: rgba(255,255,255,0.95); backdrop-filter: blur(10px); border-radius: 16px; box-shadow: 0 20px 40px rgba(0,0,0,.12); }
+    .input, .select, .textarea { width:100%; border:2px solid #e5e7eb; border-radius:10px; padding:12px 14px; background:#fff; transition: box-shadow .2s, border-color .2s; }
+    .input:focus, .select:focus, .textarea:focus { outline:none; border-color:#6366f1; box-shadow:0 0 0 4px rgba(99,102,241,.15); }
+    .btn { display:inline-flex; align-items:center; gap:.5rem; border-radius:10px; font-weight:700; transition: transform .12s, box-shadow .2s; }
+    .btn:active{ transform: translateY(1px); }
+    .btn-primary{ background: linear-gradient(135deg, #22c55e, #16a34a); color:#fff; }
+    .btn-secondary{ background:#111827; color:#fff; }
+    .btn-ghost{ background:transparent; color:#111827; border:2px solid #e5e7eb; }
+    .badge { display:inline-flex; align-items:center; gap:.4rem; border-radius:9999px; padding:.3rem .65rem; font-weight:700; font-size:.75rem; }
+    .badge-green{ background:#d1fae5; color:#065f46; }
+    .badge-amber{ background:#fef3c7; color:#92400e; }
+    .badge-gray{ background:#f3f4f6; color:#374151; }
+    .avatar { width:36px; height:36px; border-radius:9999px; background:#e5e7eb; display:flex; align-items:center; justify-content:center; font-weight:800; color:#374151;}
+    .row { display:grid; grid-template-columns: 1fr 1fr; gap:1rem; }
+    @media (max-width: 1024px){ .row { grid-template-columns: 1fr; } }
+    .empty { border:2px dashed #e5e7eb; border-radius:12px; padding:24px; text-align:center; color:#6b7280; }
+    .pill { border:2px solid #e5e7eb; border-radius:9999px; padding:.35rem .8rem; cursor:pointer; font-weight:600; color:#374151; }
+    .pill.active{ background:#111827; color:#fff; border-color:#111827; }
+    .toggle { position:relative; width:48px; height:28px; border-radius:9999px; background:#e5e7eb; cursor:pointer; }
+    .dot { position:absolute; top:3px; left:3px; width:22px; height:22px; background:#fff; border-radius:9999px; transition:left .18s; }
+    .toggle.active { background:#22c55e; }
+    .toggle.active .dot { left:23px; }
+    .sticky-actions { position: sticky; bottom: 0; background: rgba(255,255,255,0.9); backdrop-filter: blur(6px); padding-top: 12px; border-top: 1px solid #e5e7eb; }
+  </style>
+</head>
+<body>
+  <div class="min-h-screen p-6">
+    <div class="max-w-7xl mx-auto">
+      <!-- Header -->
+      <div class="flex items-center justify-between mb-6">
+        <div>
+          <h1 class="text-4xl font-extrabold text-white">Attendance</h1>
+          <p class="text-white/85">Check in members, track attendance, and export rosters</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="exportCsv" class="btn btn-ghost px-4 py-2"><i class="fa-solid fa-download"></i> Export CSV</button>
+          <button id="markAll" class="btn btn-primary px-4 py-2"><i class="fa-solid fa-user-check"></i> Check-in All</button>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Left: Controls + List -->
+        <div class="lg:col-span-2 card p-6">
+          <!-- Controls -->
+          <div class="row">
+            <div>
+              <label class="block text-sm font-semibold text-gray-700 mb-2">Class</label>
+              <select id="classSelect" class="select"></select>
+            </div>
+            <div class="row" style="grid-template-columns:1fr 1fr; gap:.75rem;">
+              <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-2">Date</label>
+                <input id="classDate" type="date" class="input"/>
+              </div>
+              <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-2">Session</label>
+                <select id="classSession" class="select">
+                  <option value="morning">Morning</option>
+                  <option value="afternoon">Afternoon</option>
+                  <option value="evening" selected>Evening</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Filters -->
+          <div class="mt-4 flex flex-wrap items-center gap-2">
+            <div class="relative">
+              <i class="fa-solid fa-magnifying-glass text-gray-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+              <input id="search" type="text" class="input pl-10" placeholder="Search by name or belt"/>
+            </div>
+            <button class="pill active" data-filter="all">All</button>
+            <button class="pill" data-filter="checked">Checked-in</button>
+            <button class="pill" data-filter="not">Not checked-in</button>
+            <button id="clearSearch" class="btn btn-ghost px-4 py-2"><i class="fa-solid fa-eraser"></i> Clear</button>
+            <div class="ml-auto flex items-center gap-3">
+              <span class="text-sm text-gray-600">Auto check-in on toggle</span>
+              <div id="autoCheck" class="toggle"><div class="dot"></div></div>
+            </div>
+          </div>
+
+          <!-- Roster -->
+          <div class="mt-6">
+            <div id="roster" class="space-y-3"></div>
+            <div id="emptyState" class="empty mt-4 hidden">
+              <i class="fa-regular fa-user text-xl mb-2"></i>
+              <p>No members found for this class.</p>
+            </div>
+          </div>
+
+          <!-- Sticky actions -->
+          <div class="sticky-actions mt-6">
+            <div class="flex items-center justify-between">
+              <div class="text-sm text-gray-600">
+                <span id="countChecked" class="font-bold text-gray-900">0</span> checked-in • 
+                <span id="countTotal" class="font-bold text-gray-900">0</span> total
+              </div>
+              <div class="flex items-center gap-2">
+                <button id="undoLast" class="btn btn-ghost px-4 py-2"><i class="fa-solid fa-rotate-left"></i> Undo</button>
+                <button id="saveSession" class="btn btn-secondary px-4 py-2"><i class="fa-solid fa-floppy-disk"></i> Save Session</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: Quick add + Activity -->
+        <div class="card p-6">
+          <h3 class="text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">
+            <i class="fa-solid fa-user-plus text-indigo-600"></i> Walk-in / Guest
+          </h3>
+          <form id="walkinForm" class="space-y-3 mb-6">
+            <input id="wName" type="text" class="input" placeholder="Full name"/>
+            <div class="row" style="grid-template-columns:1fr 1fr; gap:.75rem;">
+              <select id="wBelt" class="select">
+                <option value="white">White</option>
+                <option value="blue">Blue</option>
+                <option value="purple">Purple</option>
+                <option value="brown">Brown</option>
+                <option value="black">Black</option>
+              </select>
+              <select id="wType" class="select">
+                <option value="dropin">Drop-in</option>
+                <option value="trial">Trial</option>
+                <option value="guest">Guest</option>
+              </select>
+            </div>
+            <button type="submit" class="btn btn-primary w-full py-2"><i class="fa-solid fa-check"></i> Add & Check-in</button>
+          </form>
+
+          <h3 class="text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">
+            <i class="fa-solid fa-clock-rotate-left text-green-600"></i> Activity
+          </h3>
+          <div id="activity" class="space-y-3">
+            <!-- activity items -->
+          </div>
+          <div id="activityEmpty" class="empty mt-3">
+            <i class="fa-regular fa-bell text-xl mb-2"></i>
+            <p>No activity yet.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Toast -->
+      <div id="toast" class="hidden fixed bottom-4 right-4 bg-white rounded-xl shadow-xl border border-gray-200 px-4 py-3 z-50">
+        <div class="flex items-center gap-2 text-gray-800">
+          <i class="fa-solid fa-check-circle text-green-600"></i>
+          <span id="toastMsg">Saved</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Demo data
+    const classes = [
+      { id:1, name:'Fundamentals Gi', day:'Mon', start:'18:00' },
+      { id:2, name:'All Levels No-Gi', day:'Wed', start:'19:00' },
+      { id:3, name:'Advanced Gi', day:'Fri', start:'18:30' },
+    ];
+    let roster = [
+      { id:101, name:'John Doe', belt:'blue', checked:false },
+      { id:102, name:'Maria Santos', belt:'purple', checked:true },
+      { id:103, name:'Alex Chen', belt:'white', checked:false },
+      { id:104, name:'Priya Patel', belt:'blue', checked:false },
+      { id:105, name:'Liam O\'Brien', belt:'brown', checked:true },
+    ];
+    let lastActions = []; // stack for undo
+    let filter = 'all'; // all | checked | not
+    let autoCheck = false;
+
+    // Init
+    document.addEventListener('DOMContentLoaded', () => {
+      // Populate class selector
+      const cs = document.getElementById('classSelect');
+      cs.innerHTML = classes.map(c=> `<option value="${c.id}">${escapeHtml(c.name)} • ${c.day} ${toTime(c.start)}</option>`).join('');
+      document.getElementById('classDate').value = new Date().toISOString().split('T')[0];
+
+      // Filters
+      document.querySelectorAll('.pill').forEach(p=>{
+        p.addEventListener('click', ()=>{
+          document.querySelectorAll('.pill').forEach(x=>x.classList.remove('active'));
+          p.classList.add('active');
+          filter = p.dataset.filter;
+          renderRoster();
+        });
+      });
+      document.getElementById('search').addEventListener('input', renderRoster);
+      document.getElementById('clearSearch').addEventListener('click', ()=>{
+        document.getElementById('search').value='';
+        document.querySelector('[data-filter="all"]').click();
+        renderRoster();
+      });
+
+      // Toggles and actions
+      document.getElementById('autoCheck').addEventListener('click', function(){
+        this.classList.toggle('active');
+        autoCheck = this.classList.contains('active');
+        toast(autoCheck ? 'Auto check-in enabled' : 'Auto check-in disabled');
+      });
+
+      document.getElementById('markAll').addEventListener('click', ()=>{
+        roster.forEach(m => { if(!m.checked){ m.checked = true; pushAction({type:'check', id:m.id}); } });
+        renderRoster(true);
+        toast('All members checked-in.');
+      });
+
+      document.getElementById('exportCsv').addEventListener('click', exportCsv);
+      document.getElementById('saveSession').addEventListener('click', saveSession);
+      document.getElementById('undoLast').addEventListener('click', undo);
+
+      // Walk-in form
+      document.getElementById('walkinForm').addEventListener('submit', (e)=>{
+        e.preventDefault();
+        const name = document.getElementById('wName').value.trim();
+        const belt = document.getElementById('wBelt').value;
+        const type = document.getElementById('wType').value;
+        if(!name){ toast('Please enter a name.'); return; }
+        const id = Math.max(100, ...roster.map(m=>m.id)) + 1;
+        roster.unshift({ id, name, belt, checked:true });
+        pushActivity(`${escapeHtml(name)} (${beltLabel(belt)}) added as ${type} and checked-in.`);
+        pushAction({type:'add', id});
+        document.getElementById('walkinForm').reset();
+        renderRoster(true);
+        toast('Walk-in added and checked-in.');
+      });
+
+      // Class/session/date change (demo just resets activity)
+      document.getElementById('classSelect').addEventListener('change', resetSession);
+      document.getElementById('classDate').addEventListener('change', resetSession);
+      document.getElementById('classSession').addEventListener('change', resetSession);
+
+      renderRoster();
+      renderActivity();
+    });
+
+    function resetSession(){
+      // In a real app, you would fetch roster for this class/time/date
+      lastActions = [];
+      pushActivity('Session context changed.');
+      renderActivity();
+      toast('Session updated.');
+    }
+
+    function renderRoster(scrollTop){
+      const term = document.getElementById('search').value.toLowerCase();
+      const list = document.getElementById('roster');
+      list.innerHTML = '';
+
+      const filtered = roster.filter(m=>{
+        const tMatch = (m.name.toLowerCase().includes(term) || beltLabel(m.belt).toLowerCase().includes(term));
+        const fMatch = filter==='all' || (filter==='checked' && m.checked) || (filter==='not' && !m.checked);
+        return tMatch && fMatch;
+      });
+
+      document.getElementById('emptyState').classList.toggle('hidden', filtered.length>0);
+
+      filtered.forEach(m=>{
+        const row = document.createElement('div');
+        row.className = 'flex items-center justify-between border-2 border-gray-100 rounded-xl p-3';
+        row.innerHTML = `
+          <div class="flex items-center gap-3">
+            <div class="avatar">${initials(m.name)}</div>
+            <div>
+              <div class="font-semibold text-gray-900">${escapeHtml(m.name)}</div>
+              <div class="text-xs text-gray-600">${beltLabel(m.belt)}</div>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="badge ${m.checked?'badge-green':'badge-gray'}">${m.checked?'<i class="fa-solid fa-circle-check"></i> Checked-in':'Not checked-in'}</span>
+            <button class="btn btn-ghost px-3 py-2" data-toggle="${m.id}">
+              <i class="fa-solid ${m.checked?'fa-rotate-left':'fa-user-check'}"></i>
+              ${m.checked?'Undo':'Check-in'}
+            </button>
+            <button class="btn btn-ghost px-3 py-2" data-remove="${m.id}">
+              <i class="fa-solid fa-user-minus"></i>
+            </button>
+          </div>
+        `;
+        list.appendChild(row);
+      });
+
+      // Bind actions
+      list.querySelectorAll('[data-toggle]').forEach(b=>{
+        b.addEventListener('click', ()=>{
+          const id = parseInt(b.dataset.toggle,10);
+          toggleMember(id);
+        });
+      });
+      list.querySelectorAll('[data-remove]').forEach(b=>{
+        b.addEventListener('click', ()=>{
+          const id = parseInt(b.dataset.remove,10);
+          removeMember(id);
+        });
+      });
+
+      // Counts
+      document.getElementById('countTotal').textContent = roster.length;
+      document.getElementById('countChecked').textContent = roster.filter(m=>m.checked).length;
+
+      // Optional scroll to top for long lists
+      if(scrollTop){ window.scrollTo({ top: 0, behavior: 'smooth' }); }
+    }
+
+    function toggleMember(id){
+      const m = roster.find(x=>x.id===id);
+      if(!m) return;
+      m.checked = !m.checked;
+      pushAction({type: m.checked ? 'check' : 'uncheck', id});
+      pushActivity(`${escapeHtml(m.name)} ${m.checked?'checked-in':'unchecked'}.`);
+      renderRoster();
+      if(autoCheck){ toast(`${m.checked?'Checked-in':'Unchecked'} ${m.name}`); }
+    }
+
+    function removeMember(id){
+      const m = roster.find(x=>x.id===id);
+      if(!m) return;
+      if(!confirm(`Remove ${m.name} from this roster?`)) return;
+      roster = roster.filter(x=>x.id!==id);
+      pushAction({type:'remove', member:m});
+      pushActivity(`${escapeHtml(m.name)} removed from roster.`);
+      renderRoster();
+      toast('Member removed from this session.');
+    }
+
+    function beltLabel(b){
+      switch(b){
+        case 'white': return 'White Belt';
+        case 'blue': return 'Blue Belt';
+        case 'purple': return 'Purple Belt';
+        case 'brown': return 'Brown Belt';
+        case 'black': return 'Black Belt';
+        default: return 'Belt';
+      }
+    }
+
+    function initials(n){
+      const parts = String(n).trim().split(/\s+/);
+      return (parts[0]?.[0]||'') + (parts[1]?.[0]||'');
+    }
+
+    function exportCsv(){
+      if(roster.length===0){ toast('No data to export.'); return; }
+      const rows = [['Name','Belt','Checked In']].concat(
+        roster.map(m=>[m.name, beltLabel(m.belt), m.checked?'Yes':'No'])
+      );
+      const csv = rows.map(r=> r.map(cell=> `"${String(cell).replace(/"/g,'""')}"`).join(',')).join('\n');
+      const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const cls = classes.find(c=>c.id===parseInt(document.getElementById('classSelect').value,10));
+      const date = document.getElementById('classDate').value;
+      a.href = url; a.download = `${(cls?.name||'class').replace(/\s+/g,'_')}_${date}_attendance.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function saveSession(){
+      // Demo: just show a toast
+      pushActivity('Attendance session saved.');
+      renderActivity();
+      toast('Attendance saved!');
+    }
+
+    // Undo stack
+    function pushAction(action){ lastActions.push(action); }
+    function undo(){
+      const a = lastActions.pop();
+      if(!a){ toast('Nothing to undo.'); return; }
+      if(a.type==='check'){
+        const m = roster.find(x=>x.id===a.id); if(m){ m.checked=false; pushActivity(`${escapeHtml(m.name)} unchecked (undo).`); }
+      } else if(a.type==='uncheck'){
+        const m = roster.find(x=>x.id===a.id); if(m){ m.checked=true; pushActivity(`${escapeHtml(m.name)} checked-in (undo).`); }
+      } else if(a.type==='add'){
+        roster = roster.filter(x=>x.id!==a.id);
+        pushActivity(`Walk-in removed (undo).`);
+      } else if(a.type==='remove'){
+        roster.unshift(a.member);
+        pushActivity(`${escapeHtml(a.member.name)} restored to roster (undo).`);
+      }
+      renderRoster();
+      renderActivity();
+    }
+
+    // Activity feed
+    let activity = [];
+    function pushActivity(text){
+      activity.unshift({ text, ts: new Date().toLocaleString() });
+      renderActivity();
+    }
+    function renderActivity(){
+      const wrap = document.getElementById('activity');
+      const empty = document.getElementById('activityEmpty');
+      wrap.innerHTML = '';
+      empty.classList.toggle('hidden', activity.length>0);
+      activity.slice(0, 10).forEach(item=>{
+        const row = document.createElement('div');
+        row.className = 'flex items-start gap-3 border-2 border-gray-100 rounded-xl p-3';
+        row.innerHTML = `
+          <div class="w-8 h-8 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600">
+            <i class="fa-solid fa-bolt"></i>
+          </div>
+          <div>
+            <div class="text-sm text-gray-900">${item.text}</div>
+            <div class="text-xs text-gray-500">${item.ts}</div>
+          </div>
+        `;
+        wrap.appendChild(row);
+      });
+    }
+
+    // Helpers
+    function toTime(t){
+      const [h,m]=t.split(':').map(x=>parseInt(x,10));
+      const ampm = h>=12?'PM':'AM';
+      const hh = ((h+11)%12+1);
+      return `${hh}:${String(m).padStart(2,'0')} ${ampm}`;
+    }
+    function toast(msg){
+      const t = document.getElementById('toast');
+      document.getElementById('toastMsg').textContent = msg;
+      t.classList.remove('hidden');
+      setTimeout(()=> t.classList.add('hidden'), 2200);
+    }
+    function escapeHtml(str){ return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9716e1ade02ce8fb',t:'MTc1NTU3NzQ2OS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>

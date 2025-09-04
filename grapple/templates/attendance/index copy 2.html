@@ -1,0 +1,293 @@
+{% extends "base.html" %}
+
+{% block title %}Attendance{% endblock %}
+
+{% block extra_head %}
+<style>
+  /* Custom styles to replicate Tailwind look and feel not covered by Bootstrap */
+  .card {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 16px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, .12);
+  }
+
+  .form-control, .form-select {
+    border: 2px solid #e5e7eb;
+    border-radius: 10px;
+    padding: 12px 14px;
+    background: #fff;
+    transition: box-shadow .2s, border-color .2s;
+  }
+  .form-control:focus, .form-select:focus {
+    outline: none;
+    border-color: #6366f1;
+    box-shadow: 0 0 0 4px rgba(99, 102, 241, .15);
+  }
+  .btn-primary-custom {
+    background: linear-gradient(135deg, #22c55e, #16a34a);
+    color: #fff;
+    border: none;
+  }
+  .btn-primary-custom:hover {
+    color: #fff;
+    transform: translateY(1px);
+    box-shadow: none;
+  }
+  .btn-secondary-custom {
+    background-color: #111827;
+    color: #fff;
+    border: none;
+  }
+  .btn-secondary-custom:hover {
+    color: #fff;
+  }
+  .btn-outline-custom {
+    background: transparent;
+    color: #111827;
+    border: 2px solid #e5e7eb;
+  }
+  .btn-outline-custom:hover {
+    background-color: #f8f9fa;
+  }
+  .badge-green-custom {
+    background-color: #d1fae5;
+    color: #065f46;
+  }
+  .badge-gray-custom {
+    background-color: #f3f4f6;
+    color: #374151;
+  }
+  .badge-amber-custom {
+    background-color: #fef3c7;
+    color: #92400e;
+  }
+  .avatar-custom {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: #e5e7eb;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    color: #374151;
+  }
+  .empty-state {
+    border: 2px dashed #e5e7eb;
+    border-radius: 12px;
+    padding: 24px;
+    text-align: center;
+    color: #6b7280;
+  }
+  .pill {
+    border: 2px solid #e5e7eb;
+    border-radius: 50rem;
+    padding: .35rem .8rem;
+    cursor: pointer;
+    font-weight: 600;
+    color: #374151;
+  }
+  .pill.active {
+    background: #111827;
+    color: #fff;
+    border-color: #111827;
+  }
+  .toggle {
+    position: relative;
+    width: 48px;
+    height: 28px;
+    border-radius: 50rem;
+    background: #e5e7eb;
+    cursor: pointer;
+  }
+  .dot {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 22px;
+    height: 22px;
+    background: #fff;
+    border-radius: 50%;
+    transition: left .18s;
+  }
+  .toggle.active {
+    background: #22c55e;
+  }
+  .toggle.active .dot {
+    left: 23px;
+  }
+  .sticky-actions {
+    position: sticky;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(6px);
+    padding-top: 12px;
+    border-top: 1px solid #e5e7eb;
+  }
+
+  body {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+  }
+  .text-white-85 {
+    color: rgba(255, 255, 255, 0.85);
+  }
+</style>
+{% endblock %}
+
+{% block header_title %}Attendance{% endblock %}
+
+{% block content %}
+<div class="min-vh-100 p-4">
+  <div class="row">
+    <div class="col-lg-8 mb-4">
+      <div class="card p-4">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label fw-semibold text-gray-700 mb-2">Class</label>
+            <select id="classSelect" class="form-select">
+                <option value="{{ class_sessions.id }}">{{ class_sessions.title }}</option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <div class="row g-2">
+              <div class="col-6">
+                <label class="form-label fw-semibold text-gray-700 mb-2">Date</label>
+
+                
+              </div>
+              <div class="col-6">
+                <label class="form-label fw-semibold text-gray-700 mb-2">Session</label>
+                
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-4 d-flex flex-wrap align-items-center gap-2">
+          <form method="GET" action="{{ url_for('attendance.record', class_id=class_sessions.class_schedule_id) }}" class="d-flex flex-grow-1">
+            <div class="position-relative me-2 flex-grow-1">
+              <i class="fas fa-magnifying-glass text-gray-400 position-absolute start-0 ms-3 top-50 translate-middle-y"></i>
+              <input name="search" type="text" class="form-control ps-5" placeholder="Search by name or belt" value="{{ request.args.get('search', '') }}"/>
+            </div>
+            <button type="submit" class="btn btn-primary-custom">Search</button>
+          </form>
+          <a href="{{ url_for('attendance.record', class_id=class_sessions.id, filter='all') }}" class="pill {% if not request.args.get('filter') or request.args.get('filter') == 'all' %}active{% endif %}">All</a>
+          <a href="{{ url_for('attendance.record', class_id=class_sessions.id, filter='checked') }}" class="pill {% if request.args.get('filter') == 'checked' %}active{% endif %}">Checked-in</a>
+          <a href="{{ url_for('attendance.record', class_id=class_sessions.id, filter='not') }}" class="pill {% if request.args.get('filter') == 'not' %}active{% endif %}">Not checked-in</a>
+          <a href="{{ url_for('attendance.record', class_id=class_sessions.id) }}" class="btn btn-outline-custom px-3 py-2"><i class="fas fa-eraser"></i> Clear</a>
+        </div>
+
+        <div class="mt-4">
+          <div id="roster" class="list-group">
+            {% if members_to_display %}
+                {% for member in members_to_display %}
+                    <div class="d-flex align-items-center justify-content-between border border-1 border-gray-100 rounded-3 p-3 mb-2">
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="avatar-custom">{{ member.initials() }}</div>
+                            <div>
+                                <div class="fw-semibold text-gray-900">{{ member.full_name() }}</div>
+                                <div class="text-xs text-muted">{{ member.belt() }}</div>
+                            </div>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            {% set is_checked_in = member.id in present_members_ids %}
+                            <span class="badge {{ 'badge-green-custom' if is_checked_in else 'badge-gray-custom' }}">
+                                <i class="fas {{ 'fa-circle-check' if is_checked_in else 'fa-circle' }}"></i>
+                                {{ 'Checked-in' if is_checked_in else 'Not checked-in' }}
+                            </span>
+                            <form action="{{ url_for('attendance.toggle_attendance', class_id=class_sessions.id, member_id=member.id) }}" method="POST" class="d-inline">
+                                <button type="submit" class="btn btn-outline-custom px-3 py-2">
+                                    <i class="fas {{ 'fa-rotate-left' if is_checked_in else 'fa-user-check' }}"></i>
+                                    {{ 'Undo' if is_checked_in else 'Check-in' }}
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% else %}
+              <div id="emptyState" class="empty-state mt-4">
+                <i class="fas fa-user-circle fs-3 mb-2"></i>
+                <p>No members found for this class.</p>
+              </div>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="sticky-actions mt-4">
+          <div class="d-flex align-items-center justify-content-between">
+            <div class="text-sm text-gray-600">
+              <span id="countChecked" class="fw-bold text-gray-900">{{ present_members_count }}</span> checked-in •
+              <span id="countTotal" class="fw-bold text-gray-900">{{ members_count }}</span> total
+            </div>
+            <div class="d-flex align-items-center gap-2">
+              <a href="{{ url_for('attendance.export_csv', class_id=class_sessions.id) }}" class="btn btn-outline-custom px-3 py-2"><i class="fas fa-download"></i> Export CSV</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-4">
+      <div class="card p-4">
+        <h3 class="h5 fw-bold text-gray-900 mb-3 d-flex align-items-center gap-2">
+          <i class="fas fa-user-plus text-primary"></i> Walk-in / Guest
+        </h3>
+        <form method="POST" action="{{ url_for('attendance.add_walkin', class_id=class_sessions.id) }}">
+          {{ form.hidden_tag() }}
+          <div class="mb-3">
+              {{ form.name(class="form-control", placeholder="Full name") }}
+          </div>
+          <div class="row g-2 mb-3">
+              <div class="col-6">
+                  {{ form.belt(class="form-select") }}
+              </div>
+              <div class="col-6">
+                  {{ form.type(class="form-select") }}
+              </div>
+          </div>
+          <button type="submit" class="btn btn-primary-custom w-100 py-2"><i class="fas fa-check"></i> Add & Check-in</button>
+        </form>
+
+        <h3 class="h5 fw-bold text-gray-900 mb-3 d-flex align-items-center gap-2">
+          <i class="fas fa-clock-rotate-left text-success"></i> Activity
+        </h3>
+        <div id="activity" class="space-y-3">
+          {% if activity_log %}
+            {% for item in activity_log %}
+              <div class="d-flex align-items-start gap-3 border border-1 border-gray-100 rounded-3 p-3 mb-2">
+                  <div class="d-flex align-items-center justify-content-center bg-info bg-opacity-10 text-info rounded-circle" style="width: 32px; height: 32px;">
+                      <i class="fas fa-bolt"></i>
+                  </div>
+                  <div>
+                      <div class="text-sm text-gray-900">{{ item.text }}</div>
+                      <div class="text-xs text-muted">{{ item.timestamp.strftime('%B %d, %Y, %I:%M %p') }}</div>
+                  </div>
+              </div>
+            {% endfor %}
+          {% else %}
+            <div id="activityEmpty" class="empty-state mt-3">
+              <i class="fas fa-bell fs-3 mb-2"></i>
+              <p>No activity yet.</p>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  // Custom JavaScript for attendance page
+  document.addEventListener('DOMContentLoaded', function() {
+    // Example: Initialize tooltips
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+    const tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+      return new bootstrap.Tooltip(tooltipTriggerEl)
+    })
+  });
+</script>
+{% endblock %}
