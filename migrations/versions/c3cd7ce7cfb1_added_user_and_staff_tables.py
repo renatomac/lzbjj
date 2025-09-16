@@ -1,8 +1,8 @@
 """Added User and Staff tables
 
-Revision ID: b7e733b61dab
+Revision ID: c3cd7ce7cfb1
 Revises: 
-Create Date: 2025-08-31 15:32:40.935334
+Create Date: 2025-09-12 08:05:50.840108
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = 'b7e733b61dab'
+revision = 'c3cd7ce7cfb1'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -28,7 +28,10 @@ def upgrade():
     op.create_table('membership_types',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('name', sa.String(length=100), nullable=False),
-    sa.Column('price', sa.Numeric(precision=10, scale=2), nullable=False),
+    sa.Column('description', sa.Text(), nullable=False),
+    sa.Column('enroll_price', sa.Numeric(precision=10, scale=2), nullable=False),
+    sa.Column('membership_price', sa.Numeric(precision=10, scale=2), nullable=False),
+    sa.Column('duration_months', sa.Integer(), nullable=False),
     sa.Column('created_at', sa.DateTime(), nullable=True),
     sa.PrimaryKeyConstraint('id')
     )
@@ -57,11 +60,11 @@ def upgrade():
     sa.Column('last_name', sa.String(length=64), nullable=False),
     sa.Column('email', sa.String(length=120), nullable=False),
     sa.Column('phone', sa.String(length=20), nullable=True),
-    sa.Column('gender', sa.String(length=20), nullable=True),
     sa.Column('address', sa.String(length=255), nullable=True),
     sa.Column('city', sa.String(length=64), nullable=True),
     sa.Column('state', sa.String(length=64), nullable=True),
     sa.Column('zip_code', sa.String(length=10), nullable=True),
+    sa.Column('gender', sa.String(length=20), nullable=True),
     sa.Column('date_of_birth', sa.Date(), nullable=True),
     sa.Column('join_date', sa.Date(), nullable=True),
     sa.Column('is_active', sa.Boolean(), nullable=True),
@@ -69,6 +72,15 @@ def upgrade():
     sa.Column('stripes', sa.Integer(), nullable=True),
     sa.Column('notes', sa.Text(), nullable=True),
     sa.Column('photo', sa.String(length=200), nullable=True),
+    sa.Column('responsible_first_name', sa.String(length=64), nullable=True),
+    sa.Column('responsible_last_name', sa.String(length=64), nullable=True),
+    sa.Column('responsible_email', sa.String(length=120), nullable=True),
+    sa.Column('responsible_phone', sa.String(length=20), nullable=True),
+    sa.Column('responsible_address', sa.String(length=255), nullable=True),
+    sa.Column('responsible_city', sa.String(length=64), nullable=True),
+    sa.Column('responsible_state', sa.String(length=64), nullable=True),
+    sa.Column('responsible_zip_code', sa.String(length=10), nullable=True),
+    sa.Column('responsible_relationship', sa.String(length=50), nullable=True),
     sa.Column('emergency_contact_name', sa.String(length=100), nullable=True),
     sa.Column('emergency_contact_phone', sa.String(length=20), nullable=True),
     sa.Column('emergency_contact_relationship', sa.String(length=50), nullable=True),
@@ -164,6 +176,7 @@ def upgrade():
     sa.Column('class_schedule_id', sa.Integer(), nullable=False),
     sa.Column('instructor_id', sa.Integer(), nullable=False),
     sa.Column('session_date', sa.Date(), nullable=False),
+    sa.Column('session_time', sa.DateTime(), nullable=True),
     sa.Column('created_at', sa.DateTime(), nullable=True),
     sa.ForeignKeyConstraint(['class_schedule_id'], ['class_schedule.id'], ),
     sa.ForeignKeyConstraint(['instructor_id'], ['staff.id'], ),
@@ -174,6 +187,7 @@ def upgrade():
     sa.Column('member_id', sa.Integer(), nullable=False),
     sa.Column('class_session_id', sa.Integer(), nullable=False),
     sa.Column('date', sa.Date(), nullable=True),
+    sa.Column('timestamp', sa.DateTime(), nullable=True),
     sa.Column('created_at', sa.DateTime(), nullable=True),
     sa.ForeignKeyConstraint(['class_session_id'], ['class_session.id'], ),
     sa.ForeignKeyConstraint(['member_id'], ['members.id'], ),

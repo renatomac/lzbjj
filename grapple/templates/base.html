@@ -79,8 +79,9 @@
                     </div>
                     <h1 class="h5 mb-0 fw-bold">Lake Zurich BJJ CRM</h1>
                 </div>
-                <button id="close-sidebar" class="btn d-md-none text-white">
+                <button id="close-sidebar" class="btn d-md-none text-white" title="Close sidebar">
                     <i class="fa-solid fa-xmark"></i>
+                    <span class="visually-hidden">Close Sidebar</span>
                 </button>
             </div>
             
@@ -156,8 +157,9 @@
             <header class="bg-white shadow-sm z-10">
                 <div class="d-flex align-items-center justify-content-between p-4">
                     <div class="d-flex align-items-center">
-                        <button id="menu-toggle" class="btn d-md-none me-3">
-                             <i class="fa-solid fa-bars"></i>
+                        <button id="menu-toggle" class="btn d-md-none me-3" title="Open sidebar">
+                            <i class="fa-solid fa-bars"></i>
+                            <span class="visually-hidden">Open sidebar</span>
                         </button>
                         <h2 class="h5 mb-0 fw-semibold text-gray-800">{% block header_title %}{% endblock %}</h2>
                     </div>

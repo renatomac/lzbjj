@@ -1,0 +1,390 @@
+{% extends "base.html" %}
+{% from "_macros.html" import belt_badge %}
+
+{% block title %}Member Profile{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header Section -->
+    <div class="card bg-white shadow-sm mb-4">
+        <div class="card-body d-flex justify-content-between align-items-center">
+            <div class="d-flex align-items-center">
+                <div class="avatar-lg me-3">
+                    {{ member.first_name[0] }}{{ member.last_name[0] }}
+                </div>
+                <div>
+                    <h1 class="h2 mb-1">{{ member.full_name() }}</h1>
+                    {% if member.nickname %}
+                    <p class="text-muted mb-0">"{{ member.nickname }}"</p>
+                    {% endif %}
+                    <div class="mt-2">
+                        {{ belt_badge(member.belt_rank, member.stripes) }}
+                        <span class="badge bg-{{ 'success' if member.is_active else 'secondary' }} ms-2">
+                            {{ 'Active' if member.is_active else 'Inactive' }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="btn-group">
+                <a href="{{ url_for('members.edit', member_id=member.id) }}"
+                   class="btn btn-primary">
+                    <i class="fas fa-edit me-2"></i>Edit
+                </a>
+                <button type="button" class="btn btn-outline-danger"
+                        onclick="showModal('confirmDeactivateModal', '{{ member.id }}')">
+                    <i class="fas fa-user-slash me-2"></i>Deactivate
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content Tabs -->
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white border-bottom">
+                    <ul class="nav nav-tabs card-header-tabs" id="memberTabs" role="tablist">
+                        <li class="nav-item">
+                            <a class="nav-link active" id="details-tab" data-bs-toggle="tab" href="#details" role="tab">Details</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" id="billing-tab" data-bs-toggle="tab" href="#billing" role="tab">Billing</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" id="promotions-tab" data-bs-toggle="tab" href="#promotions" role="tab">Promotions</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" id="classes-tab" data-bs-toggle="tab" href="#classes" role="tab">Classes</a>
+                        </li>
+                    </ul>
+                </div>
+                <div class="card-body">
+                    <div class="tab-content" id="memberTabsContent">
+                        <!-- Details Tab -->
+                        <div class="tab-pane fade show active" id="details" role="tabpanel">
+                            <h5 class="mb-3">Personal Information</h5>
+                            <dl class="row">
+                                <dt class="col-sm-3 text-muted">Full Name</dt>
+                                <dd class="col-sm-9">{{ member.full_name() }}</dd>
+
+                                <dt class="col-sm-3 text-muted">Gender</dt>
+                                <dd class="col-sm-9">{{ member.gender.title() if member.gender }}</dd>
+
+                                <dt class="col-sm-3 text-muted">Date of Birth</dt>
+                                <dd class="col-sm-9">{{ member.date_of_birth.strftime('%B %d, %Y') if member.date_of_birth }}</dd>
+                            </dl>
+
+                            <h5 class="mt-4 mb-3">Contact Information</h5>
+                            <dl class="row">
+                                <dt class="col-sm-3 text-muted">Email</dt>
+                                <dd class="col-sm-9">{{ member.email }}</dd>
+
+                                <dt class="col-sm-3 text-muted">Phone</dt>
+                                <dd class="col-sm-9">{{ member.phone }}</dd>
+
+                                <dt class="col-sm-3 text-muted">Address</dt>
+                                <dd class="col-sm-9">
+                                    {{ member.address }}<br>
+                                    {{ member.city }}, {{ member.state }} {{ member.zip_code }}
+                                </dd>
+                            </dl>
+                        </div>
+
+                        <!-- Membership & Billing Tab -->
+                        <div class="tab-pane fade" id="billing" role="tabpanel">
+                            <h5 class="mb-3">Memberships</h5>
+                            {% if memberships %}
+                                <div class="table-responsive">
+                                    <table class="table table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>Plan</th>
+                                                <th>Start Date</th>
+                                                <th>End Date</th>
+                                                <th>Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for m in memberships %}
+                                                <tr>
+                                                    <td>{{ m.membership_plan.name }}</td>
+                                                    <td>{{ m.start_date.strftime('%Y-%m-%d') }}</td>
+                                                    <td>{{ m.end_date.strftime('%Y-%m-%d') if m.end_date else 'N/A' }}</td>
+                                                    <td><span class="badge bg-{{ 'success' if m.payment_status == 'active' else 'warning' }}">{{ m.payment_status.title() }}</span></td>
+                                                </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            {% else %}
+                                <p class="text-muted">No memberships found for this member.</p>
+                            {% endif %}
+
+                            <h5 class="mt-4 mb-3">Recent Payments</h5>
+                            {% if payments %}
+                                <div class="table-responsive">
+                                    <table class="table table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>Date</th>
+                                                <th>Amount</th>
+                                                <th>Method</th>
+                                                <th>Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for p in payments %}
+                                                <tr>
+                                                    <td>{{ p.payment_date.strftime('%Y-%m-%d') }}</td>
+                                                    <td>${{ p.amount|round(2) }}</td>
+                                                    <td>{{ p.payment_method.title() }}</td>
+                                                    <td><span class="badge bg-{{ 'success' if p.status == 'paid' else 'warning' }}">{{ p.status.title() }}</span></td>
+                                                </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            {% else %}
+                                <p class="text-muted">No payments found for this member.</p>
+                            {% endif %}
+                        </div>
+
+                        <!-- Promotions Tab -->
+                        <div class="tab-pane fade" id="promotions" role="tabpanel">
+                            <h5 class="mb-3">Belt Promotions</h5>
+                            {% if promotions %}
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>New Belt</th>
+                                            <th>Stripes</th>
+                                            <th>Instructor</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for p in promotions %}
+                                        <tr>
+                                            <td>{{ p.promotion_date.strftime('%Y-%m-%d') }}</td>
+                                            <td>{{ p.new_belt.title() }}</td>
+                                            <td>{{ p.new_stripes }}</td>
+                                            <td>{{ p.instructor.first_name }} {{ p.instructor.last_name }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% else %}
+                            <p class="text-muted">No promotions recorded for this member.</p>
+                            {% endif %}
+                        </div>
+
+                        <!-- Classes Tab -->
+                        <div class="tab-pane fade" id="classes" role="tabpanel">
+                            <h5 class="mb-3">Class Attendance</h5>
+                            {% if attendance %}
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Class Type</th>
+                                            <th>Instructor</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for a in attendance %}
+                                        <tr>
+                                            <td>{{ a.class_session.date.strftime('%Y-%m-%d') }}</td>
+                                            <td>{{ a.class_session.class_type.name }}</td>
+                                            <td>{{ a.class_session.instructor.full_name() }}</td>
+                                            <td><span class="badge bg-{{ 'success' if a.attendance_status == 'present' else 'warning' }}">{{ a.attendance_status.title() }}</span></td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% else %}
+                            <p class="text-muted">No class attendance recorded for this member.</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <h5 class="card-title">Activity Timeline</h5>
+                    <div class="activity-timeline">
+                        {% if promotions %}
+                            {% for p in promotions %}
+                                <div class="timeline-item">
+                                    <div class="timeline-badge">
+                                        <i class="fas fa-medal text-success"></i>
+                                    </div>
+                                    <div class="timeline-content">
+                                        <p class="mb-0">Promoted to {{ p.new_belt.title() }} belt</p>
+                                        <span class="timeline-date">{{ p.promotion_date.strftime('%b %d, %Y') }}</span>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        {% else %}
+                            <p class="text-muted">No promotions recorded yet.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Custom Modal for Confirmation -->
+<div class="modal fade" id="confirmDeactivateModal" tabindex="-1" aria-labelledby="confirmDeactivateModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="confirmDeactivateModalLabel">Confirm Deactivation</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        Are you sure you want to deactivate this member? This action can be reversed later.
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-danger" id="deactivateMemberBtn">Deactivate</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+    /* Custom CSS from original detail.html */
+    .avatar-lg {
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        background-color: #e2e8f0;
+        color: #4a5568;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2rem;
+        font-weight: 600;
+    }
+    .card-body {
+        padding: 1.5rem;
+    }
+    .badge {
+        font-size: 0.85em;
+        font-weight: 600;
+        padding: 0.4em 0.8em;
+    }
+    .btn-group .btn {
+        border-radius: 0.5rem;
+    }
+    .btn-group .btn:not(:first-child) {
+        border-top-left-radius: 0;
+        border-bottom-left-radius: 0;
+    }
+    .btn-group .btn:not(:last-child) {
+        border-top-right-radius: 0;
+        border-bottom-right-radius: 0;
+    }
+    .nav-tabs .nav-link {
+        font-weight: 500;
+        color: #6c757d;
+        transition: color 0.15s ease-in-out, border-color 0.15s ease-in-out;
+    }
+    .nav-tabs .nav-link.active {
+        color: #0d6efd;
+        border-color: #dee2e6 #dee2e6 #fff;
+    }
+    .activity-timeline {
+        position: relative;
+        padding-left: 2rem;
+        margin-left: 1rem;
+    }
+    .activity-timeline::before {
+        content: '';
+        position: absolute;
+        left: -18px;
+        top: 12px;
+        bottom: 0;
+        width: 2px;
+        background: #dee2e6;
+    }
+    .timeline-item {
+        position: relative;
+        margin-bottom: 1.5rem;
+    }
+    .timeline-badge {
+        position: absolute;
+        left: -32px;
+        top: 0;
+        width: 32px;
+        height: 32px;
+        background: #fff;
+        border: 2px solid #fff;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1rem;
+    }
+    .timeline-content {
+        background: #f8f9fa;
+        padding: 0.75rem 1rem;
+        border-radius: 0.5rem;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    }
+    .timeline-date {
+        font-size: 0.75rem;
+        color: #6c757d;
+    }
+    .belt-white { background: #e2e8f0; color: #1a202c; }
+    .belt-blue { background: #3b82f6; color: #fff; }
+    .belt-purple { background: #9333ea; color: #fff; }
+    .belt-brown { background: #a0522d; color: #fff; }
+    .belt-black { background: #1a202c; color: #fff; }
+</style>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // Custom modal handling
+    let memberIdToDeactivate = null;
+
+    function showModal(modalId, memberId) {
+        memberIdToDeactivate = memberId;
+        var myModal = new bootstrap.Modal(document.getElementById(modalId));
+        myModal.show();
+    }
+
+    document.getElementById('deactivateMemberBtn').addEventListener('click', function() {
+        if (memberIdToDeactivate) {
+            fetch(`/members/${memberIdToDeactivate}/toggle_status`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    // CSRF token would be needed here in a real application
+                },
+            })
+            .then(response => {
+                if (response.ok) {
+                    // Refresh the page or update the UI
+                    window.location.reload();
+                } else {
+                    alert('Error toggling member status.');
+                }
+            })
+            .catch(error => console.error('Error:', error));
+        }
+    });
+
+</script>
+{% endblock %}

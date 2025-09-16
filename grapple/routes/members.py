@@ -9,6 +9,7 @@ from grapple.forms import MemberForm, PaymentForm, BeltPromotionForm
 
 members_bp = Blueprint('members', __name__, url_prefix='/members')
 
+
 @members_bp.route('/')
 @login_required
 def index():
@@ -57,12 +58,12 @@ def add():
             photo=form.photo.data,
             
             notes=form.notes.data,
-
-            responsible_name=form.responsible_name.data,
+            responsible_first_name=form.responsible_first_name.data,
+            responsible_last_name=form.responsible_last_name.data,
             responsible_phone=form.responsible_phone.data,
             responsible_relationship=form.responsible_relationship.data,
             responsible_email=form.responsible_email.data,
-            reponsible_address=form.responsible_address.data,
+            responsible_address=form.responsible_address.data,
             responsible_city=form.responsible_city.data,
             responsible_state=form.responsible_state.data,
             responsible_zip_code=form.responsible_zip_code.data,
@@ -94,6 +95,8 @@ def add():
                 flash(f'Error in {getattr(form, field).label.text}: {error}', 'danger')
     return render_template('members/add.html', title='Add New Member', form=form)
 
+
+'''
 @members_bp.route('/<int:member_id>/edit', methods=['GET', 'POST'])
 @login_required
 def edit(member_id):
@@ -101,16 +104,11 @@ def edit(member_id):
     Edits an existing member.
     """
     member = Member.query.get_or_404(member_id)
-    form = MemberForm(obj=member, original_email=member.email)
     
+    form = MemberForm(obj=member)
     if form.validate_on_submit():
         form.populate_obj(member)
-        
-        if form.membership_plan.data:
-            member.membership_plan_id = form.membership_plan.data.id
-        else:
-            member.membership_plan_id = None
-            
+     
         try:
             db.session.commit()
             flash('Member has been updated successfully.', 'success')
@@ -122,8 +120,44 @@ def edit(member_id):
             for field, errors in form.errors.items():
                 for error in errors:
                     flash(f'Error in {getattr(form, field).label.text}: {error}', 'danger') 
+                    
+    # Manually populate the membership plan field
+    if member.membership_plan_id:
+        form.membership_plan.data = MembershipPlan.query.get(member.membership_plan_id)
+    flash(MembershipPlan.query.get(member.membership_plan_id))
     return render_template('members/edit.html', title='Edit Member', form=form, member=member)
+'''
 
+@members_bp.route('/<int:member_id>/edit', methods=['GET', 'POST'])
+@login_required
+def edit(member_id):
+    member = Member.query.get_or_404(member_id)
+    form = MemberForm(obj=member)
+
+    # Manually set the choices for the membership plan dropdown
+    # The value is the plan ID, and the label is the plan name.
+    form.membership_plan.choices = [(p.id, p.name) for p in MembershipPlan.query.all()]
+    form.membership_plan.choices.insert(0, (0, '-- Select a Plan --'))
+
+    if form.validate_on_submit():
+        form.populate_obj(member)
+        # Explicitly set the foreign key from the form data
+        member.membership_plan_id = form.membership_plan.data if form.membership_plan.data != 0 else None
+
+        try:
+            db.session.commit()
+            flash('Member updated successfully.', 'success')
+            return redirect(url_for('members.view_member', member_id=member.id))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'An error occurred: {str(e)}', 'danger')
+            return redirect(url_for('members.edit', member_id=member.id))
+
+    # On a GET request, set the initial value of the form field
+    if request.method == 'GET':
+        form.membership_plan.data = member.membership_plan_id if member.membership_plan_id else 0
+
+    return render_template('members/edit.html', title='Edit Member', form=form, member=member)
 
 @members_bp.route('/<int:member_id>/delete', methods=['POST'])
 @login_required
@@ -156,7 +190,7 @@ def view(member_id):
         title=f'Member: {member.full_name()}', 
         member=member, 
         payments=payments,
-        form=form
+        form=form,      
     )
     
 @members_bp.route('/<int:member_id>/add_payment', methods=['POST'])

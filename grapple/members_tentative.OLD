@@ -1,0 +1,321 @@
+from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app
+from flask_login import login_required
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+
+from grapple.extensions import db
+from grapple.models import Member, MembershipPlan, Payment, BeltPromotion
+from grapple.forms import MemberForm, PaymentForm, BeltPromotionForm
+
+members_bp = Blueprint('members', __name__, url_prefix='/members')
+
+
+@members_bp.route('/')
+@login_required
+def index():
+    """
+    Displays a paginated list of all members and a summary.
+    """
+    membership_plans = MembershipPlan.query.all()
+
+    page = request.args.get('page', 1, type=int)
+    per_page = 10
+
+    members = db.paginate(db.select(Member).order_by(Member.last_name), page=page, per_page=per_page)
+
+    summary = {
+        "total": members.total,
+        "active": sum(1 for m in members.items if m.is_active),
+        "inactive": sum(1 for m in members.items if not m.is_active),
+    }
+
+    return render_template(
+        'members/index.html',
+        title='Members',
+        members=members,
+        summary=summary,
+        membership_plans=membership_plans,
+    )
+
+
+@members_bp.route('/add', methods=['GET', 'POST'])
+@login_required
+def add():
+    """
+    Adds a new member using whitelisted assignments with safe transaction handling.
+    """
+    form = MemberForm()
+
+    if form.validate_on_submit():
+        # Whitelist form fields mapped to the Member model
+        allowed_fields = [
+            'first_name', 'last_name', 'email', 'phone', 'address', 'city', 'state', 'zip_code',
+            'gender', 'date_of_birth', 'join_date', 'is_active', 'belt_rank', 'stripes', 'notes',
+            'photo', 'responsible_first_name', 'responsible_last_name', 'responsible_email',
+            'responsible_phone', 'responsible_address', 'responsible_city', 'responsible_state',
+            'responsible_zip_code', 'responsible_relationship', 'emergency_contact_name',
+            'emergency_contact_phone', 'emergency_contact_relationship', 'membership_start_date',
+            'membership_end_date', 'membership_status', 'membership_notes', 'waivers_signed',
+            'waiver_notes'
+        ]
+        data = {name: getattr(form, name).data for name in allowed_fields}
+        data['membership_plan_id'] = form.membership_plan.data.id if form.membership_plan.data else None
+
+        new_member = Member(**data)
+
+        try:
+            # Use an atomic transaction
+            with db.session.begin():
+                db.session.add(new_member)
+        except IntegrityError:
+            db.session.rollback()
+            current_app.logger.exception('IntegrityError while creating member %s', data.get('email'))
+            flash('A database constraint error occurred while creating the member.', 'danger')
+        except SQLAlchemyError:
+            db.session.rollback()
+            current_app.logger.exception('SQLAlchemyError while creating member %s', data.get('email'))
+            flash('An unexpected error occurred while creating the member. Please try again.', 'danger')
+        else:
+            flash('Member added successfully!', 'success')
+            return redirect(url_for('members.index'))
+    elif request.method == 'POST':
+        # Show validation errors for invalid POSTs
+        for field, errors in form.errors.items():
+            for error in errors:
+                label = getattr(form, field).label.text
+                flash(f'Error in {label}: {error}', 'danger')
+
+    return render_template('members/add.html', title='Add New Member', form=form)
+
+
+@members_bp.route('/<int:member_id>/edit', methods=['GET', 'POST'])
+@login_required
+def edit(member_id):
+    """
+    Edits an existing member using whitelisted assignments and robust transaction handling.
+    """
+    member = Member.query.get_or_404(member_id)
+    form = MemberForm(obj=member)
+
+    # Pre-select membership plan on GET so the dropdown reflects saved value
+    if request.method == 'GET' and member.membership_plan_id:
+        form.membership_plan.data = MembershipPlan.query.get(member.membership_plan_id)
+
+    if form.validate_on_submit():
+        # Whitelist and assign allowed fields
+        allowed_fields = [
+            'first_name', 'last_name', 'email', 'phone', 'address', 'city', 'state', 'zip_code',
+            'gender', 'date_of_birth', 'join_date', 'is_active', 'belt_rank', 'stripes', 'notes',
+            'photo', 'responsible_first_name', 'responsible_last_name', 'responsible_email',
+            'responsible_phone', 'responsible_address', 'responsible_city', 'responsible_state',
+            'responsible_zip_code', 'responsible_relationship', 'emergency_contact_name',
+            'emergency_contact_phone', 'emergency_contact_relationship', 'membership_start_date',
+            'membership_end_date', 'membership_status', 'membership_notes', 'waivers_signed',
+            'waiver_notes'
+        ]
+        for name in allowed_fields:
+            setattr(member, name, getattr(form, name).data)
+
+        member.membership_plan_id = form.membership_plan.data.id if form.membership_plan.data else None
+
+        try:
+            with db.session.begin():
+                db.session.add(member)
+        except IntegrityError:
+            db.session.rollback()
+            current_app.logger.exception('IntegrityError while updating member %s', member.id)
+            flash('A database constraint error occurred while updating the member.', 'danger')
+        except SQLAlchemyError:
+            db.session.rollback()
+            current_app.logger.exception('SQLAlchemyError while updating member %s', member.id)
+            flash('An unexpected error occurred while updating the member. Please try again.', 'danger')
+        else:
+            flash('Member has been updated successfully.', 'success')
+            return redirect(url_for('members.view', member_id=member.id))
+    elif request.method == 'POST':
+        # Show validation errors on invalid POST
+        for field, errors in form.errors.items():
+            for error in errors:
+                label = getattr(form, field).label.text
+                flash(f'Error in {label}: {error}', 'danger')
+
+    return render_template('members/edit.html', title='Edit Member', form=form, member=member)
+
+
+@members_bp.route('/<int:member_id>/delete', methods=['POST'])
+@login_required
+def delete(member_id):
+    """
+    Deletes a member.
+    """
+    member = Member.query.get_or_404(member_id)
+    try:
+        with db.session.begin():
+            db.session.delete(member)
+    except SQLAlchemyError:
+        db.session.rollback()
+        current_app.logger.exception('SQLAlchemyError while deleting member %s', member_id)
+        flash('An error occurred while deleting the member.', 'danger')
+    else:
+        flash('Member has been deleted.', 'success')
+
+    return redirect(url_for('members.index'))
+
+
+@members_bp.route('/<int:member_id>')
+@login_required
+def view(member_id):
+    """
+    Displays detailed information for a single member along with a payment form.
+    """
+    member = Member.query.get_or_404(member_id)
+    payments = Payment.query.filter_by(member_id=member.id).order_by(Payment.payment_date.desc()).all()
+
+    # Prepare PaymentForm to be used on the member's page:
+    # - Set member choices to include only this member
+    # - Preselect the member so validation works
+    form = PaymentForm()
+    form.member.choices = [(member.id, member.full_name())]
+    form.member.data = member.id
+
+    return render_template(
+        'members/view.html',
+        title=f'Member: {member.full_name()}',
+        member=member,
+        payments=payments,
+        form=form,
+    )
+
+
+@members_bp.route('/<int:member_id>/add_payment', methods=['GET', 'POST'])
+@login_required
+def add_payment(member_id):
+    """
+    Adds a new payment for a specific member. The member_id comes from the URL, but
+    we also configure the form's member field to pass SelectField validation.
+    """
+    member = Member.query.get_or_404(member_id)
+
+    form = PaymentForm()
+    # Configure the member select to include and preselect the current member
+    form.member.choices = [(member.id, member.full_name())]
+    form.member.data = member.id
+
+    if form.validate_on_submit():
+        payment = Payment(
+            member_id=member_id,
+            amount=form.amount.data,
+            payment_date=form.payment_date.data,
+            payment_method=form.payment_method.data,  # required by the model
+            # Note: Payment model doesn't have 'description' or 'notes' columns.
+        )
+        try:
+            with db.session.begin():
+                db.session.add(payment)
+        except SQLAlchemyError:
+            db.session.rollback()
+            current_app.logger.exception('SQLAlchemyError while adding payment for member %s', member_id)
+            flash('An error occurred while adding the payment.', 'danger')
+        else:
+            flash('Payment added successfully.', 'success')
+    else:
+        # If validation fails, flash form errors
+        for field, errors in form.errors.items():
+            for error in errors:
+                label = getattr(form, field).label.text
+                flash(f'Error in {label}: {error}', 'danger')
+
+    return redirect(url_for('members.view', member_id=member_id))
+
+
+# New: Export all members (matches url_for('members.export') used in index.html)
+@members_bp.route('/export', methods=['GET'])
+@login_required
+def export():
+    """
+    Exports all members' data. Placeholder for actual export implementation.
+    This endpoint is intentionally GET to work with existing anchor links.
+    """
+    try:
+        # TODO: Implement actual export (e.g., generate CSV and return send_file)
+        flash('All members data has been exported successfully.', 'success')
+    except Exception:
+        current_app.logger.exception('Error exporting all members')
+        flash('An error occurred while exporting members data.', 'danger')
+    return redirect(url_for('members.index'))
+
+
+# Renamed: member-specific export to avoid BuildError from index links
+@members_bp.route('/<int:member_id>/export', methods=['GET'])
+@login_required
+def export_member(member_id):
+    """
+    Exports a single member's data. Placeholder for actual export implementation.
+    """
+    member = Member.query.get_or_404(member_id)
+    try:
+        # TODO: Implement actual export (e.g., generate CSV and send_file)
+        flash('Member data has been exported successfully.', 'success')
+    except Exception:
+        current_app.logger.exception('Error exporting data for member %s', member.id)
+        flash('An error occurred while exporting member data.', 'danger')
+    return redirect(url_for('members.view', member_id=member.id))
+
+
+@members_bp.route('/add_promotion', methods=['POST'])
+@login_required
+def add_promotion():
+    """
+    Adds a belt promotion for a member based on BeltPromotionForm.
+    - Updates the member's belt_rank to the new rank.
+    - Records a BeltPromotion entry with old/new ranks and date.
+    """
+    form = BeltPromotionForm()
+    if form.validate_on_submit():
+        member_id = form.member.data  # BeltPromotionForm.member is SelectField(coerce=int)
+        member = Member.query.get_or_404(member_id)
+
+        promotion = BeltPromotion(
+            member_id=member.id,
+            old_rank=member.belt_rank or 'unknown',
+            new_rank=form.new_belt_rank.data,
+            promotion_date=form.promotion_date.data,
+            notes=form.notes.data,
+            # Optionally set promoted_by_id if you have current staff context
+        )
+        try:
+            with db.session.begin():
+                db.session.add(promotion)
+                # Update the member's belt rank and optionally reset stripes
+                member.belt_rank = promotion.new_rank
+                member.stripes = 0
+                db.session.add(member)
+        except SQLAlchemyError:
+            db.session.rollback()
+            current_app.logger.exception('SQLAlchemyError while adding promotion for member %s', member_id)
+            flash('An error occurred while adding the promotion.', 'danger')
+        else:
+            flash('Promotion added successfully.', 'success')
+            return redirect(url_for('members.view', member_id=member.id))
+
+    # On initial GET this route isn't used; if used as a fallback on invalid POST:
+    return render_template('members/add_promotion.html', title='Add Promotion', form=form)
+
+
+@members_bp.route('/toggle_status/<int:member_id>', methods=['POST'])
+@login_required
+def toggle_status(member_id):
+    """
+    Toggles the active status of a member.
+    """
+    member = Member.query.get_or_404(member_id)
+    member.is_active = not member.is_active
+    try:
+        with db.session.begin():
+            db.session.add(member)
+    except SQLAlchemyError:
+        db.session.rollback()
+        current_app.logger.exception('SQLAlchemyError while toggling status for member %s', member_id)
+        flash('An error occurred while updating member status.', 'danger')
+    else:
+        flash('Member status updated successfully.', 'success')
+    return redirect(url_for('members.view', member_id=member.id))

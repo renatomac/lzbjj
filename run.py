@@ -4,7 +4,9 @@ from grapple import create_app
 
 # The create_app function is called here to create the app instance.
 # This ensures all extensions, including db, are properly initialized.
-app = create_app()
+app = create_app('development')
+
+app.config['SESSION_COOKIE_SECURE'] = True
 
 # You can run the application directly from this file.
 if __name__ == '__main__':

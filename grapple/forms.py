@@ -105,19 +105,19 @@ class MemberForm(FlaskForm):
         ('prefer-not-to-say', 'Prefer not to say')
     ])
     date_of_birth = DateField('Date of Birth', validators=[DataRequired()])
-    join_date = DateField('Join Date', validators=[DataRequired()])
-    is_active = BooleanField('Active Member')
-    belt_rank = SelectField('Belt Rank', choices=belt_choices, validators=[DataRequired()])
+    join_date = DateField('Join Date', validators=[Optional()])
+    is_active = BooleanField('Active Member', default=True)
+    belt_rank = SelectField('Belt Rank', choices=belt_choices, validators=[Optional()], default='white')
     stripes = SelectField('Stripes', choices=[
         ('0', '0'),
         ('1', '1'),
         ('2', '2'),
         ('3', '3'),
         ('4', '4')
-    ])
+    ], default='0', validators=[Optional()])
     notes = TextAreaField('Notes', validators=[Optional()])
     photo = URLField('Photo URL')
-     #responsible infomation (if minor)
+    # responsible information (if minor)
     responsible_first_name = StringField('Responsible First Name', validators=[Optional()])
     responsible_last_name = StringField('Responsible Last Name', validators=[Optional()])
     responsible_email = StringField('Responsible Email', validators=[Optional(), Email()])
@@ -126,16 +126,19 @@ class MemberForm(FlaskForm):
     responsible_city = StringField('Responsible City', validators=[Optional()])
     responsible_state = SelectField('Responsible State', choices=state_choices, validators=[Optional()])
     responsible_zip_code = StringField('Responsible Zip Code', validators=[Optional()])
+    responsible_relationship = StringField('Responsible Relationship', validators=[Optional()])
+    # Emergency contact information
     emergency_contact_name = StringField('Emergency Contact Name', validators=[Optional()])
     emergency_contact_phone = StringField('Emergency Contact Phone', validators=[Optional()])
     emergency_contact_relationship = StringField('Emergency Contact Relationship', validators=[Optional()])
+    # Membership Information
     membership_start_date = DateField('Membership Start Date', validators=[Optional()])
     membership_end_date = DateField('Membership End Date', validators=[Optional()])
     membership_status = StringField('Membership Status', validators=[Optional()])
-    #membership_plan = SelectField('Membership Plan', coerce=int, validators=[Optional()])
-    membership_notes = TextAreaField('Membership Notes', validators=[Optional()])
-    waivers_signed = BooleanField('Waivers Signed', default=False)
-    waiver_notes = TextAreaField('Waiver Notes', validators=[Optional()])
+    # Using QuerySelectField to dynamically load membership plans from the database
+    
+    membership_plan = SelectField('Membership Plan', coerce=int, validators=[Optional()])
+    '''
     membership_plan = QuerySelectField(
         'Membership Plan',
         query_factory=get_membership_plans,
@@ -144,6 +147,11 @@ class MemberForm(FlaskForm):
         blank_text='-- Select a Plan --',
         validators=[Optional()]
     )
+    '''
+    membership_notes = TextAreaField('Membership Notes', validators=[Optional()])
+    # Waivers
+    waivers_signed = BooleanField('Waivers Signed', default=False)
+    waiver_notes = TextAreaField('Waiver Notes', validators=[Optional()])
     submit = SubmitField('Save Member')
     
 
@@ -157,7 +165,7 @@ class MemberForm(FlaskForm):
 
     def __init__(self, *args, **kwargs):
         self.member = kwargs.pop('obj', None)
-        super(MemberForm, self).__init__(*args, **kwargs)
+        super(MemberForm, self).__init__(*args, obj=self.member, **kwargs)
 
 class StaffForm(FlaskForm):
     first_name = StringField('First Name', validators=[DataRequired()])
@@ -180,22 +188,7 @@ class StaffForm(FlaskForm):
     address = StringField('Address', validators=[Optional()])
     city = StringField('City', validators=[Optional()])
     #state = StringField('State', validators=[Optional()])
-    state = SelectField('Gender', choices=[
-        ('', 'Select State'),
-        ('AL', 'Alabama'), ('AK', 'Alaska'), ('AZ', 'Arizona'), ('AR', 'Arkansas'),
-        ('CA', 'California'), ('CO', 'Colorado'), ('CT', 'Connecticut'), ('DE', 'Delaware'),
-        ('FL', 'Florida'), ('GA', 'Georgia'), ('HI', 'Hawaii'), ('ID', 'Idaho'),
-        ('IL', 'Illinois'), ('IN', 'Indiana'), ('IA', 'Iowa'), ('KS', 'Kansas'),
-        ('KY', 'Kentucky'), ('LA', 'Louisiana'), ('ME', 'Maine'), ('MD', 'Maryland'),
-        ('MA', 'Massachusetts'), ('MI', 'Michigan'), ('MN', 'Minnesota'), ('MS', 'Mississippi'),
-        ('MO', 'Missouri'), ('MT', 'Montana'), ('NE', 'Nebraska'), ('NV', 'Nevada'),
-        ('NH', 'New Hampshire'), ('NJ', 'New Jersey'), ('NM', 'New Mexico'), ('NY', 'New York'),
-        ('NC', 'North Carolina'), ('ND', 'North Dakota'), ('OH', 'Ohio'), ('OK', 'Oklahoma'),
-        ('OR', 'Oregon'), ('PA', 'Pennsylvania'), ('RI', 'Rhode Island'), ('SC', 'South Carolina'),
-        ('SD', 'South Dakota'), ('TN', 'Tennessee'), ('TX', 'Texas'), ('UT', 'Utah'),
-        ('VT', 'Vermont'), ('VA', 'Virginia'), ('WA', 'Washington'), ('WV', 'West Virginia'),
-        ('WI', 'Wisconsin'), ('WY', 'Wyoming')
-    ], validators=[Optional()])
+    state = SelectField('State', choices=state_choices, validators=[Optional()])
     zip_code = StringField('Zip Code', validators=[Optional()])
     date_of_birth = DateField('Date of Birth', validators=[Optional()])
     join_date = DateField('Join Date', validators=[DataRequired()])

@@ -88,7 +88,7 @@ class Member(db.Model):
     notes = db.Column(db.Text)
     photo = db.Column(db.String(200), nullable=True)
     # responsible information (in case of minors)
-    responsible_first_name = db.Column(db.String(64), nullable=True),
+    responsible_first_name = db.Column(db.String(64), nullable=True)
     responsible_last_name = db.Column(db.String(64), nullable=True)
     responsible_email = db.Column(db.String(120), nullable=True)
     responsible_phone = db.Column(db.String(20), nullable=True)
@@ -96,6 +96,7 @@ class Member(db.Model):
     responsible_city = db.Column(db.String(64), nullable=True)
     responsible_state = db.Column(db.String(64), nullable=True)
     responsible_zip_code = db.Column(db.String(10), nullable=True)
+    responsible_relationship = db.Column(db.String(50), nullable=True)
     # Emergency Contact Information
     emergency_contact_name = db.Column(db.String(100), nullable=True)
     emergency_contact_phone = db.Column(db.String(20), nullable=True)
@@ -109,9 +110,9 @@ class Member(db.Model):
     # Waivers
     waivers_signed = db.Column(db.Boolean, default=False)
     waiver_notes = db.Column(db.Text, nullable=True)
+    
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-     
     # Relationships
     payments = db.relationship('Payment', backref='member', lazy='dynamic')
     memberships = db.relationship('Membership', back_populates='member')
@@ -123,8 +124,14 @@ class Member(db.Model):
 
     def __repr__(self):
         return f'<Member {self.full_name()}>'
-
-
+    
+    def age(self):
+        if self.date_of_birth:
+            today = date.today()
+            return today.year - self.date_of_birth.year - ((today.month, today.day) < (self.date_of_birth.month, self.date_of_birth.day))
+        return None
+    
+    
 class Staff(db.Model):
     __tablename__ = 'staff'
     id = db.Column(db.Integer, primary_key=True)
