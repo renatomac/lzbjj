@@ -4,7 +4,7 @@ from enum import member
 from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import login_required
 from grapple.extensions import db
-from grapple.models import Member, MembershipPlan, Payment, BeltPromotion
+from grapple.models import Member, MembershipPlan, Payment, BeltPromotion, Staff
 from grapple.forms import MemberForm, PaymentForm, BeltPromotionForm
 
 members_bp = Blueprint('members', __name__, url_prefix='/members')
@@ -95,38 +95,6 @@ def add():
                 flash(f'Error in {getattr(form, field).label.text}: {error}', 'danger')
     return render_template('members/add.html', title='Add New Member', form=form)
 
-
-'''
-@members_bp.route('/<int:member_id>/edit', methods=['GET', 'POST'])
-@login_required
-def edit(member_id):
-    """
-    Edits an existing member.
-    """
-    member = Member.query.get_or_404(member_id)
-    
-    form = MemberForm(obj=member)
-    if form.validate_on_submit():
-        form.populate_obj(member)
-     
-        try:
-            db.session.commit()
-            flash('Member has been updated successfully.', 'success')
-            return redirect(url_for('members.view_member', member_id=member.id))
-        except Exception as e:
-            db.session.rollback()
-            flash(f'An error occurred: {str(e)}', 'danger')
-        else:
-            for field, errors in form.errors.items():
-                for error in errors:
-                    flash(f'Error in {getattr(form, field).label.text}: {error}', 'danger') 
-                    
-    # Manually populate the membership plan field
-    if member.membership_plan_id:
-        form.membership_plan.data = MembershipPlan.query.get(member.membership_plan_id)
-    flash(MembershipPlan.query.get(member.membership_plan_id))
-    return render_template('members/edit.html', title='Edit Member', form=form, member=member)
-'''
 
 @members_bp.route('/<int:member_id>/edit', methods=['GET', 'POST'])
 @login_required
@@ -236,30 +204,92 @@ def export(member_id):
         flash(f'An error occurred while exporting member data: {str(e)}', 'danger')
     return redirect(url_for('members.view_member', member_id=member.id))
 
-@members_bp.route('/add_promotion', methods=['POST'])
+'''
+@members_bp.route('/<int:member_id>/add_promotion', methods=['GET', 'POST'])
 @login_required
-def add_promotion():
+def add_promotion(member_id):
     """
-    Adds a promotion for a member.
+    Displays the form to add a promotion and processes the form submission.
     """
+    member = Member.query.get_or_404(member_id)
     form = BeltPromotionForm()
+
+    # Manually populate the instructor choices
+    # This assumes there is an Instructor model or similar lookup
+    # Replace with your actual logic to get instructors
+    instructors = [(1, 'Coach'), (2, 'Other')] # Placeholder
+    form.instructor_id.choices = instructors
+    
+    # On form submission, process the data
     if form.validate_on_submit():
-        promotion = BeltPromotion(
-            member_id=form.member.data.id,
-            plan_id=form.plan.data.id,
-            start_date=form.start_date.data,
-            end_date=form.end_date.data
+        new_promotion = BeltPromotion(
+            member_id=member.id,
+            belt_rank=form.new_belt.data,
+            stripes=form.new_stripes.data,
+            promotion_date=form.promotion_date.data,
+            instructor_id=form.instructor_id.data,
+            notes=form.notes.data
         )
+
         try:
-            db.session.add(promotion)
+            db.session.add(new_promotion)
             db.session.commit()
-            flash('Promotion added successfully.', 'success')
-            return redirect(url_for('members.view_member', member_id=form.member.data.id))
+            
+            # Update member's belt and stripes
+            member.belt_rank = new_promotion.belt_rank
+            member.stripes = new_promotion.stripes
+            db.session.commit()
+            
+            flash('Promotion added successfully!', 'success')
+            return redirect(url_for('members.view', member_id=member.id))
         except Exception as e:
             db.session.rollback()
             flash(f'An error occurred: {str(e)}', 'danger')
 
-    return render_template('members/add_promotion.html', title='Add Promotion', form=form)
+    return render_template('members/add_promotion.html', title='Add Promotion', member=member, form=form)
+
+'''
+@members_bp.route('/<int:member_id>/add_promotion', methods=['GET', 'POST'])
+@login_required
+def add_promotion(member_id):
+    """
+    Displays the form to add a promotion and processes the form submission.
+    """
+    member = Member.query.get_or_404(member_id)
+    form = BeltPromotionForm()
+
+    # Manually populate the instructor choices
+    instructors = [(s.id, s.full_name()) for s in Staff.query.all()]
+    form.instructor_id.choices = instructors
+    
+    # Manually set the member_id field data before validation
+    form.member_id.data = member_id
+    
+    if form.validate_on_submit():
+        new_promotion = BeltPromotion(
+            member_id=form.member_id.data,
+            old_rank=member.belt_rank,
+            new_rank=form.new_belt.data,
+            promotion_date=form.promotion_date.data,
+            promoted_by_id=form.instructor_id.data,
+            notes=form.notes.data
+        )
+
+        try:
+            db.session.add(new_promotion)
+            # Update the member's record
+            member.belt_rank = form.new_belt.data
+            member.stripes = form.new_stripes.data
+            db.session.commit()
+            
+            flash('Promotion added successfully!', 'success')
+            return redirect(url_for('members.view', member_id=member.id))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'An error occurred: {str(e)}', 'danger')
+    flash('pulou o POST')
+    return render_template('members/add_promotion.html', title='Add Promotion', member=member, form=form)
+
 
 @members_bp.route('/toggle_status/<int:member_id>', methods=['POST'])
 @login_required

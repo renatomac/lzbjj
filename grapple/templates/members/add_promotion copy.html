@@ -37,12 +37,12 @@
       <div class="col-sm-6">
         <div class="border border-2 rounded-3 p-4">
           <div class="text-muted small mb-2">Current</div>
-          <div id="previewCurrent" class="d-flex align-items-center gap-2 p-2 rounded-3" style="background-color: {{ 'white' if member.belt_rank == 'white' else '#005f99' if member.belt_rank == 'blue' else '#6a0dad' if member.belt_rank == 'purple' else '#8b4513' if member.belt_rank == 'brown' else '#000000' if member.belt_rank == 'black' else '#ff0000' if member.belt_rank == 'red' else '#ff7f50' }}; color: {{ '#000000' if member.belt_rank == 'white' else '#ffffff' }};">
+          <div id="previewCurrent" class="d-flex align-items-center gap-2 p-2 rounded-3">
             <span>🏅</span>
             <div id="previewCurrentText" class="fw-semibold">{{ member.belt_rank|capitalize }} Belt</div>
             <div id="previewCurrentStripes" class="ms-auto d-flex align-items-center gap-1">
               {% for _ in range(member.stripes) %}
-                <span class="rounded-circle" style="width: 8px; height: 8px; background-color: {{ '#000000' if member.belt_rank == 'white' else '#ffffff' }};"></span>
+                <span class="rounded-circle" style="width: 8px; height: 8px; background-color: #000000;"></span>
               {% endfor %}
             </div>
           </div>
@@ -51,16 +51,12 @@
       <div class="col-sm-6">
         <div class="border border-2 rounded-3 p-4">
           <div class="text-muted small mb-2">New</div>
-          <div id="previewNew" class="d-flex align-items-center gap-2 p-2 rounded-3" style="background-color: {{ 'white' if form.new_belt.data == 'white' else '#005f99' if form.new_belt.data == 'blue' else '#6a0dad' if form.new_belt.data == 'purple' else '#8b4513' if form.new_belt.data == 'brown' else '#000000' if form.new_belt.data == 'black' else '#ff0000' if form.new_belt.data == 'red' else '#ff7f50' }}; color: {{ '#000000' if form.new_belt.data == 'white' else '#ffffff' }};">
+          <div id="previewNew" class="d-flex align-items-center gap-2 p-2 rounded-3">
             <span>🏅</span>
             <div id="previewNewText" class="fw-semibold">
               {{ (form.new_belt.data or member.belt_rank)|capitalize }} Belt
             </div>
-            <div id="previewNewStripes" class="ms-auto d-flex align-items-center gap-1">
-              {% for _ in range(form.new_stripes.data or 0) %}
-                <span class="rounded-circle" style="width: 8px; height: 8px; background-color: {{ '#000000' if form.new_belt.data == 'white' else '#ffffff' }};"></span>
-              {% endfor %}
-            </div>
+            <div id="previewNewStripes" class="ms-auto d-flex align-items-center gap-1"></div>
           </div>
         </div>
       </div>
@@ -68,7 +64,10 @@
 
     <h2 class="h4 fw-semibold text-dark mb-4">Promotion Details</h2>
     <form id="promotionForm" method="post" action="{{ url_for('members.add_promotion', member_id=member.id) }}">
-      {{ form.hidden_tag() }}
+    {{ form.hidden_tag() }}
+
+      <input type="hidden" id="previous_belt" name="previous_belt" value="{{ member.belt_rank }}">
+      <input type="hidden" id="previous_stripes" name="previous_stripes" value="{{ member.stripes }}">
 
       <div class="row g-4">
         <div class="col-sm-6">
@@ -81,12 +80,14 @@
           </div>
         </div>
         <div class="col-sm-6">
-          <div class="mb-3">
-            {{ form.new_stripes.label(class="form-label") }}
-            {{ form.new_stripes(class="form-select") }}
-            {% for error in form.new_stripes.errors %}
-                <div class="text-danger">{{ error }}</div>
+          <label for="new_stripes_select" class="form-label fw-semibold">New Stripes</label>
+          <select id="new_stripes_select" name="new_stripes" class="form-select">
+            {% for s in range(0,5) %}
+              <option value="{{ s }}" {% if (form.new_stripes.data|string) == (s|string) %}selected{% endif %}>{{ s }}</option>
             {% endfor %}
+          </select>
+          <div id="stripeHint" class="alert alert-warning my-2 small" role="alert">
+            This will add a stripe, bringing the total to {{ form.new_stripes.data }}.
           </div>
         </div>
         <div class="col-sm-6">

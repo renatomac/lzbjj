@@ -375,18 +375,13 @@ class AttendanceForm(FlaskForm):
 
 
 class BeltPromotionForm(FlaskForm):
-    """
-    Form for managing belt promotions.
-    """
-    member = SelectField('Member', coerce=int, validators=[DataRequired()])
-    new_belt_rank = StringField('New Belt Rank', validators=[DataRequired()])
-    promotion_date = DateField('Promotion Date', validators=[DataRequired()])
-    notes = TextAreaField('Notes', validators=[Optional()])
-    submit = SubmitField('Promote')
-
-    def __init__(self, *args, **kwargs):
-        super(BeltPromotionForm, self).__init__(*args, **kwargs)
-        self.member.choices = [(m.id, m.full_name()) for m in Member.query.all()]
+    member_id = IntegerField('Member ID', validators=[DataRequired()])
+    new_belt = SelectField('New Belt', validators=[DataRequired()], choices=belt_choices)
+    new_stripes = SelectField('New Stripes', coerce=int, choices=[(i, str(i)) for i in range(5)])
+    promotion_date = DateField('Date of Promotion', validators=[DataRequired()])
+    instructor_id = SelectField('Promoted By', coerce=int, validators=[DataRequired()])
+    notes = TextAreaField('Notes')
+    submit = SubmitField('Record Promotion')
         
 class MembershipPlanForm(FlaskForm):
     """

@@ -1,0 +1,9 @@
+    const beltColors = {
+            'white': '#ffffff',
+            'blue': '#005f99',
+            'purple': '#6a0dad',
+            'brown': '#8b4513',
+            'black': '#000000',
+            'red': '#ff0000',
+            'coral': '#ff7f50'
+        };

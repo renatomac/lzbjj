@@ -263,11 +263,12 @@ class BeltPromotion(db.Model):
     promoted_by_id = db.Column(db.Integer, db.ForeignKey('staff.id'))
     notes = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
     promoted_by = db.relationship('Staff', backref='promotions_given')
 
     def __repr__(self):
         return f'<BeltPromotion {self.member.full_name()} to {self.new_rank}>'
+    
+    
 
 
 class RolePermissions(db.Model):
