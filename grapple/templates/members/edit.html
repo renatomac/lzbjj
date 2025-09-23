@@ -178,9 +178,13 @@
                                 <i class="fas fa-heartbeat mr-2 text-red-500"></i> Emergency Contact
                             </h3>
                             <div class="row mb-3">
-                                <div class="col-md-4">
-                                    {{ form.emergency_contact_name.label(class="form-label fw-semibold") }}
-                                    {{ form.emergency_contact_name(class="form-control", placeholder="Name") }}
+                                <div class="col-md-3">
+                                    <label class="form-label fw-semibold">First Name</label>
+                                    {{ form.emergency_contact_first_name(class="form-control") }}
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label fw-semibold">Last Name</label>
+                                    {{ form.emergency_contact_last_name(class="form-control") }}
                                 </div>
                                 <div class="col-md-4">
                                     {{ form.emergency_contact_phone.label(class="form-label fw-semibold") }}

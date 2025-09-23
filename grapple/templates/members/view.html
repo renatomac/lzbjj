@@ -27,14 +27,16 @@
             </div>
 
             <div class="btn-group">
-                <a href="{{ url_for('members.edit', member_id=member.id) }}"
-                   class="btn btn-primary">
+                <a href="{{ url_for('members.edit', member_id=member.id) }}" class="btn btn-primary">
                     <i class="fas fa-edit me-2"></i>Edit Profile
                 </a>
-                <a href="#" class="btn btn-danger" onclick="showModal('deactivateModal', '{{ member.id }}');">
-                    <i class="fas fa-{{ 'user-slash' if member.is_active else 'user-check' }} me-2"></i>
-                    {{ 'Deactivate' if member.is_active else 'Activate' }}
-                </a>
+                <form action="{{ url_for('members.toggle_status', member_id=member.id) }}" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fas fa-{{ 'user-slash' if member.is_active else 'user-check' }} me-2"></i>
+                        {{ 'Deactivate' if member.is_active else 'Activate' }}
+                    </button>
+                </form>
             </div>
         </div>
     </div>

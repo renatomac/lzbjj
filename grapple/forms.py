@@ -128,7 +128,8 @@ class MemberForm(FlaskForm):
     responsible_zip_code = StringField('Responsible Zip Code', validators=[Optional()])
     responsible_relationship = StringField('Responsible Relationship', validators=[Optional()])
     # Emergency contact information
-    emergency_contact_name = StringField('Emergency Contact Name', validators=[Optional()])
+    emergency_contact_first_name = StringField('Emergency Contact First Name', validators=[Optional()])
+    emergency_contact_last_name = StringField('Emergency Contact Last Name', validators=[Optional()])
     emergency_contact_phone = StringField('Emergency Contact Phone', validators=[Optional()])
     emergency_contact_relationship = StringField('Emergency Contact Relationship', validators=[Optional()])
     # Membership Information

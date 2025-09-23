@@ -97,9 +97,13 @@
                                     <a href="{{ url_for('members.add_promotion', member_id=member.id) }}" class="btn btn-sm btn-outline-primary" title="Promote">
                                         <i class="fas fa-star"></i>
                                     </a>
-                                    <a href="{{ url_for('members.toggle_status', member_id=member.id) }}" class="btn btn-sm {% if member.is_active %}btn-outline-warning{% else %}btn-outline-success{% endif %}" title="{% if member.is_active %}Deactivate{% else %}Activate{% endif %}">
-                                        <i class="fas {% if member.is_active %}fa-user-slash{% else %}fa-user-plus{% endif %}"></i>
-                                    </a>
+                                    <form action="{{ url_for('members.toggle_status', member_id=member.id) }}" method="POST" style="display:inline;">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                        <button type="submit" class="btn btn-sm {% if member.is_active %}btn-outline-warning{% else %}btn-outline-success{% endif %}" title="{% if member.is_active %}Deactivate{% else %}Activate{% endif %}">
+                                            <i class="fas {% if member.is_active %}fa-user-slash{% else %}fa-user-plus{% endif %}"></i>   
+                                        </button>
+                                    </form>
+                                    
                                     <button type="button" class="btn btn-sm btn-outline-danger" title="Delete" data-bs-toggle="modal" data-bs-target="#deleteMemberModal-{{ member.id }}">
                                         <i class="fas fa-trash-alt"></i>
                                     </button>
@@ -138,6 +142,7 @@
                         {% endfor %}
                     </tbody>
                 </table>
+            {{ render_pagination(members, 'members.index') }}
             </div>
 
         </div>
@@ -176,5 +181,5 @@
     </div>
 </div>
 
-{{ render_pagination(members, 'members.index') }}
+
 {% endblock %}

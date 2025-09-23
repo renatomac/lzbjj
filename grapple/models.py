@@ -73,7 +73,7 @@ class Member(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     first_name = db.Column(db.String(64), nullable=False)
     last_name = db.Column(db.String(64), nullable=False)
-    email = db.Column(db.String(120), unique=True, nullable=False)
+    email = db.Column(db.String(120), nullable=False)
     phone = db.Column(db.String(20))
     address = db.Column(db.String(255))
     city = db.Column(db.String(64))
@@ -98,7 +98,8 @@ class Member(db.Model):
     responsible_zip_code = db.Column(db.String(10), nullable=True)
     responsible_relationship = db.Column(db.String(50), nullable=True)
     # Emergency Contact Information
-    emergency_contact_name = db.Column(db.String(100), nullable=True)
+    emergency_contact_first_name = db.Column(db.String(64), nullable=True)
+    emergency_contact_last_name = db.Column(db.String(64), nullable=True)
     emergency_contact_phone = db.Column(db.String(20), nullable=True)
     emergency_contact_relationship = db.Column(db.String(50), nullable=True)
     # Membership Information

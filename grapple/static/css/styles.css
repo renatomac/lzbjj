@@ -1,13 +1,37 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}{% endblock %} - Grapple CRM</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        @import "tailwindcss";
+body { font-family: 'Inter', sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; }
+    .card { background: rgba(255,255,255,0.95); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); border-radius: 16px; box-shadow: 0 20px 40px rgba(0,0,0,.12); }
+    .tabs { display:flex; gap:.5rem; flex-wrap:wrap; }
+    .tab-btn { color:#fff; background:rgba(255,255,255,.12); border-radius:10px; padding:.6rem 1rem; font-weight:700; }
+    .tab-btn.active { background:rgba(255,255,255,.22); }
+    .section-title { display:flex; align-items:center; gap:.5rem; font-weight:800; color:#111827; }
+    input, select, textarea { width:100%; border:2px solid #e5e7eb; border-radius:10px; padding:12px 14px; background:#fff; transition: box-shadow .2s, border-color .2s; }
+    .input:focus, .select:focus, .textarea:focus { outline:none; border-color:#6366f1; box-shadow:0 0 0 4px rgba(99,102,241,.15); }
+    .btn { display:inline-flex; align-items:center; gap:.5rem; border-radius:10px; font-weight:700; transition: transform .12s, box-shadow .2s; }
+    .btn:active{ transform: translateY(1px); }
+    .btn-primary{ background: linear-gradient(135deg, #22c55e, #16a34a); color:#fff; }
+    .btn-secondary{ background:#111827; color:#fff; }
+    .btn-ghost{ background:transparent; color:#111827; border:2px solid #e5e7eb; }
+    .badge { display:inline-flex; align-items:center; gap:.4rem; border-radius:9999px; padding:.3rem .65rem; font-weight:700; font-size:.75rem; }
+    .badge-blue{ background:#dbeafe; color:#1e40af; }
+    .badge-green{ background:#d1fae5; color:#065f46; }
+    .badge-amber{ background:#fef3c7; color:#92400e; }
+    .chip { border:2px solid #e5e7eb; border-radius:9999px; padding:.35rem .8rem; font-weight:600; color:#374151; }
+    .switch { position:relative; width:44px; height:26px; background:#e5e7eb; border-radius:9999px; cursor:pointer; }
+    .switch-dot { position:absolute; top:3px; left:3px; width:20px; height:20px; background:#fff; border-radius:9999px; transition:left .2s; }
+    .switch.active { background:#22c55e; }
+    .switch.active .switch-dot { left:21px; }
+    .row { display:grid; grid-template-columns: 1fr 1fr; gap:1rem; }
+    @media (max-width: 1024px){ .row { grid-template-columns: 1fr; } }
+    .table { width:100%; border-collapse:separate; border-spacing:0 10px; }
+    .tr { background:#fff; border-radius:12px; }
+    .tr td { padding:16px; }
+    .avatar { width:36px; height:36px; border-radius:9999px; background:#e5e7eb; display:flex; align-items:center; justify-content:center; font-weight:800; color:#374151;}
+    .empty { border:2px dashed #e5e7eb; border-radius:12px; padding:24px; text-align:center; color:#6b7280; }
+
+
+    /* This is for the login page */
+
+    @import "tailwindcss";
         @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
         
         body {
@@ -119,40 +143,3 @@
         .mb-3 {
             margin-bottom: 1rem !important;
         }
-
-
-    </style>
-</head>
-<body class="bg-gray-100 min-h-screen flex items-center justify-center">
-    <div class="max-w-md w-full bg-white rounded-lg shadow-lg overflow-hidden">
-        <div class="bg-gradient-to-r from-black to-gray-500 px-6 py-8 text-white text-center">
-            <div class="bg-dark p-3 rounded-full inline-block mb-4">
-                <img src="/static/img/checkmat200x200.png" alt="Grapple CRM logo featuring a stylized jiu-jitsu belt forming a circle with the text Grapple CRM in bold modern font on a clean white background, conveying a professional and energetic atmosphere">
-            </div>
-            <h1 class="text-2xl font-bold">Lake Zurich BJJ</h1>
-            <p class="text-blue-200">Jiu-Jitsu Studio Management</p>
-        </div>
-        
-        <div class="p-6">
-            <!-- Flash Messages -->
-            {% with messages = get_flashed_messages(with_categories=true) %}
-                {% if messages %}
-                    {% for category, message in messages %}
-                        <div class="{% if category == 'error' or category == 'danger' %}bg-red-100 border-red-400 text-red-700{% elif category == 'success' %}bg-green-100 border-green-400 text-green-700{% elif category == 'warning' %}bg-yellow-100 border-yellow-400 text-yellow-700{% else %}bg-blue-100 border-blue-400 text-blue-700{% endif %} px-4 py-3 rounded relative mb-4" role="alert">
-                            <span class="block sm:inline">{{ message }}</span>
-                        </div>
-                    {% endfor %}
-                {% endif %}
-            {% endwith %}
-            
-            {% block auth_content %}{% endblock %}
-        </div>
-        <footer>
-        <div class="mt-4 text-center text-gray-500 text-sm">
-            © {{ year }} JRM CRM. All rights reserved.
-        </div>
-    </footer>
-    </div>
-    
-</body>
-</html>

@@ -1,4 +1,5 @@
 from flask import Flask, render_template, send_from_directory
+from datetime import datetime
 from jinja2_time import TimeExtension
 import os
 from grapple.config import config
@@ -12,6 +13,7 @@ def create_app(config_name=None):
     """
     app = Flask(__name__)
     app.jinja_env.add_extension(TimeExtension)
+    app.jinja_env.add_extension('jinja2.ext.do')
     if config_name is None:
         config_name = os.environ.get('FLASK_CONFIG', 'development')
     app.config.from_object(config[config_name])
@@ -84,6 +86,9 @@ def create_app(config_name=None):
         return '${:,.2f}'.format(value)
 
     @app.context_processor
+    def inject_now():
+        return {'now': datetime.utcnow}
+
     def utility_processor():
         def belt_color_class(belt_rank):
             belt_colors = {

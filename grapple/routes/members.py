@@ -14,23 +14,48 @@ members_bp = Blueprint('members', __name__, url_prefix='/members')
 @login_required
 def index():
     """
-    Displays a list of all members.
+    Displays a list of all members with search and filter functionality.
     """
-    membership_plans = MembershipPlan.query.all()
-    
     # Get the current page number from the URL, default to 1
     page = request.args.get('page', 1, type=int)
     # Define how many items per page
     per_page = 10
     
-    # Correctly call paginate on the query object itself
-    members = db.paginate(db.select(Member).order_by(Member.last_name), page=page, per_page=per_page)
+    # Start with a base query
+    query = db.select(Member).order_by(Member.last_name)
+
+    # Apply search filter if a query is present
+    search_query = request.args.get('query')
+    if search_query:
+        search_pattern = f"%{search_query}%"
+        query = query.filter(db.or_(
+            Member.first_name.ilike(search_pattern),
+            Member.last_name.ilike(search_pattern),
+            Member.email.ilike(search_pattern)
+        ))
+
+    # Apply status filter if a status is selected
+    status = request.args.get('status')
+    if status == 'active':
+        query = query.filter_by(is_active=True)
+    elif status == 'inactive':
+        query = query.filter_by(is_active=False)
+
+    # Paginate the filtered query
+    members = db.paginate(query, page=page, per_page=per_page, error_out=False)
+
+    # Get summary counts for all members, ignoring pagination
+    total_members = db.session.execute(db.select(db.func.count(Member.id))).scalar()
+    active_members = db.session.execute(db.select(db.func.count(Member.id)).filter_by(is_active=True)).scalar()
+    inactive_members = db.session.execute(db.select(db.func.count(Member.id)).filter_by(is_active=False)).scalar()
 
     summary = {
-        "total": members.total,
-        "active": sum(1 for m in members.items if m.is_active),
-        "inactive": sum(1 for m in members.items if not m.is_active)
+        "total": total_members,
+        "active": active_members,
+        "inactive": inactive_members
     }
+    
+    membership_plans = MembershipPlan.query.all()
 
     return render_template('members/index.html', title='Members', members=members, summary=summary, membership_plans=membership_plans)
 
@@ -38,7 +63,11 @@ def index():
 @login_required
 def add():
     form = MemberForm()
-
+    # Manually set the choices for the membership plan dropdown
+    # The value is the plan ID, and the label is the plan name.
+    form.membership_plan.choices = [(p.id, p.name) for p in MembershipPlan.query.all()]
+    form.membership_plan.choices.insert(0, (0, '-- Select a Plan --'))
+    
     if form.validate_on_submit():
         new_member = Member(
             first_name=form.first_name.data,
@@ -68,11 +97,13 @@ def add():
             responsible_state=form.responsible_state.data,
             responsible_zip_code=form.responsible_zip_code.data,
                         
-            emergency_contact_name=form.emergency_contact_name.data,
+            emergency_contact_first_name=form.emergency_contact_first_name.data,
+            emergency_contact_last_name=form.emergency_contact_last_name.data,
             emergency_contact_phone=form.emergency_contact_phone.data,
             emergency_contact_relationship=form.emergency_contact_relationship.data,
             
-            membership_plan_id=form.membership_plan.data.id if form.membership_plan.data else None,
+            # Explicitly set the foreign key from the form data
+            membership_plan_id = form.membership_plan.data if form.membership_plan.data != 0 else None,
             membership_start_date=form.membership_start_date.data,
             membership_end_date=form.membership_end_date.data,
             membership_status=form.membership_status.data,
@@ -115,7 +146,7 @@ def edit(member_id):
         try:
             db.session.commit()
             flash('Member updated successfully.', 'success')
-            return redirect(url_for('members.view_member', member_id=member.id))
+            return redirect(url_for('members.view', member_id=member.id))
         except Exception as e:
             db.session.rollback()
             flash(f'An error occurred: {str(e)}', 'danger')
@@ -188,7 +219,7 @@ def add_payment(member_id):
             for error in errors:
                 flash(f'Error in {field}: {error}', 'danger')
     
-    return redirect(url_for('members.view_member', member_id=member_id))
+    return redirect(url_for('members.view', member_id=member_id))
 
 @members_bp.route('/export', methods=['POST'])
 @login_required
@@ -202,53 +233,9 @@ def export(member_id):
         flash('Member data has been exported successfully.', 'success')
     except Exception as e:
         flash(f'An error occurred while exporting member data: {str(e)}', 'danger')
-    return redirect(url_for('members.view_member', member_id=member.id))
+    return redirect(url_for('members.view', member_id=member.id))
 
-'''
-@members_bp.route('/<int:member_id>/add_promotion', methods=['GET', 'POST'])
-@login_required
-def add_promotion(member_id):
-    """
-    Displays the form to add a promotion and processes the form submission.
-    """
-    member = Member.query.get_or_404(member_id)
-    form = BeltPromotionForm()
 
-    # Manually populate the instructor choices
-    # This assumes there is an Instructor model or similar lookup
-    # Replace with your actual logic to get instructors
-    instructors = [(1, 'Coach'), (2, 'Other')] # Placeholder
-    form.instructor_id.choices = instructors
-    
-    # On form submission, process the data
-    if form.validate_on_submit():
-        new_promotion = BeltPromotion(
-            member_id=member.id,
-            belt_rank=form.new_belt.data,
-            stripes=form.new_stripes.data,
-            promotion_date=form.promotion_date.data,
-            instructor_id=form.instructor_id.data,
-            notes=form.notes.data
-        )
-
-        try:
-            db.session.add(new_promotion)
-            db.session.commit()
-            
-            # Update member's belt and stripes
-            member.belt_rank = new_promotion.belt_rank
-            member.stripes = new_promotion.stripes
-            db.session.commit()
-            
-            flash('Promotion added successfully!', 'success')
-            return redirect(url_for('members.view', member_id=member.id))
-        except Exception as e:
-            db.session.rollback()
-            flash(f'An error occurred: {str(e)}', 'danger')
-
-    return render_template('members/add_promotion.html', title='Add Promotion', member=member, form=form)
-
-'''
 @members_bp.route('/<int:member_id>/add_promotion', methods=['GET', 'POST'])
 @login_required
 def add_promotion(member_id):
@@ -287,7 +274,6 @@ def add_promotion(member_id):
         except Exception as e:
             db.session.rollback()
             flash(f'An error occurred: {str(e)}', 'danger')
-    flash('pulou o POST')
     return render_template('members/add_promotion.html', title='Add Promotion', member=member, form=form)
 
 
@@ -305,4 +291,4 @@ def toggle_status(member_id):
     except Exception as e:
         db.session.rollback()
         flash(f'An error occurred: {str(e)}', 'danger')
-    return redirect(url_for('members.view_member', member_id=member.id))
+    return redirect(url_for('members.view', member_id=member.id))

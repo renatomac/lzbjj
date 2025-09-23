@@ -49,7 +49,7 @@ def index():
     belt_distribution = {}
     if total_members_with_belts > 0:
         for belt, count in belt_counts:
-            belt_distribution[belt] = (count / total_members_with_belts) * 100
+            belt_distribution[belt] = round((count / total_members_with_belts) * 100, 2)
         
     # Get recent attendance records
     today = date.today()
