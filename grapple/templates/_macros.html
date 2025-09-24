@@ -64,13 +64,14 @@
     {% endif %}
 {% endmacro %}
 
-<!-- Belt rank badge macro -->
 {% macro belt_badge(belt_rank, stripes=0) %}
-    <span class="badge belt-{{ belt_rank.lower() }}">
-        {{ belt_rank.title() }}
+    {% set belt_class = belt_rank.lower() | replace(' ', '-') %}
+    
+    <span class="badge {{ belt_class }}-belt">
+        {{ belt_rank | title }}
         {% if stripes > 0 %}
             {% for i in range(stripes) %}
-                <i class="fas fa-star"></i>
+                <i class="fas fa-star belt-stripe"></i>
             {% endfor %}
         {% endif %}
     </span>
@@ -87,3 +88,4 @@
         {% endif %}
     </div>
 {% endmacro %}
+

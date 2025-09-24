@@ -1,0 +1,110 @@
+/* Adult Belts */
+.white-belt {
+  background-color: #F7F7F7;
+  color: #333;
+}
+
+.blue-belt {
+  background-color: #007bff;
+  color: #fff;
+}
+
+.belt-purple {
+  background-color: #6a0dad;
+  color: #fff;
+}
+
+.brown-belt {
+  background-color: #7d5b4a;
+  color: #fff;
+}
+
+.black-belt {
+  background-color: #000;
+  color: #fff;
+}
+
+/* Kids Belts */
+.gray-white-belt {
+  background-color: #b3b3b3;
+  color: #fff;
+  background-image: linear-gradient(to right, #b3b3b3 50%, #f7f7f7 50%);
+  background-size: 200% 100%;
+  background-position: 100% 0;
+}
+
+.gray-belt {
+  background-color: #808080;
+  color: #fff;
+}
+
+.gray-black-belt {
+  background-color: #808080;
+  color: #fff;
+  background-image: linear-gradient(to right, #808080 50%, #000 50%);
+  background-size: 200% 100%;
+  background-position: 100% 0;
+}
+
+.yellow-white-belt {
+  background-color: #FFD700;
+  color: #000;
+  background-image: linear-gradient(to right, #FFD700 50%, #f7f7f7 50%);
+  background-size: 200% 100%;
+  background-position: 100% 0;
+}
+
+.yellow-belt {
+  background-color: #FFC000;
+  color: #000;
+}
+
+.yellow-black-belt {
+  background-color: #FFC000;
+  color: #000;
+  background-image: linear-gradient(to right, #FFC000 50%, #000 50%);
+  background-size: 200% 100%;
+  background-position: 100% 0;
+}
+
+.orange-white-belt {
+  background-color: #FFA500;
+  color: #000;
+  background-image: linear-gradient(to right, #FFA500 50%, #f7f7f7 50%);
+  background-size: 200% 100%;
+  background-position: 100% 0;
+}
+
+.orange-belt {
+  background-color: #FF8C00;
+  color: #000;
+}
+
+.orange-black-belt {
+  background-color: #FF8C00;
+  color: #000;
+  background-image: linear-gradient(to right, #FF8C00 50%, #000 50%);
+  background-size: 200% 100%;
+  background-position: 100% 0;
+}
+
+.green-white-belt {
+  background-color: #008000;
+  color: #fff;
+  background-image: linear-gradient(to right, #008000 50%, #f7f7f7 50%);
+  background-size: 200% 100%;
+  background-position: 100% 0;
+}
+
+.green-belt {
+  background-color: #006400;
+  color: #fff;
+}
+
+.green-black-belt {
+  background-color: #006400;
+  color: #fff;
+  background-image: linear-gradient(to right, #006400 50%, #000 50%);
+  background-size: 200% 100%;
+  background-position: 100% 0;
+}
