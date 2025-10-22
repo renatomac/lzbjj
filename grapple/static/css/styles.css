@@ -11,6 +11,7 @@
 }
 .bg-yellow {
     background-color: #f1f505ff; 
+
 }.bg-gray {
     background-color: #9ba2a8ff; 
 }
@@ -75,8 +76,8 @@
 
 /* Adult Belts */
 .white-belt {
-  background-color: #F7F7F7;
-  color: #333;
+  background-color: #ffffff;
+  color: #000000;
 }
 
 .blue-belt {
@@ -101,8 +102,8 @@
 
 /* Kids Belts */
 .gray-white-belt {
-  background-color: #555454;
-  color: #000000;
+  background-color: #f71b1b;
+  color: #ffffff;
   background-image: linear-gradient(to right, #f7f7f7 3%, #555454 97%);
   background-size: 200% 100%;
   background-position: 100% 0;
@@ -111,13 +112,13 @@
 
 .gray-belt {
   background-color: #555454;
-  color: #fff;
+  color: #ffffff;
   border: 1px #555454;
 }
 
 .gray-black-belt {
   background-color: #555454;
-  color: #fff;
+  color: #ffffff;
   background-image: linear-gradient(to right, #000 3%, #555454 97%);
   background-size: 200% 100%;
   background-position: 100% 0;
@@ -135,7 +136,7 @@
 
 .yellow-belt {
   background-color: #f8e90f;
-  color: #000;
+  color: #f7f1f1;
   border: 1px #f8e90f;
 }
 

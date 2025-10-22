@@ -176,7 +176,7 @@
                             <div class="col-2 text-muted small">{{ belt|title }}</div>
                             <div class="col-8">
                                 <div class="progress border" role="progressbar" aria-label="{{ belt|title }} belt distribution" aria-valuenow="{{ percentage }}" aria-valuemin="0" aria-valuemax="100" style="height: 1.00rem;">
-                                    <div class="progress-bar bg-{{ belt }}" style="width: {{ percentage }}%; color: {% if belt == 'white' or belt == 'yellow' %}black{% else %}white{% endif %};">{{ percentage }}%</div>
+                                    <div class="progress-bar {{ belt }}-belt" style="width: {{ percentage }}%;">{{ percentage }}%</div>
                                 </div>
                             </div>
                             <div class="col-2 text-end text-muted small">{{ percentage }}%</div>
