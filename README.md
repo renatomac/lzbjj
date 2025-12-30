@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # BJJ Gym CRM
 
 ## Distinctiveness and Complexity
@@ -112,3 +113,6 @@ python manage.py runserver
 - **Financial Tracking**  Monitor the gym’s business evolution, including subscriptions, revenue, and other metrics.
 
 - **Monitor financial** and operational metrics through the dashboard.
+=======
+# LZBJJ
+>>>>>>> a9155cbee0f090280b290dbd95ab9f4fa8686fb8
