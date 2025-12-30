@@ -1,0 +1,56 @@
+{% extends "layout.html" %}
+
+{% block title %}Attendance{% endblock %}
+
+{% block extra_head %}
+
+{% endblock %}
+
+{% block header_title %}Today's Classes{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card p-4">
+                        <div class="d-flex">
+                            <a href="{% url 'dashboard' %}" class="btn btn-custom-ghost ms-auto">
+                                <i class="fa-solid fa-arrow-left me-2"></i> Back to Dashboard
+                            </a>
+                        </div>
+                        <div class="d-flex">
+                            <h3 class="h5 fw-bold text-gray-900 mb-3 d-flex align-items-center gap-2">
+                                <i class="fas fa-calendar-day text-primary"></i> Scheduled Sessions
+                            </h3>
+                        </div>
+                <p class="text-muted">Attendance for today, {{ weekday }}, {{ today }}.</p>
+                {% if classes %}
+                <div class="list-group mt-3">
+                    {% for class in classes %}
+                    <a href="{% url 'attendanceRecord' class_id=class.id %}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center rounded-3 p-3 mb-2 border border-1 border-gray-100">
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="d-flex align-items-center justify-content-center bg-primary bg-opacity-10 text-primary rounded-circle" style="width: 36px; height: 36px;">
+                                <i class="fas fa-clipboard-check"></i>
+                            </div>
+                            <div>
+                                <div class="fw-semibold text-gray-900">{{ class.name }}</div>
+                                <div class="text-xs text-muted">
+                                    {{ class.start_time }} • Coach: {{ class.instructor.first_name }}
+                                </div>
+                            </div>
+                        </div>
+                        <i class="fas fa-chevron-right text-gray-400"></i>
+                    </a>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-state mt-4">
+                    <i class="fas fa-bell fs-3 mb-2"></i>
+                    <p>No class sessions are scheduled for today.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

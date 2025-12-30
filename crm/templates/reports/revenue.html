@@ -1,0 +1,121 @@
+<!-- ========================================================================= -->
+<!-- grapple/templates/reports/revenue.html -->
+<!-- This template displays revenue data with a date filter. -->
+{% extends "layout.html" %}
+
+{% block title %}Revenue Report{% endblock %}
+{% block header_title %}Revenue Report{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Date Filter Card -->
+    <div class="card shadow-sm rounded-lg p-4 mb-4">
+        <h2 class="h5 fw-bold mb-3">Filter by Date Range</h2>
+        <form method="GET" class="row g-3 align-items-end">
+            <div class="col-md-5">
+                <label for="start_date" class="form-label">Start Date</label>
+                <input type="date" class="form-control" id="start_date" name="start_date" value="{{ request.args.get('start_date') }}">
+            </div>
+            <div class="col-md-5">
+                <label for="end_date" class="form-label">End Date</label>
+                <input type="date" class="form-control" id="end_date" name="end_date" value="{{ request.args.get('end_date') }}">
+            </div>
+            <div class="col-md-2 d-grid">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-filter me-2"></i>Apply
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Key Metrics Card -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-6 col-lg-4">
+            <div class="card shadow-sm rounded-lg h-100 text-center">
+                <div class="card-body p-4">
+                    <div class="text-secondary mb-2">Total Revenue</div>
+                    <h2 class="h1 fw-bold text-dark">{{ total_revenue | format_currency }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-4">
+            <div class="card shadow-sm rounded-lg h-100 text-center">
+                <div class="card-body p-4">
+                    <div class="text-secondary mb-2">Payments Received</div>
+                    <h2 class="h1 fw-bold text-dark">{{ total_payments }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4 d-none d-lg-block">
+            <div class="card shadow-sm rounded-lg h-100 text-center">
+                <div class="card-body p-4">
+                    <div class="text-secondary mb-2">Average Payment</div>
+                    <h2 class="h1 fw-bold text-dark">{{ average_payment | format_currency }}</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Revenue Chart -->
+    <div class="card shadow-sm rounded-lg p-4 mb-4">
+        <h2 class="h5 fw-bold mb-3">Monthly Revenue</h2>
+        <!-- Chart.js or similar chart would be rendered here -->
+        <div class="placeholder-chart text-muted text-center py-5">
+            <i class="fas fa-chart-bar fa-3x mb-3"></i>
+            <p>Chart of monthly revenue will be displayed here.</p>
+        </div>
+        <!-- Example of how a chart would be initialized with Jinja data: -->
+        <!-- <canvas id="revenueChart"></canvas> -->
+        <!-- <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                const ctx = document.getElementById('revenueChart').getContext('2d');
+                const revenueChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: {{ monthly_revenue.months | tojson }},
+                        datasets: [{
+                            label: 'Monthly Revenue',
+                            data: {{ monthly_revenue.totals | tojson }},
+                            backgroundColor: 'rgba(75, 192, 192, 0.6)',
+                            borderColor: 'rgba(75, 192, 192, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: { ... }
+                });
+            });
+        </script> -->
+    </div>
+
+    <!-- Recent Payments Table -->
+    <div class="card shadow-sm rounded-lg p-4">
+        <h2 class="h5 fw-bold mb-3">Recent Payments</h2>
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th scope="col">Date</th>
+                        <th scope="col">Member</th>
+                        <th scope="col">Amount</th>
+                        <th scope="col">Method</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for payment in recent_payments %}
+                    <tr>
+                        <td>{{ payment.payment_date | format_date }}</td>
+                        <td><a href="{{ url_for('members.view', member_id=payment.member_id) }}">{{ payment.member.full_name() }}</a></td>
+                        <td>{{ payment.amount | format_currency }}</td>
+                        <td>{{ payment.payment_method }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="4" class="text-center text-muted">No payments found.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,124 @@
+{% extends "layout.html" %}
+
+{% block title %}Classes{% endblock %}
+{% block header_title %}Class Manager{% endblock %}
+
+{% block content %}
+
+<div class="row justify-content-center">
+
+    <div class="col-lg-8 order-lg-1">
+
+        <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+            <div class="btn-toolbar mb-2 mb-md-0">
+                <div class="btn-group me-2">
+                    <a href="{% url 'addClasses'%}" class="btn btn-primary">
+                        <i class="fas fa-user-plus me-2"></i>Add Class
+                    </a>
+                    <a href="" class="btn btn-outline-secondary">
+                        <i class="fas fa-download me-2"></i>Export
+                    </a>
+                </div>
+            </div>
+        </div>
+
+
+        <div class="card shadow-sm rounded-3 p-0 mb-2">
+                        <a href="{% url 'dashboard' %}" class="btn btn-custom-ghost ms-auto">
+                <i class="fa-solid fa-arrow-left me-2"></i> Back to Dashboard
+            </a>
+            <div class="card-body">
+               <form method="GET" class="row g-3">
+                    <div class="d-flex flex-wrap gap-2 mb-3 align-items-left">
+                        <div class="p-2 flex-fill align-content-center">
+                            
+                            <div class="input-group input-group">
+                                <span class="input-group-text">
+                                    <i class="fa-solid fa-magnifying-glass fa-sm text-muted"></i>
+                                </span>
+                                <input
+                                    id="searchInput"
+                                    type="text"
+                                    class="form-control"
+                                    name="query"
+                                    placeholder="Search by instructor or class type"
+                                    value="{{ query }}"
+                                >
+                            </div>
+                            
+                            
+                        </div>
+                        <div class="p-2 flex-fill align-content-center">
+                            <select name="filterClassType" id="filterClassType" class="form-select" style="width: auto;">
+                                <option value="">All Class Types</option>
+                                {% for type in classTypes %}
+                                <option value="{{ type }}">{{ type }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="p-2 flex-fill align-content-center">
+                            <select name="filterInstructor" id="filterInstructor" class="form-select" style="width: auto;">
+                                <option value="">All Instructors</option>
+                                {% for instructor in instructors %}
+                                <option value="{{ instructor.id }}">{{ instructor.first_name }} {{ instructor.last_name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="p-2 flex-fill align-content-center">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-filter me-2"></i>Filter
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="card shadow-sm rounded-3 p-0 mb-2">
+            <div class="card-body">
+                <h5 class="fw-bold mb-3">Recurring Class Schedules</h5>
+                <div class="d-flex flex-wrap gap-2 mb-3 align-items-center">
+
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead>
+                            <tr>
+                                <th scope="col">Class Type</th>
+                                <th scope="col">Instructor</th>
+                                <th scope="col">Days</th>
+                                <th scope="col">Time</th>
+                                <th scope="col">Notes</th>
+                                <th scope="col">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for class in classes %}
+                            <tr>
+                                <td>{{ class.name }}</td>
+                                <td>{{ class.instructor.first_name|capfirst}} {{ class.instructor.last_name|capfirst}}</td>
+                                <td>{{ class.days_of_week|capfirst }}</td>
+                                <td>{{ class.start_time }} - {{ class.end_time }}</td>
+                                <td>{{ class.notes }}</td>
+                                <td class="py-3">
+                                    <div class="d-flex gap-2">
+                                        <a href="{% url 'editClass' class_id=class.id %}" class="btn btn-sm btn-outline-warning" data-bs-toggle="tooltip" title="Edit"><i class="fa-solid fa-pen"></i></a>
+                                        <form action="{% url 'deleteClass'  class_id=class.id %}" method="POST" class="d-inline-block">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure you want to delete this recurring class?');" data-bs-toggle="tooltip" title="Delete">
+                                                <i class="fa-solid fa-trash"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+   
+</div>
+
+{% endblock %}

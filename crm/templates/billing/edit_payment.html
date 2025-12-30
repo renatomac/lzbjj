@@ -1,0 +1,47 @@
+<!-- grapple/templates/billing/edit_payment.html -->
+{% extends "layout.html" %}
+{% from "_macros.html" import render_field %}
+
+{% block title %}Edit Payment{% endblock %}
+{% block header_title %}Edit Payment{% endblock %}
+
+{% block content %}
+<div class="container-fluid p-6">
+    <div class="card p-4 mx-auto" style="max-width: 48rem;">
+        <div class="text-center mb-4">
+            <h1 class="h2 fw-bold text-dark mb-2">Edit Payment</h1>
+            <p class="text-muted">Update the payment details for {{ payment.member.full_name() }}.</p>
+        </div>
+
+        <div class="p-4 rounded-lg">
+            <form id="paymentForm" method="post" action="{{ url_for('billing.edit_payment', payment_id=payment.id) }}">
+                {{ form.hidden_tag() }}
+                <div class="row g-4 mb-4">
+                    <div class="col-md-6">
+                        {{ render_field(form.amount, class="form-control") }}
+                    </div>
+                    <div class="col-md-6">
+                        {{ render_field(form.payment_date, class="form-control") }}
+                    </div>
+                    <div class="col-md-6">
+                        {{ render_field(form.payment_method, class="form-select") }}
+                    </div>
+                    <div class="col-md-6">
+                        {{ render_field(form.status, class="form-select") }}
+                    </div>
+                    <div class="col-12">
+                        {{ render_field(form.notes, class="form-control", rows=4) }}
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-end gap-2">
+                    <a href="{{ url_for('members.view', member_id=payment.member.id) }}" class="btn btn-outline-secondary">Cancel</a>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-2"></i>Save Changes
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

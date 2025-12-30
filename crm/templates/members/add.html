@@ -1,0 +1,81 @@
+{% extends "layout.html" %}
+{% load static %}
+{% load crispy_forms_tags %}
+
+{% block title %}{{ title }}{% endblock %}
+{% block header_title %}<i class="fas fa-user-plus me-2"></i> {{ title }}{% endblock %}
+
+{% block content %}
+
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card main-card mb-4">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h3 class="fw-bold mb-0">{{title}}</h3>
+                    <a href="{{ request.META.HTTP_REFERER|default:'/' }}" class="btn btn-custom-ghost"><i class="fa-solid fa-arrow-left"></i> Back to Members</a>
+                </div>
+                <h4>Personal Info</h4>
+                <form method="post" class="django-form">
+                    {% csrf_token %}
+
+                    {{ form|crispy }}
+
+                    {{ contact_formset.management_form }}
+
+                    <div id="contacts">
+                        <h4>Contacts</h4>
+                        {% if contact_formset.forms %}
+                            {% for contact_form in contact_formset %}
+                                <div class="contact-form border p-3 mb-2">
+                                    {{ contact_form.as_p }}
+                                </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="contact-form border p-3 mb-2">
+                                {{ contact_formset.empty_form.as_p }}
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Add Contact button -->
+                    <button type="button" id="add-contact" class="btn btn-secondary mt-2">+ Add Contact</button>
+
+                    <input type="submit" class="btn btn-primary mt-3" value="Submit">
+                </form>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- JS for dynamically adding contact forms -->
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const addContactBtn = document.getElementById("add-contact");
+    const formsetDiv = document.getElementById("contacts");
+    const totalForms = document.getElementById("id_contacts-TOTAL_FORMS"); // match prefix
+
+    if (!addContactBtn || !formsetDiv || !totalForms) return;
+
+    addContactBtn.addEventListener("click", function () {
+        const firstForm = formsetDiv.querySelector(".contact-form");
+        if (!firstForm) return;
+
+        const formCount = parseInt(totalForms.value, 10);
+        const newForm = firstForm.cloneNode(true);
+
+        // Replace indexes in the form fields
+        const regex = new RegExp(`contacts-0`, "g"); // match prefix-0
+        newForm.innerHTML = newForm.innerHTML.replace(regex, `contacts-${formCount}`);
+
+        newForm.querySelectorAll("input, select, textarea").forEach(el => el.value = "");
+
+        formsetDiv.appendChild(newForm);
+        totalForms.value = formCount + 1;
+    });
+});
+
+</script>
+
+{% endblock %}

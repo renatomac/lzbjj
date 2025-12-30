@@ -1,0 +1,60 @@
+{% extends "layout.html" %}
+{% from "_macros.html" import render_field, belt_badge %}
+
+{% block title %}Record Payment{% endblock %}
+{% block header_title %}Record Payment{% endblock %}
+
+{% block content %}
+<div class="container-fluid p-3 p-sm-5 d-flex flex-column align-items-center">
+    <!-- Card container for the form, styled to match the rest of the app -->
+    <div class="card p-3 p-sm-5 mx-auto bg-white" style="max-width: 64rem; backdrop-filter: blur(10px); background: rgba(255,255,255,0.95); border-radius: 16px; box-shadow: 0 20px 40px rgba(0,0,0,0.15);">
+        <div class="text-center mb-4">
+            <h1 class="h2 fw-bold text-dark mb-2">Record Payment</h1>
+            <p class="text-muted">Record a payment for {{ member.full_name() }}</p>
+        </div>
+
+        <!-- Member summary section -->
+        <div class="d-flex align-items-center justify-content-between mb-4">
+            <div class="d-flex align-items-center gap-3">
+                <!-- Avatar circle with member initials -->
+                <div class="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold fs-5" style="width: 48px; height: 48px; background: linear-gradient(135deg, #4f46e5 0%, #a855f7 100%);">
+                    {{ member.first_name[0] }}{{ member.last_name[0] }}
+                </div>
+                <div>
+                    <h2 class="h5 fw-bold mb-1">{{ member.full_name() }}</h2>
+                    <p class="text-muted small mb-0">{{ member.email }}</p>
+                    <div class="mt-1">
+                        {{ belt_badge(member.belt_rank, member.stripes) }}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <form method="post" action="{{ url_for('billing.record_payment', member_id=member.id) }}">
+            {{ form.hidden_tag() }}
+            
+            <div class="row g-4 mb-4">
+                <div class="col-sm-6">
+                    {{ render_field(form.amount) }}
+                </div>
+                <div class="col-sm-6">
+                    {{ render_field(form.payment_method) }}
+                </div>
+                <div class="col-sm-6">
+                    {{ render_field(form.payment_date) }}
+                </div>
+                <div class="col-sm-6">
+                    {{ render_field(form.notes) }}
+                </div>
+            </div>
+
+            <div class="d-grid gap-2 d-sm-flex justify-content-sm-end">
+                <a href="{{ url_for('members.view', member_id=member.id) }}" class="btn btn-outline-secondary">Cancel</a>
+                <button type="submit" class="btn btn-success">
+                    <i class="fas fa-check me-2"></i>Record Payment
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
