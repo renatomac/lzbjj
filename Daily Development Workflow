@@ -1,0 +1,35 @@
+Local Development
+
+Make changes in VS Code.
+
+Run tests locally:
+
+python manage.py runserver
+
+
+Commit and push:
+
+git add .
+git commit -m "Describe changes"
+git push origin main
+
+Update PythonAnywhere
+
+SSH in and pull:
+
+cd ~/myproject
+git pull origin main
+
+
+Apply migrations if needed:
+
+source myvirtualenv/bin/activate
+python manage.py migrate
+
+
+Collect static files:
+
+python manage.py collectstatic
+
+
+Reload the web app via PythonAnywhere Web tab.
