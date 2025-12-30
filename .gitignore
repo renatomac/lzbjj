@@ -1,165 +1,63 @@
-# Python
+# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
-*.pyo
-*.pyd
-*.pyc
-*.pdb
-*.egg
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
 *.egg-info/
+*.egg
 dist/
 build/
-.eggs/
 
-# Django
+# Django stuff:
 *.log
 *.pot
 *.pyc
+*.pyo
 *.sqlite3
 db.sqlite3
 media/
 staticfiles/
-local_settings.py
-.env
-.env.*
+static/
 
-# VS Code
+# Django local settings
+*.env
+.env
+
+# VSCode
 .vscode/
 
-# macOS
+# PyCharm
+.idea/
+
+# OS files
 .DS_Store
-
-# Windows
 Thumbs.db
-ehthumbs.db
-Desktop.ini
 
-# Virtualenv
-venv/
-ENV/
-env/
-.venv/
-pyvenv.cfg
-
-# Migrations
-**/migrations/*.py
-!**/migrations/__init__.py
-
-# Coverage reports
-htmlcov/
+# Test / coverage reports
 .coverage
+htmlcov/
 .tox/
-.nox/
-.cache/
+.pytest_cache/
+nosetests.xml
 coverage.xml
 *.cover
 *.py,cover
+.cache/
 
-# MyPy
-.mypy_cache/
-.dmypy.json
-dmypy.json
+# Migrations (optional: only if you want to ignore migrations in Git)
+*/migrations/*.py
+!*/migrations/__init__.py
 
-# Pytest
-.pytest_cache/
-
-# Celery
-celerybeat-schedule
-celerybeat.pid
-
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# IDEs
-.idea/
-*.sublime-project
-*.sublime-workspace
-.venv/pyvenv.cfg
-.venv/Scripts/activate
-.venv/pyvenv.cfg
-.venv/Scripts/activate
-auctions/__pycache__/__init__.cpython-311.pyc
-auctions/__pycache__/admin.cpython-311.pyc
-auctions/__pycache__/apps.cpython-311.pyc
-auctions/__pycache__/models.cpython-311.pyc
-auctions/__pycache__/urls.cpython-311.pyc
-auctions/__pycache__/views.cpython-311.pyc
-auctions/migrations/__pycache__/__init__.cpython-311.pyc
-auctions/migrations/__pycache__/0001_initial.cpython-311.pyc
-auctions/migrations/__pycache__/0002_listing_bid.cpython-311.pyc
-commerce/__pycache__/__init__.cpython-311.pyc
-commerce/__pycache__/settings.cpython-311.pyc
-commerce/__pycache__/urls.cpython-311.pyc
-commerce/__pycache__/wsgi.cpython-311.pyc
-.venv/Scripts/activate
-auctions/__pycache__/__init__.cpython-311.pyc
-auctions/__pycache__/admin.cpython-311.pyc
-auctions/__pycache__/apps.cpython-311.pyc
-auctions/__pycache__/models.cpython-311.pyc
-auctions/__pycache__/urls.cpython-311.pyc
-auctions/__pycache__/views.cpython-311.pyc
-auctions/migrations/__pycache__/__init__.cpython-311.pyc
-auctions/migrations/__pycache__/0001_initial.cpython-311.pyc
-auctions/migrations/__pycache__/0002_listing_bid.cpython-311.pyc
-commerce/__pycache__/__init__.cpython-311.pyc
-commerce/__pycache__/settings.cpython-311.pyc
-commerce/__pycache__/urls.cpython-311.pyc
-commerce/__pycache__/wsgi.cpython-311.pyc
-.venv/pyvenv.cfg
-.venv/pyvenv.cfg
-.venv/pyvenv.cfg
-.venv/Scripts/activate
-auctions/__pycache__/__init__.cpython-311.pyc
-auctions/__pycache__/admin.cpython-311.pyc
-auctions/__pycache__/apps.cpython-311.pyc
-auctions/__pycache__/models.cpython-311.pyc
-auctions/__pycache__/urls.cpython-311.pyc
-auctions/__pycache__/views.cpython-311.pyc
-auctions/migrations/__pycache__/__init__.cpython-311.pyc
-auctions/migrations/__pycache__/0001_initial.cpython-311.pyc
-auctions/migrations/__pycache__/0002_listing_bid.cpython-311.pyc
-commerce/__pycache__/__init__.cpython-311.pyc
-commerce/__pycache__/settings.cpython-311.pyc
-commerce/__pycache__/urls.cpython-311.pyc
-commerce/__pycache__/wsgi.cpython-311.pyc
-.venv/pyvenv.cfg
-.venv/Scripts/activate
-auctions/__pycache__/__init__.cpython-311.pyc
-auctions/__pycache__/admin.cpython-311.pyc
-auctions/__pycache__/apps.cpython-311.pyc
-auctions/__pycache__/models.cpython-311.pyc
-auctions/__pycache__/urls.cpython-311.pyc
-auctions/__pycache__/views.cpython-311.pyc
-auctions/migrations/__pycache__/__init__.cpython-311.pyc
-auctions/migrations/__pycache__/0001_initial.cpython-311.pyc
-auctions/migrations/__pycache__/0002_listing_bid.cpython-311.pyc
-commerce/__pycache__/__init__.cpython-311.pyc
-commerce/__pycache__/settings.cpython-311.pyc
-commerce/__pycache__/urls.cpython-311.pyc
-commerce/__pycache__/wsgi.cpython-311.pyc
-auctions/__pycache__/__init__.cpython-311.pyc
-auctions/__pycache__/admin.cpython-311.pyc
-auctions/__pycache__/apps.cpython-311.pyc
-auctions/__pycache__/models.cpython-311.pyc
-auctions/__pycache__/urls.cpython-311.pyc
-auctions/__pycache__/views.cpython-311.pyc
-auctions/migrations/__pycache__/__init__.cpython-311.pyc
-auctions/migrations/__pycache__/0001_initial.cpython-311.pyc
-auctions/migrations/__pycache__/0002_listing_bid.cpython-311.pyc
-commerce/__pycache__/__init__.cpython-311.pyc
-commerce/__pycache__/settings.cpython-311.pyc
-commerce/__pycache__/urls.cpython-311.pyc
-commerce/__pycache__/wsgi.cpython-311.pyc
-auctions/__pycache__/__init__.cpython-311.pyc
-auctions/__pycache__/admin.cpython-311.pyc
-auctions/__pycache__/apps.cpython-311.pyc
-auctions/__pycache__/models.cpython-311.pyc
-auctions/__pycache__/urls.cpython-311.pyc
-auctions/__pycache__/views.cpython-311.pyc
-auctions/migrations/__pycache__/__init__.cpython-311.pyc
-auctions/migrations/__pycache__/0001_initial.cpython-311.pyc
-auctions/migrations/__pycache__/0002_listing_bid.cpython-311.pyc
-commerce/__pycache__/__init__.cpython-311.pyc
-commerce/__pycache__/settings.cpython-311.pyc
-commerce/__pycache__/urls.cpython-311.pyc
-commerce/__pycache__/wsgi.cpython-311.pyc
+# Other
+*.bak
+*.swp
