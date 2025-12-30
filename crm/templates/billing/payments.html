@@ -1,0 +1,152 @@
+{% extends "layout.html" %}
+{% from "_macros.html" import render_pagination %}
+
+{% block title %}Payments{% endblock %}
+{% block header_title %}Payments{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">
+        <i class="fas fa-dollar-sign me-2"></i>Payments
+        <span class="badge bg-primary ms-2">{{ payments.total }}</span>
+    </h1>
+</div>
+
+<!-- Search and Filter Section -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="GET" class="row g-3">
+            <div class="col-md-6">
+                <div class="input-group">
+                    <span class="input-group-text"><i class="fas fa-search"></i></span>
+                    <input type="text" class="form-control" name="query" placeholder="Search by member name..." value="{{ request.args.get('query', '') }}">
+                </div>
+            </div>
+            <div class="col-md-6">
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="fas fa-filter me-2"></i>Filter
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Payments Table -->
+<div class="card shadow-sm rounded-3">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="bg-light">
+                <tr>
+                    <th scope="col">Member</th>
+                    <th scope="col">Amount</th>
+                    <th scope="col">Method</th>
+                    <th scope="col">Date</th>
+                    <th scope="col">Notes</th>
+                    <th scope="col">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for payment in payments.items %}
+                <tr>
+                    <td>
+                        <a href="{{ url_for('members.view', member_id=payment.member_id) }}" class="text-dark fw-bold text-decoration-none">
+                            {{ payment.member.full_name() }}
+                        </a>
+                    </td>
+                    <td>{{ payment.amount|format_currency }}</td>
+                    <td>{{ payment.payment_method|title }}</td>
+                    <td>{{ payment.payment_date|format_date }}</td>
+                    <td>{{ payment.notes }}</td>
+                    <td>
+                        <a href="{{ url_for('billing.edit_payment', payment_id=payment.id) }}" class="btn btn-sm btn-outline-secondary" title="Edit">
+                            <i class="fas fa-edit"></i>
+                        </a>
+                        <button type="button" class="btn btn-sm btn-outline-danger" title="Delete" data-bs-toggle="modal" data-bs-target="#deletePaymentModal-{{ payment.id }}">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                    </td>
+                </tr>
+                <!-- Delete Payment Modal -->
+                <div class="modal fade" id="deletePaymentModal-{{ payment.id }}" tabindex="-1" aria-labelledby="deletePaymentModalLabel" aria-hidden="true">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="deletePaymentModalLabel">Confirm Deletion</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                Are you sure you want to delete this payment for <strong>{{ payment.member.full_name() }}</strong>? This action cannot be undone.
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <form action="{{ url_for('billing.delete_payment', payment_id=payment.id) }}" method="POST" style="display: inline;">
+                                    {{ csrf.csrf_token }}
+                                    <button type="submit" class="btn btn-danger">Delete</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="text-center text-muted py-5">
+                        <i class="fas fa-info-circle me-2"></i>No payments found.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{{ render_pagination(payments, 'billing.payments') }}
+
+<!-- Payment Form Section -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">Add Payment</h5>
+    </div>
+    <div class="card-body">
+        <form method="POST">
+            {{ form.hidden_tag() }}
+
+            <div class="mb-3">
+                {{ form.member.label(class="form-label") }}
+                {{ form.member(class="form-select") }}
+                {% for error in form.member.errors %}
+                    <div class="text-danger">{{ error }}</div>
+                {% endfor %}
+            </div>
+            <div class="mb-3">
+                {{ form.amount.label(class="form-label") }}
+                {{ form.amount(class="form-control") }}
+                {% for error in form.amount.errors %}
+                    <div class="text-danger">{{ error }}</div>
+                {% endfor %}
+            </div>
+            <div class="mb-3">
+                {{ form.payment_date.label(class="form-label") }}
+                {{ form.payment_date(class="form-control") }}
+                {% for error in form.payment_date.errors %}
+                    <div class="text-danger">{{ error }}</div>
+                {% endfor %}
+            </div>
+            <div class="mb-3">
+                {{ form.payment_method.label(class="form-label") }}
+                {{ form.payment_method(class="form-control") }}
+            </div>
+            <div class="mb-3">
+                {{ form.status.label(class="form-label") }}
+                {{ form.status(class="form-control") }}
+            </div>
+            <div class="mb-3">
+                {{ form.notes.label(class="form-label") }}
+                {{ form.notes(class="form-control") }}
+            </div>
+            <div>
+                {{ form.submit(class="btn btn-primary") }}
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

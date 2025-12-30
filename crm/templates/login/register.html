@@ -1,0 +1,27 @@
+{% extends "login/layout.html" %}
+
+{% block body %}
+    <div class="mx-auto text-center ">
+        <h2 class="centered-text">Register</h2>
+
+        {% if message %}
+            <div>{{ message }}</div>
+        {% endif %}
+
+        <form action="{% url 'register' %}" method="post" class="centered-objects">
+            {% csrf_token %}
+            <div class="form-group">
+                <input class="form-control my-3" type="email" name="email" placeholder="Email Address">
+            </div>
+            <div class="form-group">
+                <input class="form-control my-3" type="password" name="password" placeholder="Password">
+            </div>
+            <div class="form-group">
+                <input class="form-control my-3" type="password" name="confirmation" placeholder="Confirm Password">
+            </div>
+            <input class="btn btn-primary" type="submit" value="Register">
+        </form>
+    </div>
+    Already have an account? <a href="{% url 'login' %}">Log In here.</a>
+
+{% endblock %}

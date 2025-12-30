@@ -1,0 +1,93 @@
+{% extends "layout.html" %}
+
+{% block title %}View Staff{% endblock %}
+{% block header_title %}Staff Profile{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card shadow-sm rounded-3">
+        <div class="card-body">
+            <div class="row g-4 align-items-center">
+                <div class="col-md-3 text-center">
+                    {% if staff.photo %}
+                        <img src="{{ staff.photo }}" alt="Staff Photo"
+                             class="img-fluid rounded-circle mb-2"
+                             style="max-width: 150px;">
+                    {% else %}
+                        <div class="rounded-circle bg-secondary text-white d-flex align-items-center justify-content-center"
+                             style="width: 150px; height: 150px; margin: auto;">
+                            <i class="fa-solid fa-user fa-3x"></i>
+                        </div>
+                    {% endif %}
+                </div>
+
+                <div class="col-md-9">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h4 class="fw-bold mb-1">
+                                {{ staff.first_name }} {{ staff.last_name }}
+                            </h4>
+                            <span class="badge {% if staff.is_active %}bg-success{% else %}bg-secondary{% endif %}">
+                                {{ staff.is_active|yesno:"Active,Inactive" }}
+                            </span>
+                            
+                        </div>
+
+                        <div>
+                            <a href="{% url 'staff' %}" class="btn btn-custom-ghost"><i class="fa-solid fa-arrow-left"></i> Back to Staff List</a>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-2">
+                            <strong>Role:</strong> {{ staff.role }}
+                        </div>
+                        <div class="col-md-6 mb-2">
+                            <strong>Gender:</strong> {{ staff.get_gender_display }}
+                        </div>
+                        <div class="col-md-6 mb-2">
+                            <strong>Belt Rank:</strong> {{ staff.get_belt_rank_display }}
+                        </div>
+                        <div class="col-md-6 mb-2">
+                            <strong>Stripes:</strong> {{ staff.stripes }}
+                        </div>
+                        <div class="col-md-6 mb-2">
+                            <strong>Date of Birth:</strong>
+                            {{ staff.date_of_birth|date:"M d, Y"|default:"—" }}
+                        </div>
+                        <div class="col-md-6 mb-2">
+                            <strong>Join Date:</strong>
+                            {{ staff.join_date|date:"M d, Y" }}
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <!-- Address -->
+                    <div>
+                        <strong>Address:</strong><br>
+                        {% if staff.address %}
+                            {{ staff.address }}<br>
+                            {{ staff.city }}, {{ staff.state }} {{ staff.zip_code }}
+                        {% else %}
+                            <span class="text-muted">No address on file</span>
+                        {% endif %}
+                        <div class="mt-3 d-flex">
+                            <a href="{% url 'editStaff' staff.id %}" class="btn btn-sm btn-outline-warning ms-auto">
+                                <i class="fa-solid fa-pen"></i> Edit
+                            </a>
+                        </div>
+                    </div>
+                            
+                </div>
+            </div>
+                                        
+        </div>
+    </div>
+
+    
+</div>
+
+{% endblock %}

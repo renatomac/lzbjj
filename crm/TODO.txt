@@ -1,0 +1,37 @@
+* Learn how to send notifications
+* Learn how to send emails
+* Generate a list of birthday people of the week
+* In the Dashbord Belt distribuition, generate a list of all student with the selected Belt
+* Generate a list of Gender distribuition
+* Generate a list of age distribuition
+* Learn face recognition
+* Create a face recognition attendance
+* 
+
+TO FIX:
+
+GENERAL
+    * Create admin.py
+    * Use the username instead of email for login
+    * improve the forms look and feel using CSS
+    * add the logged username on the botton of the sidebar
+    
+ADD STAFF
+    * Create drop down menu for Gender
+    * Create drop down menu for state
+    * Create drop down menu for belt rank
+    * Add sub rank for stripes
+    * drop down menu for permissions
+
+MEMBER
+    * Promotions
+    * Switch status
+
+DASHBOARD
+    * Belt distribuition
+
+
+
+KPIs
+    * Create a KPI dashboard to show the gym performance
+

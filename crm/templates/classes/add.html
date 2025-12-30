@@ -1,0 +1,38 @@
+{% extends "layout.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+{% block header_title %}Class manager{% endblock %}
+
+{% block content %}
+
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card main-card">
+            <div class="card-body">
+                <h2 class="fw-bold mb-3">{{ title }}</h2>
+                <a href="{% url 'classes'%}" class="btn btn-custom-ghost"><i class="fa-solid fa-arrow-left"></i> Back to Staff</a>
+                <p class="text-muted mb-4">
+                    {% if action_url == 'addClass' %} 
+                    Create a new recurring class schedule with a specific time and one or more weekdays.
+                    {% elif action_url == 'editClass' %}
+                    Update the details for this recurring class schedule. 
+                    {% else %}
+                    No action selected.
+                    {% endif %}
+                </p> 
+                {% load crispy_forms_tags %}
+                <form action="{% if action_url == 'addClass' %}
+                                {% url 'addClasses' %}
+                            {% else %}
+                                {% url 'editClass' class_id=class.id %}
+                            {% endif %}"  
+                        method="post" class="django-form">
+                    {% csrf_token %}
+                    {{ form|crispy }}
+                    <input type="submit" value="Submit">
+                </form>    
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

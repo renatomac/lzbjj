@@ -1,0 +1,26 @@
+{% extends "login/layout.html" %}
+
+{% block body %}
+
+    <h2 class="text-center">Login</h2>
+
+    {% if message %}
+        <div>{{ message }}</div>
+    {% endif %}
+
+    <div class="mx-auto text-center">
+        <form action="{% url 'login' %}" method="post">
+            {% csrf_token %}
+            <div class="form-group my-3">
+                <input autofocus class="form-control" type="email" name="email" placeholder="Email">
+            </div>
+            <div class="form-group my-3">
+                <input class="form-control" type="password" name="password" placeholder="Password">
+            </div>
+            <input class="btn btn-secondary" type="submit" value="Login">
+        </form>
+    </p>    
+
+    Don't have an account? <a href="{% url 'register' %}">Register here.</a>
+
+{% endblock %}

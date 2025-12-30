@@ -1,0 +1,239 @@
+{% extends "layout.html" %}
+
+
+{% block title %}Member Profile{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Tabbed Content Section -->
+    <div class="card bg-white shadow-sm mb-4 w-50 mx-auto">
+        <div class="card-header border-bottom">
+            <ul class="nav nav-tabs card-header-tabs" id="myTab" role="tablist">
+                <li class="nav-item">
+                    <a class="nav-link active" id="personal-tab" data-bs-toggle="tab" href="#personal" role="tab" aria-controls="personal" aria-selected="true">
+                        <i class="far fa-address-card me-2"></i>Personal Information
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" id="responsible-tab" data-bs-toggle="tab" href="#responsible" role="tab" aria-controls="responsible" aria-selected="false">
+                        <i class="fas fa-user-shield me-2"></i>Responsible Party
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" id="emergency-tab" data-bs-toggle="tab" href="#emergency" role="tab" aria-controls="emergency" aria-selected="false">
+                        <i class="fas fa-ambulance me-2"></i>Emergency Contact
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" id="membership-tab" data-bs-toggle="tab" href="#membership" role="tab" aria-controls="membership" aria-selected="false">
+                        <i class="fas fa-id-card-alt me-2"></i>Membership
+                    </a>
+                </li>
+                <li class="nav-item d-none">
+                    <a class="nav-link" id="details-tab" data-bs-toggle="tab" href="#details" role="tab" aria-controls="details" aria-selected="false">
+                        <i class="fas fa-bullseye me-2"></i>Details
+                    </a>
+                </li>
+                    <a class="nav-link d-none" id="billing-tab" data-bs-toggle="tab" href="#billing" role="tab" aria-controls="billing" aria-selected="false">
+                        <i class="far fa-credit-card me-2"></i>Billing
+                    </a>
+                </li>
+                <li class="nav-item d-none">
+                    <a class="nav-link" id="promotions-tab" data-bs-toggle="tab" href="#promotions" role="tab">
+                        <i class="fas fa-award me-2"></i>Promotions
+                    </a>
+                </li>
+                <li class="nav-item d-none">
+                    <a class="nav-link" id="classes-tab" data-bs-toggle="tab" href="#classes" role="tab">
+                        <i class="fas fa-chalkboard-teacher me-2"></i>Classes
+                    </a>
+                </li>
+            </ul>
+        </div>
+        <div class="card-body">
+            <div class="tab-content" id="myTabContent">
+                <!-- Personal Information Tab -->
+                <div class="tab-pane fade show active" id="personal" role="tabpanel" aria-labelledby="personal-tab">
+                    <div class="card shadow-sm rounded-3">
+                        <div class="card-body">
+                            <div class="row g-4 align-items-center">
+                                <div class="col-md-3 text-center">
+                                    {% if member.photo %}
+                                        <img src="{{ member.photo }}" alt="member Photo"
+                                            class="img-fluid rounded-circle mb-2"
+                                            style="max-width: 150px;">
+                                    {% else %}
+                                        <div class="rounded-circle bg-secondary text-white d-flex align-items-center justify-content-center"
+                                            style="width: 150px; height: 150px; margin: auto;">
+                                            <i class="fa-solid fa-user fa-3x"></i>
+                                        </div>
+                                    {% endif %}
+                                </div>
+
+                                <div class="col-md-9">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <div>
+                                            <h4 class="fw-bold mb-1">
+                                                {{ member.first_name }} {{ member.last_name }}
+                                            </h4>
+                                            <span class="badge {% if member.is_active %}bg-success{% else %}bg-secondary{% endif %}">
+                                                {{ member.is_active|yesno:"Active,Inactive" }}
+                                            </span>
+                                            
+                                        </div>
+
+                                        <div>
+                                            <a href="{% url 'members' %}" class="btn btn-custom-ghost"><i class="fa-solid fa-arrow-left"></i> Back to member List</a>
+                                            
+                                        </div>
+                                    </div>
+
+                                    <hr>
+
+                                    <div class="row">
+                                        <div class="col-md-6 mb-2">
+                                            <strong>Role:</strong> {{ member.role }}
+                                        </div>
+                                        <div class="col-md-6 mb-2">
+                                            <strong>Gender:</strong> {{ member.get_gender_display }}
+                                        </div>
+                                        <div class="col-md-6 mb-2">
+                                            <strong>Belt Rank:</strong> {{ member.get_belt_rank_display }}
+                                        </div>
+                                        <div class="col-md-6 mb-2">
+                                            <strong>Stripes:</strong> {{ member.stripes }}
+                                        </div>
+                                        <div class="col-md-6 mb-2">
+                                            <strong>Date of Birth:</strong>
+                                            {{ member.date_of_birth|date:"M d, Y"|default:"—" }}
+                                        </div>
+                                        <div class="col-md-6 mb-2">
+                                            <strong>Join Date:</strong>
+                                            {{ member.join_date|date:"M d, Y" }}
+                                        </div>
+                                    </div>
+
+                                    <hr>
+
+                                    <!-- Address -->
+                                    <div>
+                                        <strong>Address:</strong><br>
+                                        {% if member.address %}
+                                            {{ member.address }}<br>
+                                            {{ member.city }}, {{ member.state }} {{ member.zip_code }}
+                                        {% else %}
+                                            <span class="text-muted">No address on file</span>
+                                        {% endif %}
+                                        <div class="mt-3 d-flex">
+                                            <a href="{% url 'editMember' member.id %}" class="btn btn-sm btn-outline-warning ms-auto">
+                                                <i class="fa-solid fa-pen"></i> Edit
+                                            </a>
+                                        </div>
+                                        <div class="btn-group">
+                                            <a href="{% url 'editMember' member_id=member.id %}" class="btn btn-primary">
+                                                <i class="fas fa-edit me-2"></i>Edit Profile
+                                            </a>
+                                        
+                                            {% csrf_token %}
+                                            <button button type="button" data-id = {{member.id}} data-type = "Member" class="toggle-status btn btn-sm {% if member.is_active %}btn-danger{% else %}btn-success{% endif %}" id='toggle-status' data-id = {{member.id}}>
+                                                <i id='toggle-img' class={% if member.is_active %} 'fas fa-user-slash' {% else %} 'fas fa-user-check' {% endif %}me-2></i>
+                                                {% if member.is_active %} Deactivate {% else %} Activate {% endif %} 
+                                            </button>
+                                        </div>
+                                    </div>
+                                            
+                                </div>
+                            </div>
+                                                        
+                        </div>
+                    </div>
+                </div>
+                <!-- Responsible Information Tab -->
+                <div class="tab-pane fade" id="responsible" role="tabpanel" aria-labelledby="responsible-tab">
+                    <div class="card shadow-sm rounded-3">
+                        <h3 class="h5 mb-3 text-red-500 font-bold d-none">Responsible Party Information</h3>
+                        <div class="row g-3  w-75 mx-auto my-3" id='responsible-contacts' data-member-id = {{member.id}}> 
+                            <!-- Filled with JavaScript -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Emergency Contact Tab -->
+                <div class="tab-pane fade" id="emergency" role="tabpanel" aria-labelledby="emergency-tab">
+                    <div class="card shadow-sm rounded-3">
+                        <h3 class="h5 mb-3 text-red-500 font-bold d-none">Emergency Contact Information</h3>
+                        <div class="row g-3 w-75 mx-auto my-3" id='emergency-contacts' data-member-id = {{member.id}}>
+                            <!-- Filled with JavaScript -->
+                        </div>
+                    </div>    
+                </div>
+
+                <!-- Membership Information Tab -->
+                <div class="tab-pane fade" id="membership" role="tabpanel" aria-labelledby="membership-tab">
+                    <div class="card shadow-sm rounded-3">
+                    <h3 class="h5 mb-3 text-red-500 font-bold d-none">Membership Details</h3>
+                    <div class="row g-3 m-4">
+                        <div class="col-md-4">
+                            <strong>Membership Plan:</strong>
+                            <p class="text-secondary">{{ member.membership_plan }}</p>
+                        </div>
+                        <div class="col-md-4">
+                            <strong>Join Date:</strong>
+                            <p class="text-secondary">{{ member.join_date }}</p>
+                        </div>
+                        <div class="col-md-4">
+                            <strong>Belt Rank:</strong>
+                            <p class="text-secondary">{{ member.belt_rank }}</p>
+                        </div>
+                        <div class="col-md-4">
+                            <strong>Stripes:</strong>
+                            <p class="text-secondary">{{ member.stripes }}</p>
+                        </div>
+                        <div class="col-md-4">
+                            <strong>Active:</strong>
+                            <p class="text-secondary">{% if  member.is_active%} 'Yes' {% else %} 'No'{% endif %} </p>
+                        </div>
+                        <div class="col-md-4">
+                            <strong>Waivers Signed:</strong>
+                            <p class="text-secondary">{% if  member.waivers_signed%} 'Yes' {% else %} 'No' {% endif %}</p>
+                        </div>
+                        <div class="col-md-12">
+                            <strong>Notes:</strong>
+                            <p class="text-secondary">{{ member.membership_notes }}</p>
+                        </div>
+                        <div class="col-md-12">
+                            <strong>Photo:</strong>
+                            {% if member.photo %}
+                                <img src="{{ member.photo }}" alt="Member Photo" class="img-fluid rounded shadow-sm" style="max-height: 200px;">
+                            {% else %}
+                                <p class="text-secondary">No photo available</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Deactivate Modal -->
+<div class="modal fade" id="deactivateModal" tabindex="-1" aria-labelledby="deactivateModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deactivateModalLabel">Confirm Action</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                Are you sure you want to toggle the active status of this member?
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="deactivateMemberBtn">Confirm</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

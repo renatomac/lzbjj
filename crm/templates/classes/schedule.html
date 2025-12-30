@@ -1,0 +1,39 @@
+{% extends "layout.html" %}
+
+{% block title %}{{ title }} {% endblock %}
+{% block header_title %}{{ title }}{% endblock %}
+
+{% block content %}
+
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card main-card">
+            <div class="card-body">
+            <h5 class="fw-bold mb-3">{{ title }} </h5>
+            <p class="text-muted mb-4">
+                {% if action_url == 'addClass' %} {
+                'Create a new recurring class schedule with a specific time and one or more weekdays.'
+                } 
+                {% elif action_url == 'editClass' %} {
+                'Update the details for this recurring class schedule.' 
+                }
+                {% else %}
+                'No action selected.'
+                {% endif %}
+            </p>  
+            <form action="{% if action_url == 'addClass' %}
+                            {% url 'addClass' %}
+                        {% else %}
+                            {% url 'editClass' class_id=class_id %}
+                        {% endif %}"  
+                    method="post">
+                {% csrf_token %}
+                {{ form }}
+                <input type="submit" value="Submit">
+            </form>    
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

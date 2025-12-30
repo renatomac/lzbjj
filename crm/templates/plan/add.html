@@ -1,0 +1,46 @@
+{% extends "layout.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+{% block header_title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="card mb-4">
+      <div class="card-body">
+
+        <!-- Header -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+          <h3 class="fw-bold mb-0">{{ title }}</h3>
+          <a href="{% url 'plan' %}" class="btn btn-outline-secondary">
+            <i class="fa-solid fa-arrow-left me-2"></i>Back to Membership
+          </a>
+        </div>
+
+        {% load crispy_forms_tags %}
+
+        <!-- Form -->
+        <form method="post"
+              action="{% if action_url == 'addPlan' %}
+                        {% url 'addPlan' %}
+                      {% else %}
+                        {% url 'editPlan' plan_id=plan_id %}
+                      {% endif %}">
+          {% csrf_token %}
+
+          {{ form|crispy }}
+
+          <!-- Actions -->
+          <div class="d-flex justify-content-end gap-2 mt-4">
+            <a href="{% url 'plan' %}" class="btn btn-outline-secondary">
+              Cancel
+            </a>
+            <button type="submit" class="btn btn-primary">
+              Save
+            </button>
+          </div>
+        </form>
+
+      </div>
+    </div>
+</div>
+{% endblock %}

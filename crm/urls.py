@@ -1,0 +1,51 @@
+from django.urls import path
+from . import views
+
+urlpatterns = [
+    path("", views.index, name="index"),
+    path("login", views.login_view, name="login"),
+    path("logout", views.logout_view, name="logout"),
+    path("register", views.register, name="register"),
+    path("dashboard", views.dashboard, name="dashboard"),
+    path("session/<int:session_id>/", views.view_session, name="view_session"),
+    path("getClasses/<str:strDate>/", views.getClasses, name="getClasses"),
+    path("getStudents/<int:class_id>/", views.getStudents, name="getStudents"),
+    path("toggleAttendance/<int:member_id>/", views.toggleAttendance, name="toggleAttendance"),
+
+    
+    path("classes", views.classes, name="classes"),
+    path("addClasses", views.addClasses, name="addClasses"),
+    path("editClass/<int:class_id>/", views.editClass, name="editClass"),
+    path("deleteClass/<int:class_id>/", views.deleteClass, name="deleteClass"),
+    path("exportSchedule", views.exportSchedule, name="exportSchedule"),
+    path("typesClasses", views.typesClasses, name="typesClasses"),
+    path("attendance", views.attendance, name="attendance"),
+    path("attendanceRecord/<int:class_id>/", views.attendanceRecord, name="attendanceRecord"),
+    path("getClassesByDate/<str:date>/", views.getClassesByDate, name="getClassesByDate"),
+    path("billing", views.billing, name="billing"),
+    path("reports", views.reports, name="reports"),
+    path('revenue', views.reportsRevenue, name='revenue'),
+    path("staff", views.staff, name="staff"),
+    path("addStaff", views.addStaff, name="addStaff"),
+    path("editStaff/<int:staff_id>/", views.editStaff, name="editStaff"),
+    path("viewStaff/<int:staff_id>/", views.viewStaff, name="viewStaff"),
+    path("deleteStaff/<int:staff_id>/", views.deleteStaff, name="deleteStaff"),
+    path("exportStaff", views.exportStaff, name="exportStaff"),
+    path("membership", views.membership, name="membership"),
+    path("plan", views.plan, name="plan"),
+    path("addPlan", views.addPlan, name="addPlan"),
+    path("editPlan/<int:plan_id>/", views.editPlan, name="editPlan"),
+    path("deletePlan/<int:plan_id>/", views.deletePlan, name="deletePlan"),
+    path("members", views.members, name="members"),
+    path("addMember", views.addMember, name="addMember"),
+    path("editMember/<int:member_id>/", views.editMember, name="editMember"),
+    path("deleteMember/<int:member_id>/", views.deleteMember, name="deleteMember"),
+    path("exportMembers", views.exportMembers, name="exportMembers"),
+    path("viewMember/<int:member_id>/", views.viewMember, name="viewMember"),
+    path("recordPayment/<int:member_id>/", views.recordPayment, name="recordPayment"),
+    path("addPromotion/<int:member_id>/", views.addPromotion, name="addPromotion"),
+    path("toggleStatus/<str:type>/<int:member_id>/", views.toggleStatus, name="toggleStatus"),
+    path("getContacts/<int:member_id>/", views.getContacts, name="getContacts"),
+   
+    # API Routes
+]

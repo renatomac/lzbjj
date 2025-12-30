@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Grapple CRM - Billing</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+    body { font-family: 'Inter', sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; }
+    .card { background: rgba(255,255,255,0.95); backdrop-filter: blur(10px); border-radius: 16px; box-shadow: 0 20px 40px rgba(0,0,0,.12); }
+    .tabs { display:flex; gap:.5rem; flex-wrap:wrap; }
+    .tab-btn { color:#fff; background:rgba(255,255,255,.12); border-radius:10px; padding:.6rem 1rem; font-weight:700; }
+    .tab-btn.active { background:rgba(255,255,255,.22); }
+    .input, .select, .textarea { width:100%; border:2px solid #e5e7eb; border-radius:10px; padding:12px 14px; background:#fff; transition: box-shadow .2s, border-color .2s; }
+    .input:focus, .select:focus, .textarea:focus { outline:none; border-color:#6366f1; box-shadow:0 0 0 4px rgba(99,102,241,.15); }
+    .btn { display:inline-flex; align-items:center; gap:.5rem; border-radius:10px; font-weight:700; transition: transform .12s, box-shadow .2s; }
+    .btn:active{ transform: translateY(1px); }
+    .btn-primary{ background: linear-gradient(135deg, #22c55e, #16a34a); color:#fff; }
+    .btn-secondary{ background:#111827; color:#fff; }
+    .btn-ghost{ background:transparent; color:#111827; border:2px solid #e5e7eb; }
+    .badge { display:inline-flex; align-items:center; gap:.4rem; border-radius:9999px; padding:.3rem .65rem; font-weight:700; font-size:.75rem; }
+    .badge-green{ background:#d1fae5; color:#065f46; }
+    .badge-red{ background:#fee2e2; color:#991b1b; }
+    .badge-amber{ background:#fef3c7; color:#92400e; }
+    .table { width:100%; border-collapse:separate; border-spacing:0 10px; }
+    .tr { background:#fff; border-radius:12px; }
+    .tr td { padding:16px; }
+    .empty { border:2px dashed #e5e7eb; border-radius:12px; padding:24px; text-align:center; color:#6b7280; }
+    .row { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
+    @media (max-width: 1024px){ .row { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="min-h-screen p-6">
+    <div class="max-w-7xl mx-auto">
+      <!-- Header -->
+      <div class="flex items-center justify-between mb-6">
+        <div>
+          <h1 class="text-4xl font-extrabold text-white">Billing</h1>
+          <p class="text-white/85">Create invoices, track payments, and manage balances</p>
+        </div>
+        <div class="tabs">
+          <button class="tab-btn active" data-tab="dashboard"><i class="fa-solid fa-file-invoice-dollar"></i> Invoices</button>
+          <button class="tab-btn" data-tab="add"><i class="fa-solid fa-plus"></i> Add Invoice</button>
+          <button class="tab-btn" data-tab="history"><i class="fa-solid fa-clock-rotate-left"></i> Payments</button>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Main -->
+        <div class="lg:col-span-2 space-y-6">
+          <!-- Invoices -->
+          <section id="tab-dashboard" class="card p-6">
+            <div class="flex items-center justify-between mb-4 gap-3 flex-wrap">
+              <div class="flex items-center gap-2">
+                <div class="relative">
+                  <i class="fa-solid fa-magnifying-glass text-gray-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+                  <input id="invSearch" type="text" class="input pl-10" placeholder="Search by member or invoice no."/>
+                </div>
+                <select id="invStatus" class="select">
+                  <option value="">All</option>
+                  <option value="unpaid">Unpaid</option>
+                  <option value="partial">Partial</option>
+                  <option value="paid">Paid</option>
+                  <option value="overdue">Overdue</option>
+                </select>
+              </div>
+              <div class="flex items-center gap-2">
+                <button id="clearInvFilters" class="btn btn-ghost px-4 py-2"><i class="fa-solid fa-eraser"></i> Clear</button>
+                <button class="btn btn-primary px-4 py-2" data-tab-jump="add"><i class="fa-solid fa-plus"></i> New Invoice</button>
+              </div>
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="table">
+                <tbody id="invoiceRows"></tbody>
+              </table>
+            </div>
+            <div id="invEmpty" class="empty mt-4 hidden">
+              <i class="fa-regular fa-file-lines text-xl mb-2"></i>
+              <p>No invoices found.</p>
+            </div>
+          </section>
+
+          <!-- Add Invoice -->
+          <section id="tab-add" class="card p-6 hidden">
+            <div class="flex items-center justify-between mb-2">
+              <h3 class="text-lg font-extrabold text-gray-900">Add Invoice</h3>
+              <button class="btn btn-ghost px-4 py-2" data-tab-jump="dashboard"><i class="fa-solid fa-arrow-left"></i> Back to Invoices</button>
+            </div>
+            <form id="addInvoiceForm" class="space-y-6">
+              <div class="row">
+                <div>
+                  <label class="block text-sm font-semibold text-gray-700 mb-2">Member</label>
+                  <input id="invMember" type="text" class="input" placeholder="e.g., John Doe"/>
+                </div>
+                <div>
+                  <label class="block text-sm font-semibold text-gray-700 mb-2">Invoice Date</label>
+                  <input id="invDate" type="date" class="input"/>
+                </div>
+              </div>
+
+              <div class="row">
+                <div>
+                  <label class="block text-sm font-semibold text-gray-700 mb-2">Due Date</label>
+                  <input id="dueDate" type="date" class="input"/>
+                </div>
+                <div>
+                  <label class="block text-sm font-semibold text-gray-700 mb-2">Status</label>
+                  <select id="invStatusNew" class="select">
+                    <option value="unpaid">Unpaid</option>
+                    <option value="partial">Partial</option>
+                    <option value="paid">Paid</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-2">Line Items</label>
+                <div id="items" class="space-y-3"></div>
+                <button type="button" id="addItem" class="btn btn-ghost px-4 py-2 mt-2"><i class="fa-solid fa-plus"></i> Add Item</button>
+              </div>
+
+              <div class="row">
+                <div>
+                  <label class="block text-sm font-semibold text-gray-700 mb-2">Notes (optional)</label>
+                  <textarea id="invNotes" rows="3" class="textarea" placeholder="Optional info for the member…"></textarea>
+                </div>
+                <div>
+                  <div class="border-2 border-gray-100 rounded-xl p-4">
+                    <div class="flex items-center justify-between">
+                      <span class="text-gray-700 font-semibold">Subtotal</span>
+                      <span id="subtotal" class="font-extrabold">$0.00</span>
+                    </div>
+                    <div class="flex items-center justify-between mt-2">
+                      <span class="text-gray-700 font-semibold">Tax (0%)</span>
+                      <span id="tax" class="font-extrabold">$0.00</span>
+                    </div>
+                    <div class="flex items-center justify-between mt-2 border-t pt-3">
+                      <span class="text-gray-900 font-extrabold">Total</span>
+                      <span id="total" class="text-gray-900 font-extrabold">$0.00</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="flex items-center justify-between">
+                <button type="button" id="previewInvoice" class="btn btn-ghost px-4 py-2"><i class="fa-solid fa-eye"></i> Preview</button>
+                <div class="flex items-center gap-3">
+                  <button type="button" id="saveDraft" class="btn btn-secondary px-4 py-2"><i class="fa-solid fa-save"></i> Save Draft</button>
+                  <button type="submit" class="btn btn-primary px-4 py-2"><i class="fa-solid fa-check"></i> Create Invoice</button>
+                </div>
+              </div>
+            </form>
+          </section>
+
+          <!-- Payments History -->
+          <section id="tab-history" class="card p-6 hidden">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-lg font-extrabold text-gray-900">Payment History</h3>
+              <div class="flex items-center gap-2">
+                <select id="payFilter" class="select">
+                  <option value="">All Methods</option>
+                  <option>Card</option><option>Cash</option><option>Bank</option><option>Check</option>
+                </select>
+                <button id="clearPayFilters" class="btn btn-ghost px-4 py-2"><i class="fa-solid fa-eraser"></i> Clear</button>
+              </div>
+            </div>
+            <div id="payments" class="space-y-3"></div>
+            <div id="payEmpty" class="empty mt-4 hidden">
+              <i class="fa-regular fa-credit-card text-xl mb-2"></i>
+              <p>No payments to show.</p>
+            </div>
+          </section>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="space-y-6">
+          <div class="card p-6">
+            <h4 class="font-bold text-gray-900 mb-3">Summary</h4>
+            <div class="space-y-3">
+              <div class="flex items-center justify-between">
+                <span class="text-gray-600">Unpaid</span>
+                <span id="sumUnpaid" class="font-extrabold text-gray-900">$0.00</span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-gray-600">Overdue</span>
+                <span id="sumOverdue" class="font-extrabold text-red-700">$0.00</span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-gray-600">Paid (30d)</span>
+                <span id="sumPaid" class="font-extrabold text-green-700">$0.00</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="card p-6">
+            <h4 class="font-bold text-gray-900 mb-3">Quick Actions</h4>
+            <div class="grid grid-cols-1 gap-2">
+              <button class="btn btn-secondary w-full py-2" data-tab-jump="add"><i class="fa-solid fa-file-circle-plus"></i> New Invoice</button>
+              <button class="btn btn-ghost w-full py-2" id="markSelectedPaid"><i class="fa-solid fa-circle-check"></i> Mark Selected Paid</button>
+              <button class="btn btn-ghost w-full py-2" id="exportInvoices"><i class="fa-solid fa-download"></i> Export Invoices</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal -->
+      <div id="modal" class="hidden fixed inset-0 bg-black/50 z-50 items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-xl w-full p-6">
+          <div class="flex items-center justify-between mb-4">
+            <h3 id="modalTitle" class="text-lg font-bold text-gray-900">Preview</h3>
+            <button class="text-gray-500 hover:text-gray-700" onclick="toggleModal(false)"><i class="fa-solid fa-xmark"></i></button>
+          </div>
+          <div id="modalBody" class="space-y-4"></div>
+          <div class="mt-6 flex items-center justify-end gap-3">
+            <button class="btn btn-ghost px-4 py-2" onclick="toggleModal(false)">Cancel</button>
+            <button id="modalConfirm" class="btn btn-primary px-4 py-2">Confirm</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Toast -->
+      <div id="toast" class="hidden fixed bottom-4 right-4 bg-white rounded-xl shadow-xl border border-gray-200 px-4 py-3 z-50">
+        <div class="flex items-center gap-2 text-gray-800">
+          <i class="fa-solid fa-check-circle text-green-600"></i>
+          <span id="toastMsg">Saved</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Sample data
+    let invoices = [
+      { id:'INV-1001', member:'John Doe', date:'2025-01-05', due:'2025-01-20', items:[{d:'Unlimited Monthly', q:1, p:150}], status:'paid', paid:150 },
+      { id:'INV-1002', member:'Maria Santos', date:'2025-01-10', due:'2025-01-25', items:[{d:'8 Classes', q:1, p:120}], status:'unpaid', paid:0 },
+      { id:'INV-1003', member:'Alex Chen', date:'2025-01-12', due:'2025-01-20', items:[{d:'Drop-in', q:3, p:25}], status:'partial', paid:25 },
+      { id:'INV-1004', member:'Priya Patel', date:'2024-12-20', due:'2024-12-27', items:[{d:'Unlimited Monthly', q:1, p:150}], status:'overdue', paid:0 },
+    ];
+
+    let payments = [
+      { id:'PAY-301', member:'John Doe', amount:150, method:'Card', date:'2025-01-05', ref:'**** 4242' },
+      { id:'PAY-302', member:'Alex Chen', amount:25, method:'Cash', date:'2025-01-12', ref:'' },
+      { id:'PAY-303', member:'Liam O’Brien', amount:25, method:'Bank', date:'2024-12-10', ref:'TRX-5512' },
+    ];
+
+    // Tabs
+    document.querySelectorAll('.tab-btn').forEach(b=>{
+      b.addEventListener('click', ()=>{
+        document.querySelectorAll('.tab-btn').forEach(x=>x.classList.remove('active'));
+        b.classList.add('active');
+        showTab(b.dataset.tab);
+      });
+    });
+    document.querySelectorAll('[data-tab-jump]').forEach(b=>{
+      b.addEventListener('click', ()=> jumpTo(b.dataset.tabJump));
+    });
+
+    function showTab(tab){
+      ['dashboard','add','history'].forEach(t=>{
+        document.getElementById('tab-'+t)?.classList.toggle('hidden', t!==tab);
+      });
+      if(tab==='dashboard') renderInvoices();
+      if(tab==='add') initAdd();
+      if(tab==='history') renderPayments();
+      updateSummary();
+    }
+    function jumpTo(tab){
+      document.querySelectorAll('.tab-btn').forEach(x=>{
+        x.classList.toggle('active', x.dataset.tab===tab);
+      });
+      showTab(tab);
+    }
+
+    // Invoices list
+    document.getElementById('invSearch').addEventListener('input', renderInvoices);
+    document.getElementById('invStatus').addEventListener('change', renderInvoices);
+    document.getElementById('clearInvFilters').addEventListener('click', ()=>{
+      document.getElementById('invSearch').value = '';
+      document.getElementById('invStatus').value = '';
+      renderInvoices();
+    });
+
+    function renderInvoices(){
+      const body = document.getElementById('invoiceRows');
+      const term = document.getElementById('invSearch').value.toLowerCase();
+      const status = document.getElementById('invStatus').value;
+      body.innerHTML = '';
+
+      const filtered = invoices.filter(inv=>{
+        const tMatch = inv.member.toLowerCase().includes(term) || inv.id.toLowerCase().includes(term);
+        const sMatch = !status || inv.status===status;
+        return tMatch && sMatch;
+      });
+
+      document.getElementById('invEmpty').classList.toggle('hidden', filtered.length>0);
+
+      filtered.forEach(inv=>{
+        const total = inv.items.reduce((s,it)=> s + it.q*it.p, 0);
+        const tr = document.createElement('tr');
+        tr.className = 'tr';
+        tr.innerHTML = `
+          <td class="w-[24%]">
+            <div class="font-extrabold text-gray-900">${inv.id}</div>
+            <div class="text-sm text-gray-600">${inv.member}</div>
+          </td>
+          <td class="w-[22%]">
+            <div class="text-sm text-gray-600">Date: ${inv.date}</div>
+            <div class="text-sm text-gray-600">Due: ${inv.due}</div>
+          </td>
+          <td class="w-[22%]">
+            <div class="font-semibold text-gray-900">$${total.toFixed(2)}</div>
+            <div class="text-xs text-gray-500">Paid: $${inv.paid.toFixed(2)}</div>
+          </td>
+          <td class="w-[18%]">
+            <span class="badge ${badgeForStatus(inv.status)}">${labelStatus(inv.status)}</span>
+          </td>
+          <td class="w-[14%] text-right">
+            <input type="checkbox" class="mr-3 align-middle" data-select="${inv.id}" title="Select"/>
+            <button class="btn btn-ghost px-3 py-2" data-mark="${inv.id}"><i class="fa-solid fa-circle-check"></i></button>
+            <button class="btn btn-ghost px-3 py-2" data-delete="${inv.id}"><i class="fa-solid fa-trash"></i></button>
+          </td>
+        `;
+        body.appendChild(tr);
+      });
+
+      body.querySelectorAll('[data-mark]').forEach(b=>{
+        b.addEventListener('click', ()=>{
+          const id = b.dataset.mark;
+          markPaid(id);
+        });
+      });
+      body.querySelectorAll('[data-delete]').forEach(b=>{
+        b.addEventListener('click', ()=>{
+          const id = b.dataset.delete;
+          if(confirm(`Delete ${id}?`)){
+            invoices = invoices.filter(x=>x.id!==id);
+            renderInvoices(); updateSummary(); toast('Invoice deleted.');
+          }
+        });
+      });
+    }
+
+    function markPaid(id){
+      const inv = invoices.find(x=>x.id===id);
+      if(!inv) return;
+      const total = inv.items.reduce((s,it)=> s + it.q*it.p, 0);
+      inv.status = 'paid';
+      inv.paid = total;
+      // add payment record
+      payments.unshift({
+        id: 'PAY-'+(Math.floor(Math.random()*900)+100),
+        member: inv.member,
+        amount: total,
+        method: 'Card',
+        date: new Date().toISOString().split('T')[0],
+        ref: 'Recorded from invoice'
+      });
+      renderInvoices(); updateSummary(); toast(`${id} marked as paid.`);
+    }
+
+    document.getElementById('markSelectedPaid').addEventListener('click', ()=>{
+      const ids = Array.from(document.querySelectorAll('[data-select]:checked')).map(el=>el.getAttribute('data-select'));
+      if(ids.length===0){ toast('No invoices selected.'); return; }
+      ids.forEach(id=> markPaid(id));
+    });
+
+    document.getElementById('exportInvoices').addEventListener('click', ()=>{
+      if(invoices.length===0){ toast('No invoices to export.'); return; }
+      const rows = [['Invoice','Member','Date','Due','Total','Paid','Status']].concat(
+        invoices.map(inv=>{
+          const total = inv.items.reduce((s,it)=> s + it.q*it.p, 0);
+          return [inv.id, inv.member, inv.date, inv.due, total.toFixed(2), inv.paid.toFixed(2), labelStatus(inv.status)];
+        })
+      );
+      const csv = rows.map(r=> r.map(cell=> `"${String(cell).replace(/"/g,'""')}"`).join(',')).join('\n');
+      const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'invoices.csv';
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    function labelStatus(s){
+      switch(s){
+        case 'paid': return 'Paid';
+        case 'unpaid': return 'Unpaid';
+        case 'partial': return 'Partial';
+        case 'overdue': return 'Overdue';
+        default: return 'Status';
+      }
+    }
+    function badgeForStatus(s){
+      return s==='paid' ? 'badge-green' : s==='overdue' ? 'badge-red' : 'badge-amber';
+    }
+
+    // Add invoice form
+    function initAdd(){
+      document.getElementById('invDate').value = new Date().toISOString().split('T')[0];
+      const due = new Date(); due.setDate(due.getDate()+14);
+      document.getElementById('dueDate').value = due.toISOString().split('T')[0];
+
+      // Reset if empty
+      if(document.getElementById('items').children.length===0){
+        addItemRow('Monthly Membership', 1, 150);
+      }
+      calcTotals();
+      loadDraft();
+    }
+
+    document.getElementById('addItem').addEventListener('click', ()=> addItemRow('', 1, 0));
+
+    function addItemRow(desc, qty, price){
+      const wrap = document.getElementById('items');
+      const row = document.createElement('div');
+      row.className = 'grid grid-cols-12 gap-2 items-center';
+      row.innerHTML = `
+        <div class="col-span-6">
+          <input type="text" placeholder="Description" class="input item-desc" value="${escapeHtml(String(desc))}"/>
+        </div>
+        <div class="col-span-2">
+          <input type="number" min="1" class="input item-qty" value="${qty}"/>
+        </div>
+        <div class="col-span-3">
+          <div class="relative">
+            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold">$</span>
+            <input type="text" inputmode="decimal" class="input pl-8 item-price" value="${Number(price).toFixed(2)}"/>
+          </div>
+        </div>
+        <div class="col-span-1 text-right">
+          <button type="button" class="btn btn-ghost px-3 py-2 item-remove"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+      `;
+      wrap.appendChild(row);
+      row.querySelectorAll('.item-qty, .item-price, .item-desc').forEach(el=> el.addEventListener('input', calcTotals));
+      row.querySelector('.item-remove').addEventListener('click', ()=> { row.remove(); calcTotals(); });
+    }
+
+    function calcTotals(){
+      let subtotal = 0;
+      document.querySelectorAll('#items .grid').forEach(row=>{
+        const qty = parseInt(row.querySelector('.item-qty').value || '0', 10);
+        let price = parseFloat(row.querySelector('.item-price').value || '0');
+        if(isNaN(price)) price = 0;
+        subtotal += qty * price;
+      });
+      const tax = 0; // set your tax logic if needed
+      document.getElementById('subtotal').textContent = `$${subtotal.toFixed(2)}`;
+      document.getElementById('tax').textContent = `$${tax.toFixed(2)}`;
+      document.getElementById('total').textContent = `$${(subtotal+tax).toFixed(2)}`;
+    }
+
+    document.getElementById('previewInvoice').addEventListener('click', ()=>{
+      const p = collectInvoicePayload();
+      if(!validateInvoice(p)) return;
+      document.getElementById('modalTitle').textContent = 'Invoice Preview';
+      document.getElementById('modalBody').innerHTML = renderInvoicePreview(p);
+      const confirm = document.getElementById('modalConfirm');
+      confirm.onclick = ()=> { toggleModal(false); createInvoice(p); };
+      toggleModal(true);
+    });
+
+    document.getElementById('addInvoiceForm').addEventListener('submit', (e)=>{
+      e.preventDefault();
+      const p = collectInvoicePayload();
+      if(!validateInvoice(p)) return;
+      createInvoice(p);
+    });
+
+    document.getElementById('saveDraft').addEventListener('click', ()=>{
+      const p = collectInvoicePayload();
+      localStorage.setItem('invoiceDraft', JSON.stringify(p));
+      toast('Draft saved');
+    });
+
+    function collectInvoicePayload(){
+      const items = [];
+      document.querySelectorAll('#items .grid').forEach(row=>{
+        const d = row.querySelector('.item-desc').value.trim();
+        const q = parseInt(row.querySelector('.item-qty').value || '0', 10);
+        const p = parseFloat(row.querySelector('.item-price').value || '0');
+        if(d && q>0 && !isNaN(p)){ items.push({d, q, p}); }
+      });
+      return {
+        member: document.getElementById('invMember').value.trim(),
+        date: document.getElementById('invDate').value,
+        due: document.getElementById('dueDate').value,
+        status: document.getElementById('invStatusNew').value,
+        notes: document.getElementById('invNotes').value.trim(),
+        items
+      };
+    }
+
+    function validateInvoice(p){
+      if(!p.member){ toast('Please enter a member name.'); return false; }
+      if(!p.date || !p.due){ toast('Please set invoice and due dates.'); return false; }
+      if(p.items.length===0){ toast('Add at least one line item.'); return false; }
+      return true;
+    }
+
+    function createInvoice(p){
+      const id = 'INV-' + (Math.floor(Math.random()*9000)+1000);
+      const paid = p.status==='paid' ? p.items.reduce((s,i)=>s+i.q*i.p,0) : p.status==='partial' ? 0 : 0;
+      invoices.unshift({ id, member:p.member, date:p.date, due:p.due, items:p.items, status:p.status, paid });
+      localStorage.removeItem('invoiceDraft');
+      showTab('dashboard');
+      renderInvoices(); updateSummary();
+      toast('Invoice created!');
+    }
+
+    function renderInvoicePreview(p){
+      const total = p.items.reduce((s,i)=>s+i.q*i.p,0);
+      return `
+        <div class="border-2 border-gray-100 rounded-xl p-4">
+          <div class="text-sm text-gray-500 mb-1">Member</div>
+          <div class="font-extrabold text-gray-900">${escapeHtml(p.member)}</div>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="border-2 border-gray-100 rounded-xl p-4">
+            <div class="text-sm text-gray-500 mb-1">Invoice Date</div>
+            <div class="font-semibold">${p.date}</div>
+          </div>
+          <div class="border-2 border-gray-100 rounded-xl p-4">
+            <div class="text-sm text-gray-500 mb-1">Due Date</div>
+            <div class="font-semibold">${p.due}</div>
+          </div>
+          <div class="border-2 border-gray-100 rounded-xl p-4">
+            <div class="text-sm text-gray-500 mb-1">Status</div>
+            <span class="badge ${badgeForStatus(p.status)}">${labelStatus(p.status)}</span>
+          </div>
+        </div>
+        <div class="border-2 border-gray-100 rounded-xl p-4">
+          <div class="text-sm text-gray-500 mb-2">Items</div>
+          <div class="space-y-2">
+            ${p.items.map(i=>`
+              <div class="flex items-center justify-between">
+                <div>${escapeHtml(i.d)} <span class="text-gray-500">x${i.q}</span></div>
+                <div class="font-semibold">$${(i.q*i.p).toFixed(2)}</div>
+              </div>
+            `).join('')}
+          </div>
+          <div class="mt-3 border-t pt-3 flex items-center justify-between">
+            <div class="text-gray-900 font-extrabold">Total</div>
+            <div class="text-gray-900 font-extrabold">$${total.toFixed(2)}</div>
+          </div>
+        </div>
+        ${p.notes ? `
+          <div class="border-2 border-gray-100 rounded-xl p-4">
+            <div class="text-sm text-gray-500 mb-1">Notes</div>
+            <div class="text-gray-800">${escapeHtml(p.notes)}</div>
+          </div>` : ''
+        }
+      `;
+    }
+
+    function loadDraft(){
+      const raw = localStorage.getItem('invoiceDraft');
+      if(!raw) return;
+      try{
+        const d = JSON.parse(raw);
+        document.getElementById('invMember').value = d.member || '';
+        document.getElementById('invDate').value = d.date || '';
+        document.getElementById('dueDate').value = d.due || '';
+        document.getElementById('invStatusNew').value = d.status || 'unpaid';
+        document.getElementById('invNotes').value = d.notes || '';
+        // rebuild items
+        document.getElementById('items').innerHTML = '';
+        (d.items||[]).forEach(it=> addItemRow(it.d, it.q, it.p));
+        calcTotals();
+        toast('Draft loaded');
+      }catch(e){}
+    }
+
+    // Payments
+    document.getElementById('payFilter').addEventListener('change', renderPayments);
+    document.getElementById('clearPayFilters').addEventListener('click', ()=>{
+      document.getElementById('payFilter').value='';
+      renderPayments();
+    });
+
+    function renderPayments(){
+      const wrap = document.getElementById('payments');
+      const method = document.getElementById('payFilter').value;
+      wrap.innerHTML = '';
+      const filtered = payments.filter(p=> !method || p.method===method);
+      document.getElementById('payEmpty').classList.toggle('hidden', filtered.length>0);
+      filtered.forEach(p=>{
+        const row = document.createElement('div');
+        row.className = 'flex items-center justify-between border-2 border-gray-100 rounded-xl p-3';
+        row.innerHTML = `
+          <div>
+            <div class="font-extrabold text-gray-900">$${p.amount.toFixed(2)}</div>
+            <div class="text-xs text-gray-500">${p.method} • ${p.date}</div>
+          </div>
+          <div class="text-right">
+            <div class="font-semibold text-gray-900">${escapeHtml(p.member)}</div>
+            <div class="text-xs text-gray-500">${escapeHtml(p.ref || '')}</div>
+          </div>
+        `;
+        wrap.appendChild(row);
+      });
+    }
+
+    // Summary
+    function updateSummary(){
+      const sum = (arr)=> arr.reduce((s,x)=> s + x, 0);
+      const totals = invoices.map(inv=> inv.items.reduce((s,i)=>s+i.q*i.p,0));
+      const unpaid = invoices.filter(i=> i.status==='unpaid').map((i,idx)=> i.items.reduce((s,x)=>s+x.q*x.p,0) - i.paid);
+      const overdue = invoices.filter(i=> i.status==='overdue').map(i=> i.items.reduce((s,x)=>s+x.q*x.p,0) - i.paid);
+      const paid30 = payments.filter(p=> daysAgo(p.date)<=30).map(p=> p.amount);
+
+      document.getElementById('sumUnpaid').textContent = `$${sum(unpaid).toFixed(2)}`;
+      document.getElementById('sumOverdue').textContent = `$${sum(overdue).toFixed(2)}`;
+      document.getElementById('sumPaid').textContent = `$${sum(paid30).toFixed(2)}`;
+    }
+    function daysAgo(dateStr){
+      const d = new Date(dateStr);
+      return Math.floor((Date.now() - d.getTime())/(1000*60*60*24));
+    }
+
+    // Modal / Toast / Helpers
+    function toggleModal(show){
+      const m = document.getElementById('modal');
+      if(show){ m.classList.remove('hidden'); m.classList.add('flex'); }
+      else { m.classList.add('hidden'); m.classList.remove('flex'); }
+    }
+    function toast(msg){
+      const t = document.getElementById('toast');
+      document.getElementById('toastMsg').textContent = msg;
+      t.classList.remove('hidden');
+      setTimeout(()=> t.classList.add('hidden'), 2200);
+    }
+    function escapeHtml(str){ return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+    // Init
+    document.addEventListener('DOMContentLoaded', ()=>{
+      showTab('dashboard');
+      renderInvoices();
+      renderPayments();
+      updateSummary();
+    });
+  </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9716ed27d4fbfa11',t:'MTc1NTU3NzkzOS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>

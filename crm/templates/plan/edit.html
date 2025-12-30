@@ -1,0 +1,23 @@
+{% extends "layout.html" %}
+
+{% block title %}Edit Membership Plan{% endblock %}
+{% block header_title %}Edit Membership Plan{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card main-card mb-4">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h3 class="fw-bold mb-0">Edit Membership Plan</h3>
+                    <a href="{% url 'plan' %}" class="btn btn-custom-ghost"><i class="fa-solid fa-arrow-left"></i> Back to Membership</a>
+                </div>
+
+                
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        </div>
+</div>
+{% endblock %}

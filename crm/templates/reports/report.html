@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Grapple CRM - Reports</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet"/>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+    body { font-family: 'Inter', sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; }
+    .card { background: rgba(255,255,255,0.95); backdrop-filter: blur(10px); border-radius: 16px; box-shadow: 0 20px 40px rgba(0,0,0,.12); }
+    .btn { display:inline-flex; align-items:center; gap:.5rem; border-radius:10px; font-weight:700; transition: transform .12s, box-shadow .2s; }
+    .btn:active{ transform: translateY(1px); }
+    .btn-primary{ background: linear-gradient(135deg, #22c55e, #16a34a); color:#fff; }
+    .btn-secondary{ background:#111827; color:#fff; }
+    .btn-ghost{ background:transparent; color:#111827; border:2px solid #e5e7eb; }
+    .input, .select { width:100%; border:2px solid #e5e7eb; border-radius:10px; padding:12px 14px; background:#fff; transition: box-shadow .2s, border-color .2s; }
+    .input:focus, .select:focus { outline:none; border-color:#6366f1; box-shadow:0 0 0 4px rgba(99,102,241,.15); }
+    .kpi { border:2px solid #eef2f7; border-radius:14px; padding:16px; }
+    .kpi h4{ font-size:.9rem; color:#6b7280; font-weight:700; }
+    .kpi .val{ font-size:1.75rem; font-weight:800; color:#0f172a; }
+    .badge { display:inline-flex; align-items:center; gap:.4rem; border-radius:9999px; padding:.2rem .6rem; font-weight:700; font-size:.72rem; }
+    .badge-green{ background:#d1fae5; color:#065f46; }
+    .badge-amber{ background:#fef3c7; color:#92400e; }
+    .badge-blue{ background:#dbeafe; color:#1e40af; }
+    .tab { color:#fff; background:rgba(255,255,255,.12); border-radius:10px; padding:.6rem 1rem; font-weight:700; }
+    .tab.active { background:rgba(255,255,255,.22); }
+    .legend-dot{ width:10px; height:10px; border-radius:9999px; display:inline-block; }
+    .legend { display:flex; gap:12px; flex-wrap:wrap; }
+    .grid-2 { display:grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    @media (max-width:1024px){ .grid-2 { grid-template-columns: 1fr; } }
+    canvas { width: 100%; height: 260px; }
+    .table { width:100%; border-collapse:separate; border-spacing:0 8px; }
+    .tr { background:#fff; border-radius:12px; }
+    .tr td { padding:12px 16px; }
+    .empty { border:2px dashed #e5e7eb; border-radius:12px; padding:24px; text-align:center; color:#6b7280; }
+    .toggle { position:relative; width:48px; height:28px; border-radius:9999px; background:#e5e7eb; cursor:pointer; }
+    .dot { position:absolute; top:3px; left:3px; width:22px; height:22px; background:#fff; border-radius:9999px; transition:left .18s; }
+    .toggle.active { background:#22c55e; }
+    .toggle.active .dot { left:23px; }
+  </style>
+</head>
+<body>
+  <div class="min-h-screen p-6">
+    <div class="max-w-7xl mx-auto">
+      <!-- Header -->
+      <div class="flex items-center justify-between mb-6">
+        <div>
+          <h1 class="text-4xl font-extrabold text-white">Reports</h1>
+          <p class="text-white/85">Insights on members, attendance, and revenue</p>
+        </div>
+        <div class="flex gap-2">
+          <button id="exportCsv" class="btn btn-ghost px-4 py-2"><i class="fa-solid fa-file-export"></i> Export CSV</button>
+          <button id="refresh" class="btn btn-primary px-4 py-2"><i class="fa-solid fa-rotate"></i> Refresh</button>
+        </div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="flex items-center gap-2 mb-4 flex-wrap">
+        <button class="tab active" data-tab="members"><i class="fa-solid fa-user-group"></i> Members</button>
+        <button class="tab" data-tab="attendance"><i class="fa-solid fa-user-check"></i> Attendance</button>
+        <button class="tab" data-tab="revenue"><i class="fa-solid fa-sack-dollar"></i> Revenue</button>
+      </div>
+
+      <!-- Filters -->
+      <div class="card p-4 mb-6">
+        <div class="grid grid-cols-1 lg:grid-cols-5 gap-3">
+          <div class="lg:col-span-2">
+            <label class="block text-sm font-semibold text-gray-700 mb-2">Date Range</label>
+            <div class="grid grid-cols-2 gap-2">
+              <input id="fromDate" type="date" class="input"/>
+              <input id="toDate" type="date" class="input"/>
+            </div>
+          </div>
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-2">Granularity</label>
+            <select id="granularity" class="select">
+              <option value="daily">Daily</option>
+              <option value="weekly" selected>Weekly</option>
+              <option value="monthly">Monthly</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-2">Include Trials</label>
+            <div id="includeTrials" class="toggle"><div class="dot"></div></div>
+          </div>
+          <div class="flex items-end">
+            <button id="applyFilters" class="btn btn-secondary w-full py-3"><i class="fa-solid fa-sliders"></i> Apply</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- KPIs -->
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div class="kpi card">
+          <h4>Total Members</h4>
+          <div class="flex items-center justify-between">
+            <div class="val" id="kpiMembers">0</div>
+            <span class="badge badge-blue" id="kpiMembersDelta">+0%</span>
+          </div>
+        </div>
+        <div class="kpi card">
+          <h4>Active Members</h4>
+          <div class="flex items-center justify-between">
+            <div class="val" id="kpiActive">0</div>
+            <span class="badge badge-green" id="kpiActiveDelta">+0%</span>
+          </div>
+        </div>
+        <div class="kpi card">
+          <h4>Revenue</h4>
+          <div class="flex items-center justify-between">
+            <div class="val" id="kpiRevenue">$0</div>
+            <span class="badge badge-green" id="kpiRevenueDelta">+0%</span>
+          </div>
+        </div>
+        <div class="kpi card">
+          <h4>Avg. Attendance</h4>
+          <div class="flex items-center justify-between">
+            <div class="val" id="kpiAttendance">0</div>
+            <span class="badge badge-amber" id="kpiAttendanceDelta">-0%</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Content: three tabs -->
+      <div id="tab-members" class="space-y-6">
+        <div class="card p-6">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-extrabold text-gray-900">Members over time</h3>
+            <div class="legend">
+              <span><span class="legend-dot" style="background:#6366f1"></span> Total</span>
+              <span><span class="legend-dot" style="background:#10b981"></span> Active</span>
+            </div>
+          </div>
+          <canvas id="chartMembers"></canvas>
+        </div>
+
+        <div class="grid-2">
+          <div class="card p-6">
+            <h3 class="text-lg font-extrabold text-gray-900 mb-4">Belt distribution</h3>
+            <canvas id="chartBelts"></canvas>
+          </div>
+          <div class="card p-6">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-lg font-extrabold text-gray-900">Recent signups</h3>
+              <button id="exportSignups" class="btn btn-ghost px-4 py-2"><i class="fa-solid fa-download"></i> Export</button>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="table">
+                <tbody id="rowsSignups"></tbody>
+              </table>
+            </div>
+            <div id="emptySignups" class="empty hidden mt-3"><i class="fa-regular fa-user"></i><p>No signups in range.</p></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="tab-attendance" class="space-y-6 hidden">
+        <div class="card p-6">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-extrabold text-gray-900">Attendance trend</h3>
+            <div class="legend">
+              <span><span class="legend-dot" style="background:#22c55e"></span> Check-ins</span>
+            </div>
+          </div>
+          <canvas id="chartAttendance"></canvas>
+        </div>
+
+        <div class="grid-2">
+          <div class="card p-6">
+            <h3 class="text-lg font-extrabold text-gray-900 mb-4">Top classes</h3>
+            <div id="topClasses" class="space-y-3"></div>
+          </div>
+          <div class="card p-6">
+            <h3 class="text-lg font-extrabold text-gray-900 mb-4">Most active members</h3>
+            <div id="topMembers" class="space-y-3"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="tab-revenue" class="space-y-6 hidden">
+        <div class="card p-6">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-extrabold text-gray-900">Revenue trend</h3>
+            <div class="legend">
+              <span><span class="legend-dot" style="background:#0ea5e9"></span> Revenue</span>
+            </div>
+          </div>
+          <canvas id="chartRevenue"></canvas>
+        </div>
+
+        <div class="grid-2">
+          <div class="card p-6">
+            <h3 class="text-lg font-extrabold text-gray-900 mb-4">Plan mix</h3>
+            <canvas id="chartPlans"></canvas>
+          </div>
+          <div class="card p-6">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-lg font-extrabold text-gray-900">Recent payments</h3>
+              <button id="exportPayments" class="btn btn-ghost px-4 py-2"><i class="fa-solid fa-download"></i> Export</button>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="table">
+                <tbody id="rowsPayments"></tbody>
+              </table>
+            </div>
+            <div id="emptyPayments" class="empty hidden mt-3"><i class="fa-regular fa-credit-card"></i><p>No payments in range.</p></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Toast -->
+      <div id="toast" class="hidden fixed bottom-4 right-4 bg-white rounded-xl shadow-xl border border-gray-200 px-4 py-3 z-50">
+        <div class="flex items-center gap-2 text-gray-800">
+          <i class="fa-solid fa-check-circle text-green-600"></i>
+          <span id="toastMsg">Saved</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Demo data generators
+    function rand(min,max){ return Math.floor(Math.random()*(max-min+1))+min; }
+    function range(n, start=0){ return Array.from({length:n},(_,i)=>i+start); }
+    function toDateInput(d){ return d.toISOString().split('T')[0]; }
+
+    // State
+    let currentTab = 'members';
+    let includeTrials = false;
+    let granularity = 'weekly';
+    let fromDate, toDate;
+    let dataCache = {}; // simple cache per tab/range
+
+    // Init
+    document.addEventListener('DOMContentLoaded', ()=>{
+      // Dates default: last 90 days
+      const today = new Date();
+      const start = new Date(); start.setDate(today.getDate()-90);
+      document.getElementById('fromDate').value = toDateInput(start);
+      document.getElementById('toDate').value = toDateInput(today);
+
+      // Tab switching
+      document.querySelectorAll('.tab').forEach(t=>{
+        t.addEventListener('click', ()=>{
+          document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+          t.classList.add('active');
+          switchTab(t.dataset.tab);
+        });
+      });
+
+      // Filters
+      document.getElementById('includeTrials').addEventListener('click', function(){
+        this.classList.toggle('active');
+        includeTrials = this.classList.contains('active');
+      });
+      document.getElementById('granularity').addEventListener('change', e=> granularity = e.target.value);
+      document.getElementById('applyFilters').addEventListener('click', applyFilters);
+      document.getElementById('refresh').addEventListener('click', ()=> { dataCache = {}; applyFilters(); });
+
+      // Exports
+      document.getElementById('exportCsv').addEventListener('click', exportCurrentCsv);
+      document.getElementById('exportSignups').addEventListener('click', ()=> exportTable('rowsSignups','signups.csv'));
+      document.getElementById('exportPayments').addEventListener('click', ()=> exportTable('rowsPayments','payments.csv'));
+
+      // First render
+      applyFilters();
+    });
+
+    function switchTab(tab){
+      currentTab = tab;
+      ['members','attendance','revenue'].forEach(id=>{
+        document.getElementById('tab-'+id).classList.toggle('hidden', id!==tab);
+      });
+      renderAll();
+    }
+
+    function applyFilters(){
+      const f = document.getElementById('fromDate').value;
+      const t = document.getElementById('toDate').value;
+      if(!f || !t){ toast('Please select a date range.'); return; }
+      fromDate = new Date(f);
+      toDate = new Date(t);
+      renderAll();
+      toast('Filters applied');
+    }
+
+    function renderAll(){
+      // get or generate data
+      const key = `${currentTab}|${granularity}|${includeTrials}|${fromDate?.toISOString()}|${toDate?.toISOString()}`;
+      if(!dataCache[key]){
+        dataCache[key] = generateData();
+      }
+      const d = dataCache[key];
+
+      // KPIs
+      document.getElementById('kpiMembers').textContent = d.kpi.totalMembers;
+      document.getElementById('kpiActive').textContent = d.kpi.activeMembers;
+      document.getElementById('kpiRevenue').textContent = `$${d.kpi.revenue.toLocaleString()}`;
+      document.getElementById('kpiAttendance').textContent = d.kpi.avgAttendance;
+      document.getElementById('kpiMembersDelta').textContent = sign(d.kpi.membersDelta) + Math.abs(d.kpi.membersDelta) + '%';
+      document.getElementById('kpiActiveDelta').textContent = sign(d.kpi.activeDelta) + Math.abs(d.kpi.activeDelta) + '%';
+      document.getElementById('kpiRevenueDelta').textContent = sign(d.kpi.revenueDelta) + Math.abs(d.kpi.revenueDelta) + '%';
+      document.getElementById('kpiAttendanceDelta').textContent = sign(d.kpi.attendanceDelta) + Math.abs(d.kpi.attendanceDelta) + '%';
+
+      // Charts
+      drawLine('chartMembers', d.series.labels, [
+        { label:'Total', color:'#6366f1', data:d.series.members },
+        { label:'Active', color:'#10b981', data:d.series.active }
+      ]);
+      drawBar('chartAttendance', d.series.labels, [{ label:'Check-ins', color:'#22c55e', data:d.series.attendance }]);
+      drawLine('chartRevenue', d.series.labels, [{ label:'Revenue', color:'#0ea5e9', data:d.series.revenue }]);
+
+      drawPie('chartBelts', ['White','Blue','Purple','Brown','Black'], d.pie.belts, ['#e5e7eb','#3b82f6','#7c3aed','#8b5e34','#111827']);
+      drawPie('chartPlans', d.pie.plans.labels, d.pie.plans.data, ['#22c55e','#f59e0b','#06b6d4','#a855f7','#ef4444']);
+
+      // Tables
+      renderSignups(d.tables.signups);
+      renderPayments(d.tables.payments);
+
+      // Attendance lists
+      renderTopList('topClasses', d.lists.classes, 'classes');
+      renderTopList('topMembers', d.lists.members, 'check-ins');
+    }
+
+    function sign(n){ return n>=0?'+':'-'; }
+
+    // Data generator (demo)
+    function generateData(){
+      const points = granularity==='daily'? 14 : granularity==='weekly'? 10 : 8;
+      const labels = range(points).map(i=> labelForPoint(i, granularity));
+      const members = spark(points, 180, 12);
+      const active = members.map(v=> Math.max(0, v - rand(20,60)));
+      const attendance = range(points).map(()=> rand(30, 140));
+      const revenue = range(points).map(()=> rand(1200, 5200));
+
+      const kpi = {
+        totalMembers: members[members.length-1],
+        activeMembers: active[active.length-1],
+        revenue: revenue.reduce((s,x)=>s+x,0),
+        avgAttendance: Math.round(attendance.reduce((s,x)=>s+x,0)/attendance.length),
+        membersDelta: deltaPct(members),
+        activeDelta: deltaPct(active),
+        revenueDelta: deltaPct(revenue),
+        attendanceDelta: deltaPct(attendance)
+      };
+
+      const belts = [
+        rand(40,80), rand(30,70), rand(10,40), rand(8,25), rand(5,20)
+      ];
+      const planLabels = ['Unlimited','8/mo','4/mo','Drop-in','Other'];
+      const planData = [rand(60,120), rand(20,60), rand(10,40), rand(10,30), rand(5,20)];
+
+      const signups = range(rand(3,7)).map(i=> ({
+        name: sample(['John Doe','Maria Santos','Alex Chen','Priya Patel','Luke Nguyen','Ana Garcia','Chris Park']),
+        date: shiftDate(toDate, -rand(1,28)),
+        source: sample(['Website','Walk-in','Referral','Instagram']),
+        plan: sample(planLabels)
+      }));
+
+      const pays = range(rand(4,8)).map(i=> ({
+        member: sample(['John Doe','Maria Santos','Alex Chen','Priya Patel','Liam O’Brien']),
+        amount: rand(25, 180),
+        method: sample(['Card','Cash','Bank','Check']),
+        date: shiftDate(toDate, -rand(1,28)),
+        ref: sample(['**** 4242','Receipt 12A','TRX-8892',''])
+      }));
+
+      const classes = [
+        { name:'Fundamentals Gi', value: rand(60,180) },
+        { name:'All Levels No-Gi', value: rand(60,180) },
+        { name:'Advanced Gi', value: rand(60,180) },
+        { name:'Open Mat', value: rand(60,180) },
+        { name:'Kids', value: rand(60,180) },
+      ].sort((a,b)=>b.value-a.value);
+
+      const membersTop = range(5).map(()=> ({ name: sample(['John Doe','Maria Santos','Alex Chen','Priya Patel','Luke Nguyen','Ana Garcia']), value: rand(8,24) })).sort((a,b)=>b.value-a.value);
+
+      return {
+        series: { labels, members, active, attendance, revenue },
+        kpi,
+        pie: { belts, plans: { labels: planLabels, data: planData } },
+        tables: { signups, payments: pays },
+        lists: { classes, members: membersTop }
+      };
+    }
+
+    function deltaPct(arr){
+      if(arr.length<2) return 0;
+      const prev = arr[arr.length-2] || 1;
+      const curr = arr[arr.length-1] || 1;
+      return Math.round(((curr - prev) / (prev || 1)) * 100);
+    }
+    function labelForPoint(i, gran){
+      const d = new Date(fromDate || new Date());
+      if(gran==='daily'){ d.setDate(d.getDate() + i); return d.toLocaleDateString(); }
+      if(gran==='weekly'){ d.setDate(d.getDate() + i*7); return 'W' + weekNumber(d); }
+      d.setMonth(d.getMonth()+i); return d.toLocaleString('default',{ month:'short', year:'2-digit' });
+    }
+    function weekNumber(d){
+      const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+      const dayNum = date.getUTCDay() || 7;
+      date.setUTCDate(date.getUTCDate() + 4 - dayNum);
+      const yearStart = new Date(Date.UTC(date.getUTCFullYear(),0,1));
+      return Math.ceil((((date - yearStart) / 86400000) + 1)/7);
+    }
+    function spark(n, start, swing){ // simple walk
+      let v = start; const arr=[];
+      for(let i=0;i<n;i++){ v += rand(-swing,swing); v = Math.max(50, v); arr.push(v); }
+      return arr;
+    }
+    function sample(arr){ return arr[rand(0, arr.length-1)]; }
+    function shiftDate(base, deltaDays){ const d = new Date(base); d.setDate(d.getDate()+deltaDays); return d.toISOString().split('T')[0]; }
+
+    // Drawing helpers (minimal canvas charts)
+    function drawLine(id, labels, series){
+      const canvas = document.getElementById(id);
+      if(!canvas) return;
+      const ctx = canvas.getContext('2d');
+      clearCanvas(ctx, canvas);
+
+      const padding = { t:20, r:20, b:30, l:40 };
+      const w = canvas.width = canvas.clientWidth * devicePixelRatio;
+      const h = canvas.height = 260 * devicePixelRatio;
+
+      const max = Math.max(1, ...series.flatMap(s=>s.data));
+      const min = 0;
+
+      // axes
+      ctx.scale(devicePixelRatio, devicePixelRatio);
+      ctx.translate(0.5,0.5);
+      ctx.strokeStyle = '#e5e7eb';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(padding.l, h/devicePixelRatio - padding.b);
+      ctx.lineTo(w/devicePixelRatio - padding.r, h/devicePixelRatio - padding.b);
+      ctx.stroke();
+
+      // lines
+      series.forEach(s=>{
+        ctx.strokeStyle = s.color;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        s.data.forEach((v,i)=>{
+          const x = map(i, 0, s.data.length-1, padding.l, w/devicePixelRatio - padding.r);
+          const y = map(v, min, max, h/devicePixelRatio - padding.b, padding.t);
+          if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+        });
+        ctx.stroke();
+
+        // dots
+        s.data.forEach((v,i)=>{
+          const x = map(i, 0, s.data.length-1, padding.l, w/devicePixelRatio - padding.r);
+          const y = map(v, min, max, h/devicePixelRatio - padding.b, padding.t);
+          ctx.fillStyle = s.color; ctx.beginPath(); ctx.arc(x,y,3,0,Math.PI*2); ctx.fill();
+        });
+      });
+    }
+
+    function drawBar(id, labels, seriesArr){
+      const canvas = document.getElementById(id);
+      if(!canvas) return;
+      const ctx = canvas.getContext('2d');
+      clearCanvas(ctx, canvas);
+
+      const padding = { t:20, r:20, b:30, l:40 };
+      const w = canvas.width = canvas.clientWidth * devicePixelRatio;
+      const h = canvas.height = 260 * devicePixelRatio;
+      ctx.scale(devicePixelRatio, devicePixelRatio);
+      ctx.translate(0.5,0.5);
+
+      const series = seriesArr[0];
+      const max = Math.max(1, ...series.data);
+      const barW = (w/devicePixelRatio - padding.l - padding.r) / series.data.length * 0.6;
+
+      series.data.forEach((v,i)=>{
+        const x = map(i, 0, series.data.length-1, padding.l, w/devicePixelRatio - padding.r) - barW/2;
+        const y = map(v, 0, max, h/devicePixelRatio - padding.b, padding.t);
+        const hh = (h/devicePixelRatio - padding.b) - y;
+        ctx.fillStyle = series.color;
+        ctx.beginPath();
+        const radius = 6;
+        roundRect(ctx, x, y, barW, hh, radius);
+        ctx.fill();
+      });
+    }
+
+    function drawPie(id, labels, data, colors){
+      const canvas = document.getElementById(id);
+      if(!canvas) return;
+      const ctx = canvas.getContext('2d');
+      clearCanvas(ctx, canvas);
+      const w = canvas.width = canvas.clientWidth * devicePixelRatio;
+      const h = canvas.height = 260 * devicePixelRatio;
+      ctx.scale(devicePixelRatio, devicePixelRatio);
+
+      const total = data.reduce((s,x)=>s+x,0) || 1;
+      let start = -Math.PI/2;
+      const cx = (w/devicePixelRatio)/2, cy = (h/devicePixelRatio)/2, r = Math.min(cx, cy) - 10;
+
+      data.forEach((v,i)=>{
+        const angle = (v/total) * Math.PI*2;
+        ctx.beginPath();
+        ctx.moveTo(cx,cy);
+        ctx.fillStyle = colors[i % colors.length];
+        ctx.arc(cx,cy,r,start,start+angle);
+        ctx.closePath(); ctx.fill();
+        start += angle;
+      });
+
+      // simple legend under pie
+      const legendY = h/devicePixelRatio - 20;
+      let lx = 12;
+      ctx.font = '12px Inter';
+      labels.forEach((lab,i)=>{
+        ctx.fillStyle = colors[i%colors.length];
+        ctx.fillRect(lx, legendY, 10,10);
+        ctx.fillStyle = '#374151';
+        ctx.fillText(' '+lab, lx+12, legendY+10);
+        lx += ctx.measureText(' '+lab).width + 40;
+      });
+    }
+
+    function roundRect(ctx, x, y, w, h, r){
+      ctx.moveTo(x+r, y);
+      ctx.arcTo(x+w, y, x+w, y+h, r);
+      ctx.arcTo(x+w, y+h, x, y+h, r);
+      ctx.arcTo(x, y+h, x, y, r);
+      ctx.arcTo(x, y, x+w, y, r);
+    }
+    function map(v, a,b, c,d){ return c + (v - a)*(d - c)/(b - a || 1); }
+    function clearCanvas(ctx, canvas){
+      ctx.setTransform(1,0,0,1,0,0);
+      ctx.clearRect(0,0,canvas.width, canvas.height);
+    }
+
+    // Lists and tables
+    function renderTopList(id, items, unit){
+      const wrap = document.getElementById(id);
+      wrap.innerHTML = '';
+      items.slice(0,5).forEach((it, idx)=>{
+        const row = document.createElement('div');
+        row.className = 'flex items-center justify-between border-2 border-gray-100 rounded-xl p-3';
+        row.innerHTML = `
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">${idx+1}</div>
+            <div class="font-semibold text-gray-900">${escapeHtml(it.name)}</div>
+          </div>
+          <div class="text-gray-900 font-extrabold">${it.value}</div>
+        `;
+        wrap.appendChild(row);
+      });
+    }
+
+    function renderSignups(rows){
+      const body = document.getElementById('rowsSignups');
+      body.innerHTML = '';
+      document.getElementById('emptySignups').classList.toggle('hidden', rows.length>0);
+      rows.forEach(r=>{
+        const tr = document.createElement('tr');
+        tr.className = 'tr';
+        tr.innerHTML = `
+          <td class="w-[40%] font-semibold text-gray-900">${escapeHtml(r.name)}</td>
+          <td class="w-[25%] text-gray-600">${r.date}</td>
+          <td class="w-[20%]"><span class="badge badge-blue">${escapeHtml(r.source)}</span></td>
+          <td class="w-[15%] text-right"><span class="badge badge-green">${escapeHtml(r.plan)}</span></td>
+        `;
+        body.appendChild(tr);
+      });
+    }
+
+    function renderPayments(rows){
+      const body = document.getElementById('rowsPayments');
+      body.innerHTML = '';
+      document.getElementById('emptyPayments').classList.toggle('hidden', rows.length>0);
+      rows.forEach(r=>{
+        const tr = document.createElement('tr');
+        tr.className = 'tr';
+        tr.innerHTML = `
+          <td class="w-[40%] font-semibold text-gray-900">${escapeHtml(r.member)}</td>
+          <td class="w-[20%] text-gray-600">${r.date}</td>
+          <td class="w-[20%]"><span class="badge badge-blue">${escapeHtml(r.method)}</span></td>
+          <td class="w-[20%] text-right font-extrabold text-gray-900">$${Number(r.amount).toFixed(2)}</td>
+        `;
+        body.appendChild(tr);
+      });
+    }
+
+    // Exports
+    function exportCurrentCsv(){
+      const key = Object.keys(dataCache).find(k=>k.includes(currentTab)) || null;
+      if(!key){ toast('Nothing to export.'); return; }
+      const d = dataCache[key] || generateData();
+      let rows = [];
+      if(currentTab==='members'){
+        rows = [['Label','Total Members','Active Members']].concat(
+          d.series.labels.map((lab,i)=> [lab, d.series.members[i], d.series.active[i]])
+        );
+      } else if(currentTab==='attendance'){
+        rows = [['Label','Check-ins']].concat(
+          d.series.labels.map((lab,i)=> [lab, d.series.attendance[i]])
+        );
+      } else {
+        rows = [['Label','Revenue']].concat(
+          d.series.labels.map((lab,i)=> [lab, d.series.revenue[i]])
+        );
+      }
+      downloadCsv(rows, `${currentTab}_report.csv`);
+    }
+
+    function exportTable(tbodyId, filename){
+      const body = document.getElementById(tbodyId);
+      const rows = [['Col1','Col2','Col3','Col4']];
+      body.querySelectorAll('tr').forEach(tr=>{
+        const cells = Array.from(tr.querySelectorAll('td')).map(td=> td.textContent.trim());
+        rows.push(cells);
+      });
+      if(rows.length<=1){ toast('No rows to export.'); return; }
+      downloadCsv(rows, filename);
+    }
+
+    function downloadCsv(rows, filename){
+      const csv = rows.map(r=> r.map(cell=> `"${String(cell).replace(/"/g,'""')}"`).join(',')).join('\n');
+      const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast('Exported!');
+    }
+
+    // Toast
+    function toast(msg){
+      const t = document.getElementById('toast');
+      document.getElementById('toastMsg').textContent = msg;
+      t.classList.remove('hidden');
+      setTimeout(()=> t.classList.add('hidden'), 2200);
+    }
+    function escapeHtml(str){ return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'97170307f06ce25b',t:'MTc1NTU3ODgzNS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
