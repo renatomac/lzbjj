@@ -310,6 +310,10 @@ class Attendance(models.Model):
         null=True
     )
 
+    technique = models.ForeignKey("Technique", on_delete=models.PROTECT, related_name="technique", null=True, blank=True)
+    position = models.ForeignKey("Position", on_delete=models.PROTECT, related_name="position", null=True, blank=True)
+    comment = models.TextField(null=True, blank=True)
+
     date = models.DateField(auto_now_add=False)
     timestamp = models.DateTimeField(auto_now_add=True)
 
@@ -337,3 +341,35 @@ class BeltPromotion(models.Model):
     notes = models.TextField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
+class Technique(models.Model):
+    name = models.CharField(max_length=100)
+    def __str__(self):
+        return self.name
+
+class Position(models.Model):
+    name = models.CharField(max_length=100)
+    def __str__(self):
+        return self.name
+
+class Guard(models.Model):
+    name = models.CharField(max_length=100)
+    def __str__(self):
+        return self.name
+
+class Submission(models.Model):
+    name = models.CharField(max_length=100)
+    def __str__(self):
+        return self.name
+
+class Curriculum(models.Model):
+    year = models.SmallIntegerField()
+    week = models.PositiveSmallIntegerField (null=True, blank=True )
+    theme = models.ForeignKey(
+        "Technique",
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="theme"
+    )
+
+    def __str__(self):
+        return f"Curriculum of {self.year}, week {self.week} is {self.theme}"
