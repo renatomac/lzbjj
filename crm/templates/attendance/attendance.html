@@ -31,15 +31,14 @@
 
         <div class="card mb-4">
           <div class="card-body">
-            
               
             <form method="GET" class="row g-3" >
-              <div class="col-4">
+              <div class="col-5">
                   <label for="classDate" class="form-label fw-semibold">Date</label>
                   <input name="classDate" id="classDate" type="date" class="form-control m-0"  value={{classDate|date:'Y-m-d'}}>
               </div>
             
-              <div class="col-4 mb-4">
+              <div class="col-7 mb-4">
                 <label for="classSelect" class="form-label fw-semibold">Class</label>
                 <select name="classSelect" id="classSelect" class="form-select" onchange="this.form.submit()">
                   <option value=0>Select Class</option>
@@ -77,7 +76,7 @@
             
             
             <div class="row g-3 mb-2">
-              <div class="col-6 ">
+              <div class="col-12 ">
                 <div class="d-flex flex-wrap gap-1 mb-1">
                   <form method="GET">
                   
@@ -94,6 +93,27 @@
                 </div>
               </div>
             </div>
+            {% csrf_token %}
+            <div class="row g-3 mb-2">
+              <div class="col-12 ">
+                <label for="techSelect" class="form-label fw-semibold">Technique</label>
+                <select name="techSelect" id="techSelect" class="form-select">
+                  <option value=0>Select a technique</option>
+                  {% for technique in technics %}
+                      <option value={{technique.id}}> {{technique.name}} </option>
+                  {%endfor%}
+                </select>
+              </div>
+            </div>
+
+            <div class="row g-3 mb-2">
+              <div class="col-12 ">
+                <label for="comment">Comments:</label>
+                <textarea class="form-control fw-semibold m-0" rows="2" id="comment-id" name="comment">{{comment}} </textarea>
+              </div>
+            </div>   
+
+            <button type="button" class="btn btn-primary techBtn" name="techBtn" id="techBtnId" value={{class.id}}>Submit</button>
 
           </div>
         </div>

@@ -1,6 +1,40 @@
 // ADD CONTACT TO MEMBERS
 console.log("crm.js loaded");
 
+function getCSRFToken() {
+    return document.querySelector("[name=csrfmiddlewaretoken]").value;
+}
+
+document.addEventListener("click", function (event) {
+    const button = event.target.closest(".techBtn");
+    if (!button) return;
+
+    const payload = {
+        class_date: document.getElementById("classDate").value,
+        class_id: document.getElementById("classSelect").value,
+        technique_id: document.getElementById("techSelect").value,
+        comment: document.getElementById("comment-id").value,
+    };
+
+    //console.log("payload:",payload)
+    
+    fetch("/saveTechnique/", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": getCSRFToken()
+        },
+        body: JSON.stringify(payload)
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log(data)
+    });
+});
+
+
+
+
 document.addEventListener("DOMContentLoaded", function () {
     const date = document.getElementById("classDate");
     const sel = document.getElementById("classSelect");

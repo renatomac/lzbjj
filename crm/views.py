@@ -11,7 +11,7 @@ from django.shortcuts import HttpResponse, HttpResponseRedirect, render, get_obj
 from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
-from .models import User, Plan, Member, Membership, BeltPromotion, Staff, Contact, Class, Attendance
+from .models import User, Plan, Member, Membership, BeltPromotion, Staff, Contact, Class, Attendance, Technique, Position
 from .forms import PlanForm, StaffForm , MemberForm, MembershipForm, ClassForm, ContactFormSet, ContactForm,BeltPromotionForm, AttendanceForm
 from datetime import datetime, date, timedelta
 
@@ -382,15 +382,15 @@ def attendance(request):
     })
 
 def attendanceRecord(request, class_id):
+    
     session = None
     members = None
     attending_ids = None
     today = timezone.localdate()
     btnFilter = request.GET.get("filter")
     classSelectedStr = request.GET.get("classSelect")
-
     classDateStr = request.GET.get("classDate")
-    print(classDateStr)
+
     if classDateStr:
         classDate = datetime.strptime(classDateStr, "%Y-%m-%d").date()
         class_id = 0
@@ -398,7 +398,6 @@ def attendanceRecord(request, class_id):
     else:
         classDate = today
 
-    print(classSelectedStr)
     if not classSelectedStr:
         classSelected = class_id
     else:
@@ -441,6 +440,9 @@ def attendanceRecord(request, class_id):
         else:
             print("Button filter was not found")
 
+    # Techique of the day:
+    technics = Technique.objects.all().order_by('name')
+   
     return render(request, "attendance/attendance.html", {
     "classes":classes,
     "today":today,
@@ -451,6 +453,7 @@ def attendanceRecord(request, class_id):
     "classDate":classDate,
     "attending_ids" : attending_ids,
     "filter" : btnFilter,
+    "technics":technics,
     })
 
 def getClassesByDate(request, date):
@@ -724,4 +727,20 @@ def classesThisWeek():
             today = today+timedelta(days=1)
             shortWeekday = today.strftime("%a").lower()[:3]
     return classesCount
+
+def saveTechnique(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "Invalid method"}, status=405)
+
+    data = json.loads(request.body)
+
+    class_date = data["class_date"]
+    class_id = data["class_id"]
+    technique_id = data.get("technique_id")
+    comment = data.get("comment")
+
+    # update logic here
+    
+
+    return JsonResponse({"success": True})
 

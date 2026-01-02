@@ -278,7 +278,7 @@ class ClassForm(forms.ModelForm):
 class AttendanceForm(forms.ModelForm):
     class Meta:
         model = Attendance
-        fields = ['member', 'Class', 'date']
+        fields = ['member', 'Class', 'date', 'technique', 'position', 'comment']
         widgets = {
             'date': forms.DateInput(attrs={'type': 'date'}),
         }

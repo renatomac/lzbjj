@@ -312,6 +312,8 @@ class Attendance(models.Model):
 
     technique = models.ForeignKey("Technique", on_delete=models.PROTECT, related_name="technique", null=True, blank=True)
     position = models.ForeignKey("Position", on_delete=models.PROTECT, related_name="position", null=True, blank=True)
+    guard = models.ForeignKey("Guard", on_delete=models.PROTECT, related_name="guard", null=True, blank=True)
+    submission = models.ForeignKey("Submission", on_delete=models.PROTECT, related_name="submission", null=True, blank=True)
     comment = models.TextField(null=True, blank=True)
 
     date = models.DateField(auto_now_add=False)
