@@ -11,10 +11,12 @@ from django.shortcuts import HttpResponse, HttpResponseRedirect, render, get_obj
 from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
-from .models import User, Plan, Member, Membership, BeltPromotion, Staff, Contact, Class, Attendance, Technique, Position
+from .models import User, Plan, Member, Membership, BeltPromotion, Staff, Contact, Class, Attendance, Technique, Position, ClassSession
 from .forms import PlanForm, StaffForm , MemberForm, MembershipForm, ClassForm, ContactFormSet, ContactForm,BeltPromotionForm, AttendanceForm
 from datetime import datetime, date, timedelta
 
+
+WEEKDAY_CODES = ['mon','tue','wed','thu','fri','sat','sun']
 
 def index(request):
 
@@ -741,6 +743,32 @@ def saveTechnique(request):
 
     # update logic here
     
-
     return JsonResponse({"success": True})
 
+# Create the next 30 days class session
+
+def create_future_sessions(days_ahead=30):
+    today = date.today()
+    end_date = today + timedelta(days=days_ahead)
+    
+
+    for class_template in Class.objects.filter(is_active=True):
+        # days_of_week is a list of strings, e.g., ['Monday', 'Wednesday']
+        for day_offset in range(days_ahead + 1):
+            session_date = today + timedelta(days=day_offset)
+            weekday_code = WEEKDAY_CODES[session_date.weekday()]
+            #weekday_name = session_date.strftime('%A')  # 'Monday', 'Tuesday', etc.
+            if weekday_code in class_template.days_of_week:
+                # Only create if not exists
+                exists = ClassSession.objects.filter(
+                    class_template=class_template,
+                    date=session_date
+                ).exists()
+                if not exists:
+                    ClassSession.objects.create(
+                        class_template=class_template,
+                        date=session_date,
+                        start_time=class_template.start_time,
+                        end_time=class_template.end_time,
+                        instructor=class_template.instructor
+                    )

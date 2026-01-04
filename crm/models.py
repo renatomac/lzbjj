@@ -296,6 +296,68 @@ class Class(models.Model):
 
     def __str__(self):
         return self.name
+    
+class ClassSession(models.Model):
+    class_template = models.ForeignKey(
+        Class,
+        on_delete=models.CASCADE,
+        related_name="sessions"
+    )
+
+    date = models.DateField()
+
+    start_time = models.TimeField()
+    end_time = models.TimeField()
+
+    instructor = models.ForeignKey(
+        "Staff",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="sessions"
+    )
+
+    is_canceled = models.BooleanField(default=False)
+    notes = models.TextField(blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("class_template", "date")
+        ordering = ["-date"]
+
+    def __str__(self):
+        return f"{self.class_template.name} — {self.date}"
+
+class SessionAttendance(models.Model):
+    session = models.ForeignKey(ClassSession, on_delete=models.CASCADE)
+    member = models.ForeignKey(Member, on_delete=models.CASCADE)
+    present = models.BooleanField(default=True)
+
+class Technique(models.Model):
+    name = models.CharField(max_length=100)
+    def __str__(self):
+        return self.name
+
+class Position(models.Model):
+    name = models.CharField(max_length=100)
+    def __str__(self):
+        return self.name
+
+class Guard(models.Model):
+    name = models.CharField(max_length=100)
+    def __str__(self):
+        return self.name
+
+class Submission(models.Model):
+    name = models.CharField(max_length=100)
+    def __str__(self):
+        return self.name
+
+class SessionTechnique(models.Model):
+    session = models.ForeignKey(ClassSession, on_delete=models.CASCADE)
+    technique = models.ForeignKey(Technique, on_delete=models.CASCADE)
+
 
 class Attendance(models.Model):
     member = models.ForeignKey(
@@ -343,25 +405,7 @@ class BeltPromotion(models.Model):
     notes = models.TextField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
-class Technique(models.Model):
-    name = models.CharField(max_length=100)
-    def __str__(self):
-        return self.name
 
-class Position(models.Model):
-    name = models.CharField(max_length=100)
-    def __str__(self):
-        return self.name
-
-class Guard(models.Model):
-    name = models.CharField(max_length=100)
-    def __str__(self):
-        return self.name
-
-class Submission(models.Model):
-    name = models.CharField(max_length=100)
-    def __str__(self):
-        return self.name
 
 class Curriculum(models.Model):
     year = models.SmallIntegerField()
