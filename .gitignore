@@ -66,3 +66,6 @@ db_tunnel.py
 local_settings.py
 settings.py
 capstone/settings.py
+
+__pycache__/
+*.pyc
