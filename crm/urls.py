@@ -46,6 +46,6 @@ urlpatterns = [
     path("addPromotion/<int:member_id>/", views.addPromotion, name="addPromotion"),
     path("toggleStatus/<str:type>/<int:member_id>/", views.toggleStatus, name="toggleStatus"),
     path("getContacts/<int:member_id>/", views.getContacts, name="getContacts"),
-   
+    path("create_sessions", views.create_sessions, name="create_sessions"),
     # API Routes
 ]
