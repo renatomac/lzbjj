@@ -318,6 +318,7 @@ class ClassSession(models.Model):
     )
 
     is_canceled = models.BooleanField(default=False)
+
     notes = models.TextField(blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -335,28 +336,30 @@ class SessionAttendance(models.Model):
     present = models.BooleanField(default=True)
 
 class Technique(models.Model):
-    name = models.CharField(max_length=100)
+    name = models.CharField(max_length=100, null=True, blank=True)
     def __str__(self):
         return self.name
 
 class Position(models.Model):
-    name = models.CharField(max_length=100)
+    name = models.CharField(max_length=100, null=True, blank=True)
     def __str__(self):
         return self.name
 
 class Guard(models.Model):
-    name = models.CharField(max_length=100)
+    name = models.CharField(max_length=100, null=True, blank=True)
     def __str__(self):
         return self.name
 
 class Submission(models.Model):
-    name = models.CharField(max_length=100)
+    name = models.CharField(max_length=100, null=True, blank=True)
     def __str__(self):
         return self.name
 
 class SessionTechnique(models.Model):
-    session = models.ForeignKey(ClassSession, on_delete=models.CASCADE)
-    technique = models.ForeignKey(Technique, on_delete=models.CASCADE)
+    session = models.ForeignKey(ClassSession, on_delete=models.CASCADE, null=True,
+    blank=True)
+    technique = models.ForeignKey(Technique, on_delete=models.CASCADE, null=True,
+    blank=True)
 
 
 class Attendance(models.Model):

@@ -10,9 +10,8 @@ urlpatterns = [
     path("session/<int:session_id>/", views.view_session, name="view_session"),
     path("getClasses/<str:strDate>/", views.getClasses, name="getClasses"),
     path("getStudents/<int:class_id>/", views.getStudents, name="getStudents"),
-    path("toggleAttendance/<int:member_id>/", views.toggleAttendance, name="toggleAttendance"),
-
-    path("saveTechnique/", views.saveTechnique, name="saveTechnique"),
+    path("toggleAttendance/<int:attendance_id>/", views.toggleAttendance, name="toggleAttendance"),
+    path("saveTechnique", views.saveTechnique, name="saveTechnique"),
     path("classes", views.classes, name="classes"),
     path("addClasses", views.addClasses, name="addClasses"),
     path("editClass/<int:class_id>/", views.editClass, name="editClass"),
@@ -20,8 +19,9 @@ urlpatterns = [
     path("exportSchedule", views.exportSchedule, name="exportSchedule"),
     path("typesClasses", views.typesClasses, name="typesClasses"),
     path("attendance", views.attendance, name="attendance"),
-    path("attendanceRecord/<int:class_id>/", views.attendanceRecord, name="attendanceRecord"),
-    path("getClassesByDate/<str:date>/", views.getClassesByDate, name="getClassesByDate"),
+    path("attendanceRecord/<int:session_id>/", views.attendanceRecord, name="attendanceRecord"),
+ 
+    path("getSessionsByDate/<str:date>/", views.getSessionsByDate, name="getSessionsByDate"),
     path("billing", views.billing, name="billing"),
     path("reports", views.reports, name="reports"),
     path('revenue', views.reportsRevenue, name='revenue'),

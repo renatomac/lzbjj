@@ -11,8 +11,8 @@ from django.shortcuts import HttpResponse, HttpResponseRedirect, render, get_obj
 from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
-from .models import User, Plan, Member, Membership, BeltPromotion, Staff, Contact, Class, Attendance, Technique, Position, ClassSession
-from .forms import PlanForm, StaffForm , MemberForm, MembershipForm, ClassForm, ContactFormSet, ContactForm,BeltPromotionForm, AttendanceForm
+from .models import User, Plan, Member, Membership, BeltPromotion, Staff, Contact, Class, Attendance, Technique, Position, ClassSession, SessionAttendance, SessionTechnique
+from .forms import PlanForm, StaffForm , MemberForm, MembershipForm, ClassForm, ContactFormSet, ContactForm,BeltPromotionForm, AttendanceForm 
 from datetime import datetime, date, timedelta
 
 
@@ -86,7 +86,7 @@ def dashboard(request):
     today = timezone.localdate()
     weekday = today.strftime("%A")
     shortWeekday = today.strftime("%a").lower()[:3]
-    classes = Class.objects.filter(days_of_week__contains = shortWeekday).order_by("start_time").values()
+    sessions = ClassSession.objects.filter(date = today).order_by("start_time").values()
     # Dashboard metrix
     oneMonthLess = timezone.localdate()-timedelta(days=30)
     oneMonthMore = timezone.localdate()+timedelta(days=30)
@@ -116,7 +116,7 @@ def dashboard(request):
         # membership exping in the next 30 days
         'expiring': expiring,
         'expiringCount': expiringCount,
-        "classes":classes,
+        "sessions":sessions,
         "today":today,
         "weekday":weekday,
         "classesCount":classesCount,
@@ -374,129 +374,83 @@ def typesClasses(request):
 def attendance(request):
     today = timezone.localdate()
     weekday = today.strftime("%A")
-    shortWeekday = today.strftime("%a").lower()[:3]
-    classes = Class.objects.filter(days_of_week__contains = shortWeekday).order_by("start_time")
-
+    sessions = ClassSession.objects.filter(date = today).order_by("start_time")
     return render(request, "attendance/index.html", {
-        "classes":classes,
+        "sessions":sessions,
         "today":today,
         "weekday":weekday,
     })
 
-def attendanceRecord(request, class_id):
-    
-    session = None
-    members = None
-    attending_ids = None
+def attendanceRecord(request, session_id):
     today = timezone.localdate()
     btnFilter = request.GET.get("filter")
-    classSelectedStr = request.GET.get("classSelect")
-    classDateStr = request.GET.get("classDate")
-
-    if classDateStr:
-        classDate = datetime.strptime(classDateStr, "%Y-%m-%d").date()
-        class_id = 0
-        selectReset = 1
+    if not btnFilter:
+        filter = "all"
     else:
-        classDate = today
+        filter = btnFilter
 
-    if not classSelectedStr:
-        classSelected = class_id
+    sessionSelectedStr = request.GET.get("sessionSelect")
+
+    session = get_object_or_404(ClassSession, id=session_id)
+    todaySessions = ClassSession.objects.filter(date = session.date)
+    #sessionDate = session.date
+
+    if not sessionSelectedStr:
+        sessionSelected = session_id
     else:
-        classSelected = int(classSelectedStr)
-
-    try:
-        session = get_object_or_404(Class, id=classSelected)
-    except:
-        print("No classes was found.")
-
-    if classDate and session:
-        attending_ids = set(
-            Attendance.objects.filter(
-                Class=session,
-                date=classDate
-            ).values_list("member_id", flat=True)
-        )
+        sessionSelected = int(sessionSelectedStr)
+    
     weekday = today.strftime("%A")
-    shortWeekday = classDate.strftime("%a").lower()[:3]
-    classes = Class.objects.select_related("instructor").order_by("start_time")
-    todayClasses = Class.objects.filter(days_of_week__contains = shortWeekday).values().order_by("start_time")
+
+    if filter == "all":
+        attending_list = SessionAttendance.objects.filter(session = sessionSelected)
+    elif filter == "checked":
+        attending_list = SessionAttendance.objects.filter(session = sessionSelected, present = True)
+    else:
+        attending_list = SessionAttendance.objects.filter(session = sessionSelected, present = False)
+
+    technics = Technique.objects.all().values()
+    techniques = SessionTechnique.objects.filter(session=session).select_related("technique")
+    names = [st.technique.name for st in techniques if st.technique]
 
 
-    if session:
-        if session.type == 'open':
-            members = Member.objects.filter(is_active = True)
-        elif session.type == 'adult':
-            members = Member.objects.filter(member_type='adult')
-        elif session.type == 'kids':
-            members = Member.objects.filter(member_type='child')
-        else:
-            print("Session type was not found")
-            members = None
 
-    if members:
-        if btnFilter == 'checked':
-            members = members.filter(id__in = attending_ids)
-        elif btnFilter == 'not':
-            members = members.exclude(id__in=attending_ids)
-        else:
-            print("Button filter was not found")
-
-    # Techique of the day:
-    technics = Technique.objects.all().order_by('name')
-   
     return render(request, "attendance/attendance.html", {
-    "classes":classes,
+    "session":session,
     "today":today,
     "weekday":weekday,
-    "todayClasses": todayClasses,
-    "members":members,
-    "class_id": classSelected,
-    "classDate":classDate,
-    "attending_ids" : attending_ids,
-    "filter" : btnFilter,
-    "technics":technics,
+    "sessionSelected": sessionSelected,
+    "sessionTechniques":names,
+    "technics": technics,
+    "attending_list":attending_list,
+    "todaySessions":todaySessions, 
+    "filter": filter,
     })
 
-def getClassesByDate(request, date):
-    print("date", date)
-    formated_date = datetime.fromisoformat(date)
-    shortWeekday = formated_date.strftime("%a").lower()[:3]
-    dateClasses = Class.objects.filter(days_of_week__contains = shortWeekday).values()
-    print(dateClasses)
 
-    return JsonResponse(list(dateClasses), safe=False)
-
-def toggleAttendance(request, member_id):
-    classDate = request.GET.get("classDate")
-    class_id = request.GET.get("classId")
-    session = get_object_or_404(Class, pk=class_id)
-    member = get_object_or_404(Member, pk=member_id)
-    attending_ids = set(
-        Attendance.objects.filter(
-            Class=session,
-            date=classDate
-        ).values_list("member_id", flat=True)
+def getSessionsByDate(request, date):
+    sessions = ClassSession.objects.filter(date=date).values(
+        "id",
+        "date",
+        "start_time",
+        "end_time",
+        "class_template__name",
+        "instructor__first_name",
+        "instructor__last_name",
     )
-    if member_id not in attending_ids:
-        attendance, created = Attendance.objects.get_or_create(
-        member=member,
-        Class=session,
-        date=classDate
-        )
-        status = "created"
+
+    return JsonResponse(list(sessions), safe=False)
+
+def toggleAttendance(request, attendance_id):
+    attendance = get_object_or_404(SessionAttendance, pk=attendance_id)
+    if attendance.present == True:
+        attendance.present = False
+        status = "deleted"
     else:
-        try:
-            attendance = Attendance.objects.get(
-                member=member,
-                Class=session,
-                date=classDate
-            )
-            attendance.delete()
-            status = "deleted"
-        except Attendance.DoesNotExist:
-            status = "not found"
-    print(status)
+        attendance.present = True
+        status = "created"
+    attendance.save(update_fields=["present"])
+
     return JsonResponse({"status": status})
 
 def getClasses(request, strDate):
@@ -736,12 +690,26 @@ def saveTechnique(request):
 
     data = json.loads(request.body)
 
-    class_date = data["class_date"]
-    class_id = data["class_id"]
+    session_date = data["session_date"]
+    session_id = data["session_id"]
     technique_id = data.get("technique_id")
     comment = data.get("comment")
+    session = get_object_or_404(ClassSession, id=session_id)
+    SessionTechnique.objects.filter(session=session).delete()
+    session.notes = comment
+    session.save(update_fields=["notes"])
 
-    # update logic here
+    for id in technique_id:
+        print(id)
+        if int(id) == 0: 
+            pass
+        else:
+            technique = get_object_or_404(Technique, id=int(id))
+            SessionTechnique.objects.create(
+                session = session,
+                technique = technique,
+                )
+
     
     return JsonResponse({"success": True})
 
@@ -751,7 +719,7 @@ def create_future_sessions(days_ahead=30):
     today = date.today()
     end_date = today + timedelta(days=days_ahead)
     
-
+    # CREATE CLASSES FOR THE NEXT 30 DAYS 
     for class_template in Class.objects.filter(is_active=True):
         # days_of_week is a list of strings, e.g., ['Monday', 'Wednesday']
         for day_offset in range(days_ahead + 1):
@@ -770,5 +738,35 @@ def create_future_sessions(days_ahead=30):
                         date=session_date,
                         start_time=class_template.start_time,
                         end_time=class_template.end_time,
-                        instructor=class_template.instructor
+                        instructor=class_template.instructor,
+                        session_type = class_template.type
                     )
+    create_attendance_for_period(days_ahead)    
+    
+    
+
+
+def create_attendance_for_period(days_ahead=30):
+    today = date.today()
+    end_date = today + timedelta(days=days_ahead)
+
+    sessions = ClassSession.objects.filter(date__range=(today, end_date))
+
+    for session in sessions:
+        create_attendance_for_session(session)
+
+
+def create_attendance_for_session(session):
+    if session.type == 'open':
+        active_members = Member.objects.filter(is_active = True)
+    elif session.type == 'adult':
+        active_members = Member.objects.filter(is_active = True, member_type='adult')
+    elif session.type == 'kids':
+        active_members = Member.objects.filter(is_active = True, member_type='child')
+
+    for member in active_members:
+        SessionAttendance.objects.get_or_create(
+            session=session,
+            member=member,
+            defaults={"present": False}
+        )

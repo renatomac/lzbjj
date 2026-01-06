@@ -9,16 +9,34 @@ document.addEventListener("click", function (event) {
     const button = event.target.closest(".techBtn");
     if (!button) return;
 
+    
+    const techSelect = document.getElementById("techSelect");
+    const selectedValues = Array.from(techSelect.selectedOptions).map(option => option.value);
+    const techComment = document.getElementById("comment-id").value;
+    if (selectedValues.length === 0 && techComment == " "){
+        console.log("No data to save.")
+        return;
+    }
+
+    if (selectedValues.length === 0){
+        console.log("no techinique selected.")
+    }
+
+    if (techComment === " "){
+        console.log("Add a comment")
+    }
+
     const payload = {
-        class_date: document.getElementById("classDate").value,
-        class_id: document.getElementById("classSelect").value,
-        technique_id: document.getElementById("techSelect").value,
+        session_date: document.getElementById("sessionDate").value,
+        session_id: document.getElementById("sessionSelect").value,
+        technique_id: selectedValues,
         comment: document.getElementById("comment-id").value,
     };
 
-    //console.log("payload:",payload)
-    
-    fetch("/saveTechnique/", {
+    // Best practice to create the URL correctly
+    const url = button.dataset.saveUrl;
+
+    fetch("/saveTechnique", {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
@@ -29,6 +47,7 @@ document.addEventListener("click", function (event) {
     .then(response => response.json())
     .then(data => {
         console.log(data)
+        location.reload();
     });
 });
 
@@ -36,36 +55,45 @@ document.addEventListener("click", function (event) {
 
 
 document.addEventListener("DOMContentLoaded", function () {
-    const date = document.getElementById("classDate");
-    const sel = document.getElementById("classSelect");
+    const date = document.getElementById("sessionDate");
+    const sel = document.getElementById("sessionSelect");
     if (!date || !sel) return;
 
     
-    date.addEventListener('change', resetSelect);
-    function resetSelect(){
-        const url = new URL(`/getClassesByDate/${date.value}`, window.location.origin);
+    date.addEventListener('change', dateSelect);
+    function dateSelect(){
+        const url = new URL(`/getSessionsByDate/${date.value}`, window.location.origin);
+        console.log(url)
         fetch(url)
         .then(response => response.json())
         .then(data => {
-            while (sel.options.length > 1) {
+            while (sel.options.length > 1) {    
                 sel.remove(1);
             }
             for (const option of sel.options) {
                 option.selected = option.value === "Select Class";
             }
-            data.forEach(cls => {
+            data.forEach(session => {
             const option = document.createElement("option");
-            option.value = cls.id;
-            option.textContent = `${cls.name} - ${cls.start_time}`;
+            option.value = session.id;
+            option.textContent = `${session.class_template__name} - ${session.start_time}`;
             sel.appendChild(option);
-            
+            });
         });
-        });
+    }
 
-        
+    sel.addEventListener('change', sessionSelect);
+    function sessionSelect(){
+        const sessionId = this.value;
+        if (!sessionId || sessionId == 0) return;
 
+        // keep selected date if present
+        const dateInput = document.getElementById("sessionDate");
+        const dateParam = dateInput?.value
+            ? `?classDate=${dateInput.value}`
+            : "";
 
-
+        window.location.href = `/attendanceRecord/${sessionId}/${dateParam}`;
     }
 });
 
@@ -294,7 +322,7 @@ function getClasses(value) {
 function getStudents(value) {
     classDate = document.getElementById("classDate").value;
     classSelect = document.getElementById("classSelect");
-    fetch(`/getStudents/${value}?classDate=${classDate}`)
+    fetch(`/getStudents/${value}`)
         .then(response => response.json())
         .then(data => {
             students = document.getElementById("students");
@@ -411,20 +439,18 @@ document.addEventListener("click", function (event) {
     const btn = event.target.closest(".toggle-attendance");
     if (!btn) return;
 
-    const memberId = btn.dataset.memberId; 
-    console.log(memberId)
-    date = document.getElementById('classDate').value
-    class_id = document.getElementById('classSelect').value
+    const attendeeId = btn.dataset.attendeeId; 
+    console.log(attendeeId)
         
-    const url = `/toggleAttendance/${memberId}?classDate=${encodeURIComponent(date)}&classId=${encodeURIComponent(class_id)}`;
+    const url = `/toggleAttendance/${attendeeId}`;
     fetch(url)
         .then(response => response.json())
         .then(data => {
-            const span = document.getElementById('span'+memberId);
-            const i = document.getElementById('i'+memberId);
-            const label = document.getElementById('label'+memberId);
-            const labelBtn = document.getElementById('labelBtn'+memberId);
-            const btn_i = document.getElementById('btn_i'+memberId);
+            const span = document.getElementById('span'+attendeeId);
+            const i = document.getElementById('i'+attendeeId);
+            const label = document.getElementById('label'+attendeeId);
+            const labelBtn = document.getElementById('labelBtn'+attendeeId);
+            const btn_i = document.getElementById('btn_i'+attendeeId);
             const total = document.getElementById('countTotal').innerHTML
             const checked = document.getElementById('countChecked').innerHTML
             let checkedInt = parseInt(checked, 10);
@@ -453,8 +479,6 @@ document.addEventListener("click", function (event) {
                     i.classList.replace("fa-circle-check", "fa-circle-exclamation");
                 }
                 
-
-    
                 labelBtn.textContent = " Check-in";
                 checkedInt = checkedInt-1
                 btn_i.classList.remove("fa-rotate-left");
@@ -464,6 +488,8 @@ document.addEventListener("click", function (event) {
             document.getElementById('countChecked').innerHTML = checkedInt
         });
 });
+
+
 
 
 

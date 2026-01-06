@@ -82,18 +82,18 @@
             <div class="card-header bg-white">
                 <h3 class="h5 fw-semibold text-dark mb-0">Upcoming Classes</h3>
             </div>`
-            {% if summary.classes %}
+            {% if summary.sessions %}
                 <div class="list-group  p-4">
-                    {% for class in summary.classes %}
-                    <a href="{% url 'attendanceRecord' class_id=class.id %}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center rounded-3 p-3 mb-2 border border-1 border-gray-100">
+                    {% for session in summary.sessions %}
+                    <a href="{% url 'attendanceRecord' session_id=session.id %}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center rounded-3 p-3 mb-2 border border-1 border-gray-100">
                         <div class="d-flex align-items-center gap-3  ">
                             <div class="d-flex align-items-center justify-content-center bg-primary bg-opacity-10 text-primary rounded-circle" style="width: 36px; height: 36px;">
                                 <i class="fas fa-clipboard-check"></i>
                             </div>
                             <div>
-                                <div class="fw-semibold text-gray-900">{{ class.name }}</div>
+                                <div class="fw-semibold text-gray-900">{{ session.name }}</div>
                                 <div class="text-xs text-muted">
-                                    {{ class.start_time }} • Coach: {{ class.instructor.first_name }}
+                                    {{ session.start_time }} • Coach: {{ session.class_template.instructor.first_name }}
                                 </div>
                             </div>
                         </div>
