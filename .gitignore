@@ -69,7 +69,5 @@ capstone/settings.py
 
 __pycache__/
 *.pyc
-crm/__pycache__/urls.cpython-310.pyc
-crm/__pycache__/views.cpython-310.pyc
-crm/views.py
-crm/__pycache__/views.cpython-310.pyc
+*.pyo
+*.log
