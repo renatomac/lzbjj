@@ -6,3 +6,4 @@ django-multiselectfield
 pymysql>=1.0.2
 django-phonenumbers
 django-phonenumber-field
+django_extensions

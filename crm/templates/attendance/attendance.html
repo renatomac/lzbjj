@@ -55,7 +55,7 @@
             </form>  
 
             <div class="row g-3 mb-2">
-              <div class="col-12 ">
+              <div class="col-lg-8 col-sm-12 ">
                 <div class="d-flex flex-wrap gap-1 mb-1">
                   <form method="GET">
                   
@@ -76,7 +76,7 @@
 
             {% csrf_token %}
             <div class="row g-3 mb-2">
-              <div class="col-12 ">
+              <div class="col-lg-8 col-sm-12 ">
                 <label for="techSelect" class="form-label fw-semibold">Technique</label>
                 <select multiple name="techSelect" id="techSelect" class="form-select">
                   {% for technique in technics %}
@@ -87,7 +87,7 @@
             </div>
 
             <div class="row g-3 mb-2">
-              <div class="col-12 ">
+              <div class="col-lg-8 col-sm-12 ">
                 <label for="comment">Comments:</label>
                 <textarea class="form-control fw-semibold m-0" rows="2" id="comment-id" name="comment">{{comment}} </textarea>
               </div>
@@ -99,14 +99,14 @@
         </div>
         <div class="card mb-4 ">
           <div class="row m-4">
-            <div class="col-md-6 col-lg-6">
+            <div class="col-lg-8 col-sm-12">
               <h6>Class Session: #{{session.id}} - {{session.class_template.name}} </h6>
               <h6>Technique: {%for technique in sessionTechniques%}
                 {{technique}},   
                 {%endfor%}
               </h6>
             </div>
-            <div class="col-md-6 col-lg-6">  
+            <div class="col-lg-8 col-sm-12">  
               <h6>Professor: {{session.instructor}}</h6>
               <h6>Notes: {{session.notes}} </h6>
             </div>
@@ -114,57 +114,59 @@
         </div>
         <!-- Roster -->
         <div class="card mb-4 ">
-          <div id='students' class="mb-4 px-5">
+          <div id='students' class="mb-4 px-5 col-md-6 col-lg-6 col-sm-12">
             {%if attending_list %}
             <div id="roster" class="d-grid gap-3 ">
-              <table class="table table-hover align-middle px-3 py-2">
-                <tbody>
-                  {% for attendee in attending_list %}
-                  <tr>
-                    <td>
-                      <div class="d-flex align-items-center">
-                        <i class="fas fa-user-circle me-2 text-secondary h4 mb-0"></i>
-                        <div>
-                          <a href="{% url 'viewMember' attendee.member.id %}"
-                              class="text-dark fw-bold text-decoration-none">
-                              {{ attendee.member.first_name|capfirst }} {{ attendee.member.last_name|capfirst }}
-                          </a>
-                          <p class="small text-muted">{{attendee.member.belt_rank}} belt</p>
+              <div class="table-responsive">
+                <table class="table table-hover align-middle px-3 py-2">
+                  <tbody>
+                    {% for attendee in attending_list %}
+                    <tr>
+                      <td>
+                        <div class="d-flex align-items-center">
+                          <i class="fas fa-user-circle me-2 text-secondary h4 mb-0"></i>
+                          <div>
+                            <a href="{% url 'viewMember' attendee.member.id %}"
+                                class="text-dark fw-bold text-decoration-none">
+                                {{ attendee.member.first_name|capfirst }} {{ attendee.member.last_name|capfirst }}
+                            </a>
+                            <p class="small text-muted">{{attendee.member.belt_rank}} belt</p>
+                          </div>
                         </div>
-                      </div>
-                    </td>
-                    <td>
-                      
-                      {%if attendee.present%}
-                        <span class="badge bg-success" id="span{{attendee.id}}">
-                        <i class="fa-solid fa-circle-check me-1" id="i{{attendee.id}}"></i>
-                        <span class="label-text" id="label{{attendee.id}}">Checked-in </span>
-                        </span>
-                      {%else%}
-                        <span class="badge bg-secondary" id="span{{attendee.id}}">
-                        <i class="fa-solid fa-circle-exclamation me-1" id="i{{attendee.id}}"></i>
-                        <span class="label-text" id="label{{attendee.id}}">Not checked-in </span>
-                        </span>
-                      {%endif%}
-                      
-                    </td>
-                    <td>
-                      {%if attendee.present%}
-                        <button class="btn btn-outline-secondary btn-sm toggle-attendance"  data-attendee-id = {{attendee.id}}>
-                          <i class="fa-solid fa-rotate-left me-1" id="btn_i{{attendee.id}}"></i> 
-                          <span id="labelBtn{{attendee.id}}">Undo</span>
-                        </button>
-                      {%else%}
-                        <button class="btn btn-outline-secondary btn-sm toggle-attendance"  data-attendee-id = {{attendee.id}}>
-                          <i class="fa-solid fa-user-check me-1" id="btn_i{{attendee.id}}"></i> 
-                          <span id="labelBtn{{attendee.id}}">Check-in</span>
-                        </button>
-                      {%endif%}
-                    </td>
-                  </tr>
-                  {% endfor %}
-                </tbody>
-              </table>
+                      </td>
+                      <td>
+                        
+                        {%if attendee.present%}
+                          <span class="badge bg-success" id="span{{attendee.id}}">
+                          <i class="fa-solid fa-circle-check me-1" id="i{{attendee.id}}"></i>
+                          <span class="label-text" id="label{{attendee.id}}">Checked-in </span>
+                          </span>
+                        {%else%}
+                          <span class="badge bg-secondary" id="span{{attendee.id}}">
+                          <i class="fa-solid fa-circle-exclamation me-1" id="i{{attendee.id}}"></i>
+                          <span class="label-text" id="label{{attendee.id}}">Not checked-in </span>
+                          </span>
+                        {%endif%}
+                        
+                      </td>
+                      <td>
+                        {%if attendee.present%}
+                          <button class="btn btn-outline-secondary btn-sm toggle-attendance"  data-attendee-id = {{attendee.id}}>
+                            <i class="fa-solid fa-rotate-left me-1" id="btn_i{{attendee.id}}"></i> 
+                            <span id="labelBtn{{attendee.id}}">Undo</span>
+                          </button>
+                        {%else%}
+                          <button class="btn btn-outline-secondary btn-sm toggle-attendance"  data-attendee-id = {{attendee.id}}>
+                            <i class="fa-solid fa-user-check me-1" id="btn_i{{attendee.id}}"></i> 
+                            <span id="labelBtn{{attendee.id}}">Check-in</span>
+                          </button>
+                        {%endif%}
+                      </td>
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
             </div>
             {%else%}
             <!-- Empty State -->
