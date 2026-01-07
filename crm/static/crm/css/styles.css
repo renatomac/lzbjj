@@ -1,0 +1,335 @@
+body {
+  font-size: 1rem;
+}
+
+@media (max-width: 768px) {
+  body {
+    font-size: 1.1rem;
+  }
+
+  h1 {
+    font-size: 2rem;
+  }
+}
+
+
+
+
+.form-control{
+    width: 25;
+    margin: 10px;
+    align-items: center;
+    align-self: center;
+    text-align: left;
+}
+
+
+.centered-objects {
+    display: flex;
+    flex-direction: column;
+    align-items: center;      
+    justify-content: center;  
+    gap: 10px;                
+}
+
+.centered-objects .form-group,
+.centered-objects input {
+    width: 70;             
+    max-width: 300px;         
+}
+
+
+#btn-logo{
+    height: 24px;
+}
+
+.django-form {
+    max-width: 640px;
+}
+
+.django-form label {
+    display: block;
+    margin-bottom: 0.35rem;
+    font-weight: 600;
+    color: #212529;
+}
+
+.django-form input[type="text"],
+.django-form input[type="email"],
+.django-form input[type="password"],
+.django-form input[type="number"],
+.django-form input[type="date"],
+.django-form input[type="time"],
+.django-form select,
+.django-form textarea{
+    width: 100%;
+    padding: 0.55rem 0.75rem;
+    font-size: 0.95rem;
+    border: 1px solid #ced4da;
+    border-radius: 0.375rem;
+    background-color: #fff;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.django-form input:focus,
+.django-form select:focus,
+.django-form textarea:focus {
+    outline: none;
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 0.2rem rgba(13,110,253,.15);
+}
+
+
+.django-form textarea {
+    min-height: 100px;
+    resize: vertical;
+}
+
+
+.django-form .helptext {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: 0.8rem;
+    color: #6c757d;
+}
+
+
+.django-form .errorlist {
+    list-style: none;
+    padding-left: 0;
+    margin: 0.25rem 0 0;
+    color: #dc3545;
+    font-size: 0.85rem;
+}
+
+
+.django-form p,
+.django-form div {
+    margin-bottom: 1rem;
+}
+
+
+.django-form input[type="checkbox"],
+.django-form input[type="radio"] {
+    margin-right: 0.4rem;
+}
+
+
+.django-form input:disabled,
+.django-form select:disabled,
+.django-form textarea:disabled {
+    background-color: #e9ecef;
+    opacity: 0.8;
+}
+
+
+.django-form button[type="submit"] {
+    margin-top: 1rem;
+}
+
+[class$="-belt"] .form-select {
+  background-color: inherit !important;
+  color: inherit !important;
+  border-color: currentColor;
+}
+
+/* =========================================================
+   BASE BELT STYLE (shared by all belts)
+   ========================================================= */
+
+.belt {
+  background-color: var(--belt-bg);
+  color: var(--belt-text);
+  background-image: var(--belt-gradient, none);
+  background-size: 200% 100%;
+  background-position: 100% 0;
+  border: 1px solid var(--belt-bg);
+  padding: 0.5rem 1rem;
+  border-radius: 0.25rem;
+}
+
+/* Optional text holder */
+.belt-name {
+  font-weight: 600;
+}
+
+/* =========================================================
+   ADULT BELTS
+   ========================================================= */
+
+.white-belt {
+  --belt-bg: #ffffff;
+  --belt-text: #000000;
+  --belt-name: "White Belt";
+}
+
+.blue-belt {
+  --belt-bg: #007bff;
+  --belt-text: #ffffff;
+  --belt-name: "Blue Belt";
+}
+
+.purple-belt {
+  --belt-bg: #6a0dad;
+  --belt-text: #ffffff;
+  --belt-name: "Purple Belt";
+}
+
+.brown-belt {
+  --belt-bg: #7d5b4a;
+  --belt-text: #ffffff;
+  --belt-name: "Brown Belt";
+}
+
+.black-belt {
+  --belt-bg: #000000;
+  --belt-text: #ffffff;
+  --belt-name: "Black Belt";
+}
+
+.red-white-belt {
+  --belt-bg: #ff0000;
+  --belt-text: #000000;
+  --belt-name: "Red/White Belt";
+  --belt-gradient: linear-gradient(to right, #ffffff 3%,#ff0000 97% );
+}
+
+.red-black-belt {
+  --belt-bg: #ff0000;
+  --belt-text: #000000;
+  --belt-name: "Red/Black Belt (CORAL)";
+  --belt-gradient: linear-gradient(to right, #000000 3%, #ff0101 97%);
+}
+
+.red-belt {
+  --belt-bg: #ff0000;
+  --belt-text: #000000;
+  --belt-name: "Red Belt";
+}
+/* =========================================================
+   KIDS BELTS – GRAY
+   ========================================================= */
+
+.gray-white-belt {
+  --belt-bg: #555454;
+  --belt-text: #ffffff;
+  --belt-name: "Gray / White Belt";
+  --belt-gradient: linear-gradient(to right, #f7f7f7 3%, #555454 97%);
+}
+
+.gray-belt {
+  --belt-bg: #555454;
+  --belt-text: #ffffff;
+  --belt-name: "Gray Belt";
+}
+
+.gray-black-belt {
+  --belt-bg: #555454;
+  --belt-text: #ffffff;
+  --belt-name: "Gray / Black Belt";
+  --belt-gradient: linear-gradient(to right, #000000 3%, #555454 97%);
+}
+
+/* =========================================================
+   KIDS BELTS – YELLOW
+   ========================================================= */
+
+.yellow-white-belt {
+  --belt-bg: #f8e90f;
+  --belt-text: #000000;
+  --belt-name: "Yellow / White Belt";
+  --belt-gradient: linear-gradient(to right, #f7f7f7 2%, #f8e90f 97%);
+}
+
+.yellow-belt {
+  --belt-bg: #f8e90f;
+  --belt-text: #000000;
+  --belt-name: "Yellow Belt";
+}
+
+.yellow-black-belt {
+  --belt-bg: #f8e90f;
+  --belt-text: #000000;
+  --belt-name: "Yellow / Black Belt";
+  --belt-gradient: linear-gradient(to right, #000000 3%, #f8e90f 97%);
+}
+
+/* =========================================================
+   KIDS BELTS – ORANGE
+   ========================================================= */
+
+.orange-white-belt {
+  --belt-bg: #ffa500;
+  --belt-text: #000000;
+  --belt-name: "Orange / White Belt";
+  --belt-gradient: linear-gradient(to right, #f7f7f7 3%, #ffa500 97%);
+}
+
+.orange-belt {
+  --belt-bg: #ff8c00;
+  --belt-text: #000000;
+  --belt-name: "Orange Belt";
+}
+
+.orange-black-belt {
+  --belt-bg: #ff8c00;
+  --belt-text: #000000;
+  --belt-name: "Orange / Black Belt";
+  --belt-gradient: linear-gradient(to right, #000000 3%, #ff8c00 97%);
+}
+
+/* =========================================================
+   KIDS BELTS – GREEN
+   ========================================================= */
+
+.green-white-belt {
+  --belt-bg: #0bc20b;
+  --belt-text: #ffffff;
+  --belt-name: "Green / White Belt";
+  --belt-gradient: linear-gradient(to right, #f7f7f7 3%, #0bc20b 97%);
+}
+
+.green-belt {
+  --belt-bg: #0bc20b;
+  --belt-text: #ffffff;
+  --belt-name: "Green Belt";
+}
+
+.green-black-belt {
+  --belt-bg: #0bc20b;
+  --belt-text: #ffffff;
+  --belt-name: "Green / Black Belt";
+  --belt-gradient: linear-gradient(to right, #000000 3%, #0bc20b 97%);
+}
+
+
+
+.card {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 16px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, .12);
+}
+
+/*  Used for Schedule/index */ 
+.empty-state {
+    border: 2px dashed #e5e7eb;
+    border-radius: 12px;
+    padding: 24px;
+    text-align: center;
+    color: #6b7280;
+}
+.list-group-item.list-group-item-action {
+  transition: transform 0.2s ease-in-out;
+}
+.list-group-item.list-group-item-action:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.avatar {
+  vertical-align: middle;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+}
