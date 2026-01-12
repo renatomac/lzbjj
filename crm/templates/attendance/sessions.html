@@ -1,0 +1,53 @@
+{% extends "layout.html" %}
+
+{% block title %}All Scheduled Classes{% endblock %}
+
+{% block extra_head %}
+
+{% endblock %}
+
+{% block header_title %}All Scheduled Classes{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card p-4">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle px-3 py-2">
+                        <thead>
+                            <tr>
+                            
+                            <th>Date</th>
+                            <th>Start</th>
+                            <th>End</th>
+                            <th>Class</th>
+                            <th>Instructor</th>
+                            <th>Canceled?</th>
+                            <th>Notes</th>
+                            </tr>
+                        </thead>
+                        <tbody>                            
+                            {% for s in sessions %}
+                            <tr>                                
+                                <td>
+                                    <a href="{% url 'session_edit' s.pk %}"> {{ s.date|date:"Y-m-d" }} </a>
+                                </td>
+                                <td>{{ s.effective_start_time|time:"H:i" }}</td>
+                                <td>{{ s.effective_end_time|time:"H:i" }}</td>
+                                <td>{{ s.class_template.name }}</td>
+                                <td>{{ s.effective_instructor|default:"—" }}</td>
+                                <td>{{ s.is_canceled|yesno:"Yes,No" }}</td>
+                                <td>{{ s.notes|default_if_none:""|linebreaksbr }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="7" class="text-muted">No sessions found.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

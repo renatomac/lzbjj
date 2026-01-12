@@ -4,17 +4,19 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db import IntegrityError, transaction
-from django.db.models import Count, Q
+from django.db.models import Count, Q, F
+from django.db.models.functions import Coalesce, ExtractIsoWeekDay
 from django.forms import inlineformset_factory
 from django.http import JsonResponse,Http404
 from django.shortcuts import HttpResponse, HttpResponseRedirect, render, get_object_or_404, redirect
 from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import  require_POST
 from .models import User, Plan, Member, Membership, BeltPromotion, Staff, Contact, Class, Attendance, Technique, Position, ClassSession, SessionAttendance, SessionTechnique
 from .forms import PlanForm, StaffForm , MemberForm, MembershipForm, ClassForm, ContactFormSet, ContactForm,BeltPromotionForm, AttendanceForm 
 from datetime import datetime, date, timedelta
-from crm.utils import create_future_sessions
+from crm.utils import create_future_sessions, edit_future_sessions
 
 
 WEEKDAY_CODES = ['mon','tue','wed','thu','fri','sat','sun']
@@ -87,7 +89,17 @@ def dashboard(request):
     today = timezone.localdate()
     weekday = today.strftime("%A")
     shortWeekday = today.strftime("%a").lower()[:3]
-    sessions = ClassSession.objects.filter(date = today).order_by("start_time").values()
+    sessions = (
+    ClassSession.objects
+    .filter(date=today)
+    .annotate(
+        effective_start_time_db=Coalesce(
+            "start_time",
+            F("class_template__start_time")
+        )
+    )
+    .order_by("effective_start_time_db")
+    )
     # Dashboard metrix
     oneMonthLess = timezone.localdate()-timedelta(days=30)
     oneMonthMore = timezone.localdate()+timedelta(days=30)
@@ -345,9 +357,14 @@ def editClass(request, class_id):
         form = ClassForm(request.POST, instance=instance)
         if form.is_valid():
             form.save()
+            edit_future_sessions(class_id)
+            create_future_sessions(30)
             return redirect('classes')
     else:
         form = ClassForm(instance=instance)
+
+    # UPDATE THE SESSIONS WITH THE NEW CLASS CONFIGURATION
+
 
     return render(request, "classes/add.html", {
         "form": form,
@@ -377,10 +394,19 @@ def attendance(request):
     todayDate = timezone.localdate()
     weekday = timezone.localdate().strftime("%A")
     shortWeekday = timezone.localdate().strftime("%a").lower()[:3]
-    sessions = ClassSession.objects.filter(date = todayDate).order_by("start_time")
-    for i in range(7-today):
-        sessions = sessions.union(ClassSession.objects.filter(date = todayDate).order_by("start_time"))
-        todayDate = todayDate + timedelta(days=1)
+    end_date = todayDate + timedelta(days=6)
+    sessions = (
+    ClassSession.objects
+    .filter(date__range=(todayDate, end_date))
+    .annotate(
+        effective_start_time_db=Coalesce(
+            "start_time",
+            F("class_template__start_time")
+        )
+    )
+    .order_by("date", "effective_start_time_db")
+    )   
+
     return render(request, "attendance/index.html", {
         "sessions":sessions,
         "today":today,
@@ -407,12 +433,16 @@ def attendanceRecord(request, session_id):
     
     weekday = today.strftime("%A")
 
-    if filter == "all":
-        attending_list = SessionAttendance.objects.filter(session = sessionSelected)
-    elif filter == "checked":
-        attending_list = SessionAttendance.objects.filter(session = sessionSelected, present = True)
+    if session.is_canceled == False:
+        if filter == "all":
+            attending_list = SessionAttendance.objects.filter(session = sessionSelected)
+        elif filter == "checked":
+            attending_list = SessionAttendance.objects.filter(session = sessionSelected, present = True)
+        else:
+            attending_list = SessionAttendance.objects.filter(session = sessionSelected, present = False)
     else:
-        attending_list = SessionAttendance.objects.filter(session = sessionSelected, present = False)
+        attending_list = None    
+    
 
     technics = Technique.objects.all().values()
     techniques = SessionTechnique.objects.filter(session=session).select_related("technique")
@@ -443,7 +473,6 @@ def getSessionsByDate(request, date):
         "instructor__first_name",
         "instructor__last_name",
     )
-
     return JsonResponse(list(sessions), safe=False)
 
 def toggleAttendance(request, attendance_id):
@@ -722,5 +751,55 @@ def create_sessions(request):
     return HttpResponse("Future sessions created!")
 
 def sessions(request):
-    print(request.GET.get("date"))
-    return render(request, "attendance/sessions.html")
+    sessions = (ClassSession.objects
+    .select_related('class_template', 'instructor')
+    .order_by("date", "start_time"))
+    return render(request, "attendance/sessions.html", {
+        'sessions': sessions,
+    })
+
+@require_POST
+def session_edit(request, session_id ):
+    session = get_object_or_404(ClassSession, id=session_id)
+    print (session)
+    return render(request, "attendance/session_edit.html", {
+        'session': session,
+    })
+
+@require_POST
+def session_delete(request, session_id ):
+    session = get_object_or_404(ClassSession, id=session_id)
+    classDate = session.date
+    classWeekday = classDate.strftime("%A")
+    classShortWeekday = classDate.strftime("%a").lower()[:3]
+    today = timezone.localdate()
+    
+    mode = request.POST.get("mode")
+
+    if mode == "all":
+        class_template = session.class_template
+        classTime = class_template.start_time
+        sessions = ClassSession.objects.annotate(dow=ExtractIsoWeekDay('date')).filter(class_template = class_template, start_time = classTime, dow=classDate.isoweekday(), date__gte=today)
+        for i in sessions:
+            i.delete()
+    elif mode == "one":
+        session.delete()
+    else:
+        print ("No mode selectrion was made.")
+    return HttpResponseRedirect(reverse("attendance"))
+
+@require_POST
+def session_cancel(request, session_id ):
+    session = get_object_or_404(ClassSession, id=session_id)
+    if session.is_canceled == False:
+        session.is_canceled = True
+        session.save()    
+    return redirect("attendanceRecord", session_id=session_id)
+
+@require_POST
+def session_activate(request, session_id ):
+    session = get_object_or_404(ClassSession, id=session_id)
+    if session.is_canceled == True:
+        session.is_canceled = False
+        session.save()    
+    return redirect("attendanceRecord", session_id=session_id)

@@ -59,11 +59,21 @@ document.addEventListener("DOMContentLoaded", function () {
     const sel = document.getElementById("sessionSelect");
     if (!date || !sel) return;
 
+    // --- Helper: 24h "HH:MM:SS" -> "h:mm a.m./p.m." ---
+    function formatTime24to12(timeStr) {
+        // Accepts "18:30:00" or "06:05:00" or "18:30"
+        if (!timeStr) return "";
+        const [h, m] = timeStr.split(":");
+        const hour = Number(h);
+        const ampm = hour >= 12 ? "p.m." : "a.m.";
+        const hour12 = ((hour + 11) % 12) + 1; // 0->12, 13->1, etc.
+        return `${hour12}:${String(m).padStart(2, "0")} ${ampm}`;
+    }
+
     
     date.addEventListener('change', dateSelect);
     function dateSelect(){
         const url = new URL(`/getSessionsByDate/${date.value}`, window.location.origin);
-        console.log(url)
         fetch(url)
         .then(response => response.json())
         .then(data => {
@@ -75,8 +85,10 @@ document.addEventListener("DOMContentLoaded", function () {
             }
             data.forEach(session => {
             const option = document.createElement("option");
+            
             option.value = session.id;
-            option.textContent = `${session.class_template__name} - ${session.start_time}`;
+            const start = formatTime24to12(session.start_time);
+            option.textContent = `${session.class_template__name} (${start})`;
             sel.appendChild(option);
             });
         });
@@ -97,11 +109,11 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 });
 
+
 document.addEventListener("DOMContentLoaded", function () {
     let sel = document.getElementById("id_new_rank");
     if (!sel) return;
     
-    console.log(sel.value);
     sel.addEventListener('change', beltUpdate);
 
     function beltUpdate(){
@@ -489,6 +501,8 @@ document.addEventListener("click", function (event) {
         });
 });
 
+
+/* MODEAL CONFIGURATION  */
 
 
 

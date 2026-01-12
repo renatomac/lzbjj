@@ -1,16 +1,16 @@
 {% extends "layout.html" %}
 
-{% block title %}Attendance{% endblock %}
+{% block title %}Class Session View{% endblock %}
 
-{% block header_title %}Record attendance{% endblock %}
+{% block header_title %}Class Session View{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center">
-  <div class="col-lg-8 col-sm-12">
+  <div class="col-lg-6 col-sm-12">
     <div class="card main-card mb-4">
       <div class="card-body d-flex justify-content-between align-items-center flex-wrap gap-3">
         <div>
-          <h1 class="fw-bold fs-2 mb-1">Attendance</h1>
+          <h1 class="fw-bold fs-2 mb-1">Class Session View</h1>
           <p class="text-muted mb-0">
             Check in members, track attendance
           </p>
@@ -25,29 +25,29 @@
 </div>
 
 <div class="row justify-content-center">
-  <div class="col-lg-8 col-sm-12">
+  <div class="col-lg-6 col-sm-12">
     <div class="card main-card mb-4">
       <div class="card-body">
 
         <div class="card mb-4">
           <div class="card-body">
               
-            <form method="GET" class="row g-3" >
-              <div class="col-5">
+            <form method="GET" class="row g-3 mb-4 px-5 w-100" >
+              <div class="col-4">
                   <label for="sessionDate" class="form-label fw-semibold">Date</label>
-                  <input name="sessionDate" id="sessionDate" type="date" class="form-control m-0"  value={{session.date|date:'Y-m-d'}}>
+                  <input name="sessionDate" id="sessionDate" type="date" class="form-control m-0 w-100"  value={{session.date|date:'Y-m-d'}}>
               </div>
             
-              <div class="col-7 mb-4">
+              <div class="col-8 mb-4">
                 <label for="sessionSelect" class="form-label fw-semibold">Class {{sessionSelect}}</label>
-                <select name="sessionSelect" id="sessionSelect" class="form-select" >
+                <select name="sessionSelect" id="sessionSelect" class="form-select w-75" >
                   <option value=0>Select Class</option>
                   {% for Session in todaySessions %}
                     
                     {%if sessionSelected == Session.id%}
-                      <option selected value={{Session.id}}> {{Session.name}} ({{Session.start_time}} - {{Session.end_time}}) </option>
+                      <option selected value={{Session.id}}> {{Session.class_template.name}} ({{Session.effective_start_time}}) </option>
                     {% else %}
-                      <option value={{Session.id}}> {{Session.name}} ({{Session.start_time}} - {{Session.end_time}}) </option>
+                      <option value={{Session.id}}> {{Session.class_template.name}} ({{Session.effective_start_time}} ) </option>
                     {%endif%}
                   {%endfor%}
                 </select>
@@ -55,7 +55,7 @@
             </form>  
 
             <div class="row g-3 mb-2">
-              <div class="col-lg-8 col-sm-12 ">
+              <div class="mb-4 px-5 w-100">
                 <div class="d-flex flex-wrap gap-1 mb-1">
                   <form method="GET">
                   
@@ -76,9 +76,9 @@
 
             {% csrf_token %}
             <div class="row g-3 mb-2">
-              <div class="col-lg-8 col-sm-12 ">
+              <div class="mb-4 px-5 w-100 ">
                 <label for="techSelect" class="form-label fw-semibold">Technique</label>
-                <select multiple name="techSelect" id="techSelect" class="form-select">
+                <select multiple name="techSelect" id="techSelect" class="form-select" {% if session.is_canceled == True  %}disabled{%endif%}>
                   {% for technique in technics %}
                       <option value={{technique.id}}> {{technique.name}} </option>
                   {%endfor%}
@@ -87,14 +87,14 @@
             </div>
 
             <div class="row g-3 mb-2">
-              <div class="col-lg-8 col-sm-12 ">
+              <div class="mb-4 px-5 w-100 ">
                 <label for="comment">Comments:</label>
-                <textarea class="form-control fw-semibold m-0" rows="2" id="comment-id" name="comment">{{comment}} </textarea>
+                <textarea class="form-control fw-semibold m-0 " rows="2" id="comment-id" name="comment" {% if session.is_canceled == True  %}disabled{%endif%}>{{comment}} </textarea>
               </div>
             </div>   
 
-            <button type="button" class="btn btn-primary techBtn" name="techBtn" id="techBtnId" value={{class.id}} data-save-url="{% url 'saveTechnique' %}">Submit</button>
-
+            <button type="button" class="btn btn-primary techBtn" name="techBtn" id="techBtnId" value={{session.id}} data-save-url="{% url 'saveTechnique' %}" {% if session.is_canceled == True  %}disabled{%endif%}>Submit</button>
+            
           </div>
         </div>
         <div class="card mb-4 ">
@@ -107,14 +107,39 @@
               </h6>
             </div>
             <div class="col-lg-8 col-sm-12">  
-              <h6>Professor: {{session.instructor}}</h6>
+              <h6>Professor: {{session.effective_instructor}}</h6>
               <h6>Notes: {{session.notes}} </h6>
             </div>
           </div>
+          <div class="d-flex gap-2 m-4">
+
+            <!-- Call DELETE Modal -->
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#deleteModal">
+              Delete Modal
+            </button>
+
+            
+            <form method="POST" 
+              action="{% url 'session_cancel' session.id %}" 
+              onsubmit="return confirm('Are you sure you want to cancel this class session?');"
+              {% if session.is_canceled == True %} class="d-none"{%endif%}>
+              {% csrf_token %}
+              <button type="submit" class="btn btn-primary techBtn" name="techBtn" id="techBtnId" >Cancel Session</button>
+            </form>
+
+            <form method="POST" 
+            action="{% url 'session_activate' session.id %}" 
+            onsubmit="return confirm('Are you sure you want to activate this class session?');"
+            {% if session.is_canceled == False %} class="d-none"{%endif%}>
+              {% csrf_token %}
+              <button type="submit" class="btn btn-primary techBtn" name="techBtn" id="techBtnId" >Activate Session</button>
+            </form>
+          </div>
+          
         </div>
         <!-- Roster -->
-        <div class="card mb-4 ">
-          <div id='students' class="mb-4 px-5 col-md-6 col-lg-6 col-sm-12">
+        <div class="card mb-4">
+          <div id='students' class="mb-4 px-5 w-100">
             {%if attending_list %}
             <div id="roster" class="d-grid gap-3 ">
               <div class="table-responsive">
@@ -199,5 +224,43 @@
       </div>
     </div>
   </div>
+
+<!-- DELETE Modal -->
+<div class="modal" id="deleteModal">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+
+      <!-- Modal Header -->
+      <div class="modal-header">
+        <h4 class="modal-title">Session Delete</h4>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+
+      <!-- Modal body -->
+      <div class="modal-body">
+        Do you want to delete only this session or the complete series? 
+      </div>
+
+      <!-- Modal footer -->
+      <div class="modal-footer">
+        <form method="POST" 
+          action="{% url 'session_delete' session.id %}">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-primary techBtn" name="techBtn" id="techBtnId" >Delete Session</button>
+          <input type="hidden" name="mode" value="one">
+        </form>
+        <form method="POST" 
+          action="{% url 'session_delete' session.id %}">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-primary techBtn" name="techBtn" id="techBtnId" >Delete Series</button>
+          <input type="hidden" name="mode" value="all">
+        </form>
+        <button type="button" class="btn btn-danger" data-bs-dismiss="modal">Close</button>
+        
+      </div>
+
+    </div>
+  </div>
+</div>
 
   {% endblock %}

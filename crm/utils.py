@@ -1,9 +1,18 @@
 from datetime import date, timedelta
 from crm.models import ClassSession, Class, Member, SessionAttendance
-
+from django.shortcuts import get_object_or_404
+from django.db import transaction
 
 WEEKDAY_CODES = ['mon','tue','wed','thu','fri','sat','sun']
-
+WEEKDAY_MAP = {
+    "mon": 0,
+    "tue": 1,
+    "wed": 2,
+    "thu": 3,
+    "fri": 4,
+    "sat": 5,
+    "sun": 6,
+}
 
 # Create the next 30 days class session
 
@@ -28,9 +37,9 @@ def create_future_sessions(days_ahead=30):
                     ClassSession.objects.create(
                         class_template=class_template,
                         date=session_date,
-                        start_time=class_template.start_time,
-                        end_time=class_template.end_time,
-                        instructor=class_template.instructor,
+                        start_time=None,
+                        end_time=None,
+                        instructor=None,
                     )
     create_attendance_for_period(days_ahead)    
 
@@ -59,3 +68,79 @@ def create_attendance_for_session(session):
             defaults={"present": False}
         )
 
+def edit_future_sessions(class_id):
+    today = date.today()
+
+    template_class = get_object_or_404(Class, id=class_id)
+
+    future_sessions = ClassSession.objects.filter(
+        class_template=template_class,
+        date__gte=today,
+        is_canceled=False,
+    )
+
+    with transaction.atomic():
+        for session in future_sessions:
+            updated = False
+
+            # Update instructor ONLY if not overridden
+            if session.instructor is None:
+                session.instructor = template_class.instructor
+                updated = True
+
+            # Update times ONLY if not overridden
+            if session.start_time is None:
+                session.start_time = template_class.start_time
+                updated = True
+
+            if session.end_time is None:
+                session.end_time = template_class.end_time
+                updated = True
+
+            if updated:
+                session.save()
+        
+# REGENERATE CLASS SESSIONS WHEN YOU CHANGE THE CLASS DATE
+
+def regenerate_future_sessions(class_id):
+    today = date.today()
+    template_class = get_object_or_404(Class, id=class_id)
+
+    target_weekdays = {
+        WEEKDAY_MAP[d] for d in template_class.days_of_week
+    }
+
+    future_sessions = ClassSession.objects.filter(
+        class_template=template_class,
+        date__gte=today,
+    )
+
+    existing_dates = {
+        s.date: s for s in future_sessions
+    }
+
+    with transaction.atomic():
+
+        # 1️⃣ Remove sessions on invalid weekdays
+        for session in future_sessions:
+            if session.date.weekday() not in target_weekdays:
+                # Optional: skip manually edited or canceled sessions
+                if session.is_canceled:
+                    continue
+                session.delete()
+
+        # 2️⃣ Create missing sessions (next X weeks)
+        end_date = template_class.end_date or (today + timedelta(weeks=12))
+        current = max(today, template_class.start_date)
+
+        while current <= end_date:
+            if current.weekday() in target_weekdays:
+                if current not in existing_dates:
+                    ClassSession.objects.create(
+                        class_template=template_class,
+                        date=current,
+                        start_time=None,
+                        end_time=None,
+                        instructor=None,
+                    )
+            current += timedelta(days=1)

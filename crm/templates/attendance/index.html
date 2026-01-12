@@ -27,17 +27,17 @@
                 {% if sessions %}
                 <div class="list-group mt-3">   
                     
-                    {% for class in sessions %}
+                    {% for session in sessions %}
 
-                    <a href="{% url 'attendanceRecord' session_id=class.id %}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center rounded-3 p-3 mb-2 border border-1 border-gray-100">
+                    <a href="{% url 'attendanceRecord' session_id=session.id %}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center rounded-3 p-3 mb-2 border border-1 border-gray-100">
                         <div class="d-flex align-items-center gap-3">
                             <div class="d-flex align-items-center justify-content-center bg-primary bg-opacity-10 text-primary rounded-circle" style="width: 36px; height: 36px;">
                                 <i class="fas fa-clipboard-check"></i>
                             </div>
                             <div>
-                                <div class="fw-semibold text-gray-900">{{ class.class_template.name }}</div>
+                                <div class="fw-semibold text-gray-900">{{ session.class_template.name }}</div>
                                 <div class="text-xs text-muted">
-                                    {{class.date}} • {{ class.start_time }} • Coach: {{ class.instructor.first_name }}
+                                    {{session.date}} • {{ session.effective_start_time }} • Coach: {{ session.effective_instructor }}
                                 </div>
                             </div>
                         </div>

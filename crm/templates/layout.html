@@ -79,6 +79,14 @@
                 </li>
 
                 <li class="nav-item">
+                    <a href="{% url 'sessions' %}"
+                       class="nav-link text-white d-flex align-items-center gap-3 rounded-3
+                       {% if request.resolver_match.app_name == 'sessions' %}active{% endif %}">
+                        <i class="fas fa-clipboard-check"></i> Sessions
+                    </a>
+                </li>
+
+                <li class="nav-item">
                     <a href="{% url 'billing' %}"
                        class="nav-link text-white d-flex align-items-center gap-3 rounded-3
                        {% if request.resolver_match.app_name == 'billing' %}active{% endif %}">
