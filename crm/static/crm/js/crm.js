@@ -307,7 +307,7 @@ function getContacts(member_id, filter){
         });
     
 }
-        */
+       
 
 function getClasses(value) {
     classSelect = document.getElementById("classSelect");
@@ -330,6 +330,9 @@ function getClasses(value) {
             }
         );
 }
+
+*/
+
 
 function getStudents(value) {
     classDate = document.getElementById("classDate").value;

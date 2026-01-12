@@ -16,7 +16,7 @@ from django.views.decorators.http import  require_POST
 from .models import User, Plan, Member, Membership, BeltPromotion, Staff, Contact, Class, Attendance, Technique, Position, ClassSession, SessionAttendance, SessionTechnique
 from .forms import PlanForm, StaffForm , MemberForm, MembershipForm, ClassForm, ContactFormSet, ContactForm,BeltPromotionForm, AttendanceForm 
 from datetime import datetime, date, timedelta
-from crm.utils import create_future_sessions, edit_future_sessions
+from crm.utils import *
 
 
 WEEKDAY_CODES = ['mon','tue','wed','thu','fri','sat','sun']
@@ -118,7 +118,8 @@ def dashboard(request):
     {**m, 'age': calculateAge(m['date_of_birth'])} for m in newMembers
     ]
     # Totals
-
+    ak_distrib = adult_kids_distrib()
+    birthdays = birthdays_of_the_month()
     summary = {
         'active':active,
         'inactive':inactive,
@@ -133,6 +134,8 @@ def dashboard(request):
         "today":today,
         "weekday":weekday,
         "classesCount":classesCount,
+        "ak_distrib" : ak_distrib, 
+        "birthdays": birthdays,
         }
 
     # Belt Distribution

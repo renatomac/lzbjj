@@ -1,7 +1,10 @@
-from datetime import date, timedelta
+from datetime import datetime, date, timedelta
 from crm.models import ClassSession, Class, Member, SessionAttendance
 from django.shortcuts import get_object_or_404
 from django.db import transaction
+from django.db.models import Count
+from django.db.models.functions import ExtractDay
+from django.utils import timezone
 
 WEEKDAY_CODES = ['mon','tue','wed','thu','fri','sat','sun']
 WEEKDAY_MAP = {
@@ -17,7 +20,7 @@ WEEKDAY_MAP = {
 # Create the next 30 days class session
 
 def create_future_sessions(days_ahead=30):
-    today = date.today()
+    today = timezone.localdate()
     end_date = today + timedelta(days=days_ahead)
     
     # CREATE CLASSES FOR THE NEXT 30 DAYS 
@@ -44,7 +47,7 @@ def create_future_sessions(days_ahead=30):
     create_attendance_for_period(days_ahead)    
 
 def create_attendance_for_period(days_ahead=30):
-    today = date.today()
+    today = timezone.localdate()
     end_date = today + timedelta(days=days_ahead)
 
     sessions = ClassSession.objects.filter(date__range=(today, end_date))
@@ -69,7 +72,7 @@ def create_attendance_for_session(session):
         )
 
 def edit_future_sessions(class_id):
-    today = date.today()
+    today = timezone.localdate()
 
     template_class = get_object_or_404(Class, id=class_id)
 
@@ -103,7 +106,7 @@ def edit_future_sessions(class_id):
 # REGENERATE CLASS SESSIONS WHEN YOU CHANGE THE CLASS DATE
 
 def regenerate_future_sessions(class_id):
-    today = date.today()
+    today = timezone.localdate()
     template_class = get_object_or_404(Class, id=class_id)
 
     target_weekdays = {
@@ -144,3 +147,42 @@ def regenerate_future_sessions(class_id):
                         instructor=None,
                     )
             current += timedelta(days=1)
+
+# Distributions
+
+def adult_kids_distrib():
+    adults = Member.objects.filter(is_active = True, member_type='adult').count()
+    children = Member.objects.filter(is_active = True, member_type="child").count()
+    distribution={}
+    distribution['adult'] = round((adults / (adults + children)) * 100, 2)
+    distribution['child'] = round((children / (adults + children)) * 100, 2)
+    distribution['total_adult'] = adults
+    distribution['total_child'] = children
+    return distribution
+
+
+def belt_distrib():
+    belt_counts = (Member.objects.values("belt_rank").annotate(count=Count("id")))
+
+    total_members_with_belts = sum(item["count"] for item in belt_counts)
+
+    belt_distribution = {}
+    if total_members_with_belts > 0:
+        for item in belt_counts:
+            belt = item["belt_rank"]
+            count = item["count"]
+            belt_distribution[belt] = round((count / total_members_with_belts) * 100, 2)
+    return belt_distribution
+
+def birthdays_of_the_month():
+    today = timezone.localdate()
+    
+    members_with_birthdays_this_month = (
+        Member.objects
+        .filter(date_of_birth__month=today.month)
+        .annotate(day=ExtractDay('date_of_birth'))
+        .order_by('day', 'last_name', 'first_name')
+    )
+    return members_with_birthdays_this_month
+
+
