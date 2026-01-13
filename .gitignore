@@ -26,8 +26,7 @@ build/
 *.sqlite3
 db.sqlite3
 media/
-staticfiles/
-static/
+
 
 # Django local settings
 *.env
