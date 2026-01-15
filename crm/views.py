@@ -25,75 +25,8 @@ def index(request):
 
     # Authenticated users view the Dashboard
     if request.user.is_authenticated:
-        today = timezone.localdate()
-        weekday = today.strftime("%A")
-        shortWeekday = today.strftime("%a").lower()[:3]
-        sessions = (
-        ClassSession.objects
-        .filter(date=today)
-        .annotate(
-            effective_start_time_db=Coalesce(
-                "start_time",
-                F("class_template__start_time")
-            )
-        )
-        .order_by("effective_start_time_db")
-        )
-        # Dashboard metrix
-        oneMonthLess = timezone.localdate()-timedelta(days=30)
-        oneMonthMore = timezone.localdate()+timedelta(days=30)
-        active=Member.objects.filter(is_active = True).count()
-        inactive=Member.objects.filter(is_active = False).count()
-        total=Member.objects.all().count()
-        # members enrolled in the last 30 days
-        newMembers=Member.objects.filter(membership_start_date__gte = oneMonthLess).values()
-        newMembersCount=Member.objects.filter(membership_start_date__gte = oneMonthLess).count()
-        # membership exping in the next 30 days
-        expiring= Member.objects.filter(membership_start_date__lt = oneMonthMore ).values()
-        expiringCount= Member.objects.filter(membership_start_date__lt = oneMonthMore ).count()
-        classesCount = classesThisWeek()
-        # members age
-        members_age = [
-        {**m, 'age': calculateAge(m['date_of_birth'])} for m in newMembers
-        ]
-        # Totals
-        ak_distrib = adult_kids_distrib()
-        birthdays = birthdays_of_the_month()
-        summary = {
-            'active':active,
-            'inactive':inactive,
-            'total':total,
-            # members enrolled in the last 30 days
-            'newMembers':members_age,
-            'newMembersCount':newMembersCount,
-            # membership exping in the next 30 days
-            'expiring': expiring,
-            'expiringCount': expiringCount,
-            "sessions":sessions,
-            "today":today,
-            "weekday":weekday,
-            "classesCount":classesCount,
-            "ak_distrib" : ak_distrib, 
-            "birthdays": birthdays,
-            }
+        return render(request, "dashboard/index.html")
 
-        # Belt Distribution
-        belt_counts = (Member.objects.values("belt_rank").annotate(count=Count("id")))
-
-        total_members_with_belts = sum(item["count"] for item in belt_counts)
-
-        belt_distribution = {}
-        if total_members_with_belts > 0:
-            for item in belt_counts:
-                belt = item["belt_rank"]
-                count = item["count"]
-                belt_distribution[belt] = round((count / total_members_with_belts) * 100, 2)
-
-        return render(request, "dashboard/index.html", {
-            "summary" : summary,
-            "belt_distribution":belt_distribution,
-
-            })
     # Everyone else is prompted to sign in
     else:
         return HttpResponseRedirect(reverse("login"))
@@ -201,7 +134,7 @@ def dashboard(request):
         "today":today,
         "weekday":weekday,
         "classesCount":classesCount,
-        "ak_distrib" : ak_distrib, 
+        "ak_distrib" : ak_distrib,
         "birthdays": birthdays,
         }
 
@@ -475,7 +408,7 @@ def attendance(request):
         )
     )
     .order_by("date", "effective_start_time_db")
-    )   
+    )
 
     return render(request, "attendance/index.html", {
         "sessions":sessions,
@@ -500,7 +433,7 @@ def attendanceRecord(request, session_id):
         sessionSelected = session_id
     else:
         sessionSelected = int(sessionSelectedStr)
-    
+
     weekday = today.strftime("%A")
 
     if session.is_canceled == False:
@@ -511,8 +444,8 @@ def attendanceRecord(request, session_id):
         else:
             attending_list = SessionAttendance.objects.filter(session = sessionSelected, present = False)
     else:
-        attending_list = None    
-    
+        attending_list = None
+
 
     technics = Technique.objects.all().values()
     techniques = SessionTechnique.objects.filter(session=session).select_related("technique")
@@ -528,7 +461,7 @@ def attendanceRecord(request, session_id):
     "sessionTechniques":names,
     "technics": technics,
     "attending_list":attending_list,
-    "todaySessions":todaySessions, 
+    "todaySessions":todaySessions,
     "filter": filter,
     })
 
@@ -805,7 +738,7 @@ def saveTechnique(request):
 
     for id in technique_id:
         print(id)
-        if int(id) == 0: 
+        if int(id) == 0:
             pass
         else:
             technique = get_object_or_404(Technique, id=int(id))
@@ -818,7 +751,7 @@ def saveTechnique(request):
 
 def create_sessions(request):
     create_future_sessions(days_ahead=30)
-    return HttpResponse("Future sessions created!")
+    return HttpResponseRedirect(reverse("classes"))
 
 def sessions(request):
     sessions = (ClassSession.objects
@@ -843,7 +776,7 @@ def session_delete(request, session_id ):
     classWeekday = classDate.strftime("%A")
     classShortWeekday = classDate.strftime("%a").lower()[:3]
     today = timezone.localdate()
-    
+
     mode = request.POST.get("mode")
 
     if mode == "all":
@@ -863,7 +796,7 @@ def session_cancel(request, session_id ):
     session = get_object_or_404(ClassSession, id=session_id)
     if session.is_canceled == False:
         session.is_canceled = True
-        session.save()    
+        session.save()
     return redirect("attendanceRecord", session_id=session_id)
 
 @require_POST
@@ -871,7 +804,7 @@ def session_activate(request, session_id ):
     session = get_object_or_404(ClassSession, id=session_id)
     if session.is_canceled == True:
         session.is_canceled = False
-        session.save()    
+        session.save()
     return redirect("attendanceRecord", session_id=session_id)
 
 

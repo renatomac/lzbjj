@@ -3,6 +3,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+__pycache__/
+*.pyc
+
 # C extensions
 *.so
 
@@ -26,8 +29,7 @@ build/
 *.sqlite3
 db.sqlite3
 media/
-staticfiles/
-static/
+
 
 # Django local settings
 *.env
@@ -71,3 +73,8 @@ __pycache__/
 *.pyc
 *.pyo
 *.log
+
+
+.local/
+.ipython/
+.virtualenvs/

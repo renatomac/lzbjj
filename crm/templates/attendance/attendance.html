@@ -31,19 +31,19 @@
 
         <div class="card mb-4">
           <div class="card-body">
-              
+
             <form method="GET" class="row g-3 mb-4 px-5 w-100" >
-              <div class="col-4">
+              <div class="col-12 col-lg-4">
                   <label for="sessionDate" class="form-label fw-semibold">Date</label>
                   <input name="sessionDate" id="sessionDate" type="date" class="form-control m-0 w-100"  value={{session.date|date:'Y-m-d'}}>
               </div>
-            
-              <div class="col-8 mb-4">
+
+              <div class="col-12 col-lg-8 mb-4">
                 <label for="sessionSelect" class="form-label fw-semibold">Class {{sessionSelect}}</label>
                 <select name="sessionSelect" id="sessionSelect" class="form-select w-75" >
                   <option value=0>Select Class</option>
                   {% for Session in todaySessions %}
-                    
+
                     {%if sessionSelected == Session.id%}
                       <option selected value={{Session.id}}> {{Session.class_template.name}} ({{Session.effective_start_time}}) </option>
                     {% else %}
@@ -52,13 +52,13 @@
                   {%endfor%}
                 </select>
               </div>
-            </form>  
+            </form>
 
             <div class="row g-3 mb-2">
               <div class="mb-4 px-5 w-100">
                 <div class="d-flex flex-wrap gap-1 mb-1">
                   <form method="GET">
-                  
+
                   <a href="{% url 'attendanceRecord' sessionSelected %}?filter=all" class="btn btn-outline-secondary {% if filter == 'all' %}active{%endif%}">
                     all
                   </a>
@@ -91,10 +91,10 @@
                 <label for="comment">Comments:</label>
                 <textarea class="form-control fw-semibold m-0 " rows="2" id="comment-id" name="comment" {% if session.is_canceled == True  %}disabled{%endif%}>{{comment}} </textarea>
               </div>
-            </div>   
+            </div>
 
             <button type="button" class="btn btn-primary techBtn" name="techBtn" id="techBtnId" value={{session.id}} data-save-url="{% url 'saveTechnique' %}" {% if session.is_canceled == True  %}disabled{%endif%}>Submit</button>
-            
+
           </div>
         </div>
         <div class="card mb-4 ">
@@ -102,11 +102,11 @@
             <div class="col-lg-8 col-sm-12">
               <h6>Class Session: #{{session.id}} - {{session.class_template.name}} </h6>
               <h6>Technique: {%for technique in sessionTechniques%}
-                {{technique}},   
+                {{technique}},
                 {%endfor%}
               </h6>
             </div>
-            <div class="col-lg-8 col-sm-12">  
+            <div class="col-lg-8 col-sm-12">
               <h6>Professor: {{session.effective_instructor}}</h6>
               <h6>Notes: {{session.notes}} </h6>
             </div>
@@ -118,24 +118,24 @@
               Delete Modal
             </button>
 
-            
-            <form method="POST" 
-              action="{% url 'session_cancel' session.id %}" 
+
+            <form method="POST"
+              action="{% url 'session_cancel' session.id %}"
               onsubmit="return confirm('Are you sure you want to cancel this class session?');"
               {% if session.is_canceled == True %} class="d-none"{%endif%}>
               {% csrf_token %}
               <button type="submit" class="btn btn-primary techBtn" name="techBtn" id="techBtnId" >Cancel Session</button>
             </form>
 
-            <form method="POST" 
-            action="{% url 'session_activate' session.id %}" 
+            <form method="POST"
+            action="{% url 'session_activate' session.id %}"
             onsubmit="return confirm('Are you sure you want to activate this class session?');"
             {% if session.is_canceled == False %} class="d-none"{%endif%}>
               {% csrf_token %}
               <button type="submit" class="btn btn-primary techBtn" name="techBtn" id="techBtnId" >Activate Session</button>
             </form>
           </div>
-          
+
         </div>
         <!-- Roster -->
         <div class="card mb-4">
@@ -160,7 +160,7 @@
                         </div>
                       </td>
                       <td>
-                        
+
                         {%if attendee.present%}
                           <span class="badge bg-success" id="span{{attendee.id}}">
                           <i class="fa-solid fa-circle-check me-1" id="i{{attendee.id}}"></i>
@@ -172,17 +172,17 @@
                           <span class="label-text" id="label{{attendee.id}}">Not checked-in </span>
                           </span>
                         {%endif%}
-                        
+
                       </td>
                       <td>
                         {%if attendee.present%}
                           <button class="btn btn-outline-secondary btn-sm toggle-attendance"  data-attendee-id = {{attendee.id}}>
-                            <i class="fa-solid fa-rotate-left me-1" id="btn_i{{attendee.id}}"></i> 
+                            <i class="fa-solid fa-rotate-left me-1" id="btn_i{{attendee.id}}"></i>
                             <span id="labelBtn{{attendee.id}}">Undo</span>
                           </button>
                         {%else%}
                           <button class="btn btn-outline-secondary btn-sm toggle-attendance"  data-attendee-id = {{attendee.id}}>
-                            <i class="fa-solid fa-user-check me-1" id="btn_i{{attendee.id}}"></i> 
+                            <i class="fa-solid fa-user-check me-1" id="btn_i{{attendee.id}}"></i>
                             <span id="labelBtn{{attendee.id}}">Check-in</span>
                           </button>
                         {%endif%}
@@ -238,25 +238,25 @@
 
       <!-- Modal body -->
       <div class="modal-body">
-        Do you want to delete only this session or the complete series? 
+        Do you want to delete only this session or the complete series?
       </div>
 
       <!-- Modal footer -->
       <div class="modal-footer">
-        <form method="POST" 
+        <form method="POST"
           action="{% url 'session_delete' session.id %}">
           {% csrf_token %}
           <button type="submit" class="btn btn-primary techBtn" name="techBtn" id="techBtnId" >Delete Session</button>
           <input type="hidden" name="mode" value="one">
         </form>
-        <form method="POST" 
+        <form method="POST"
           action="{% url 'session_delete' session.id %}">
           {% csrf_token %}
           <button type="submit" class="btn btn-primary techBtn" name="techBtn" id="techBtnId" >Delete Series</button>
           <input type="hidden" name="mode" value="all">
         </form>
         <button type="button" class="btn btn-danger" data-bs-dismiss="modal">Close</button>
-        
+
       </div>
 
     </div>

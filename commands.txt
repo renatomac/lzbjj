@@ -1,0 +1,16 @@
+**** Bash DB dump: *****
+
+mysqldump \
+  -h renatomac.mysql.pythonanywhere-services.com \
+  -u renatomac \
+  -p \
+  --no-tablespaces \
+  --single-transaction \
+  --quick \
+  --skip-lock-tables \
+  --ignore-table=renatomac$crmdb.django_session \
+  --ignore-table=renatomac$crmdb.django_admin_log \
+  'renatomac$crmdb' \
+  > crm_prod.sql
+
+

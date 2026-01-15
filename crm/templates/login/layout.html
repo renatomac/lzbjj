@@ -13,47 +13,50 @@
     </head>
     <body>
         <div class="container-fluid">
-            <div class="card mx-auto my-5 w-50 w-md-50 w-lg-25" >
-                <div class="card-body">
-                    <div class="p-3 mb-2 bg-dark text-white text-center">
-                        <img src="{% static 'crm/img/checkmat200x200.png' %}" alt="Checkmat logo" class="img-fluid mx-auto d-block">
-                        <h1>Lake Zurich BJJ</h1>
-                        <p>Jiu-Jitsu Studio Management</p>
-                    </div>
+            <div class="mx-auto text-center col-10 col-lg-4"
+                <div class="card mx-auto my-5 w-50 w-50 w-lg-25" >
+                    <div class="card-body">
+                        <div class="p-3 mb-2 bg-dark text-white text-center">
+                            <img src="{% static 'crm/img/checkmat200x200.png' %}" alt="Checkmat logo" class="img-fluid mx-auto d-block">
+                            <h1>Lake Zurich BJJ</h1>
+                            <p>Jiu-Jitsu Studio Management</p>
+                        </div>
 
-                    {% if messages %}
-                        <ul class="messages">
-                            {% for message in messages %}
-                                <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
-                            {% endfor %}
+                        {% if messages %}
+                            <ul class="messages">
+                                {% for message in messages %}
+                                    <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
+                                {% endfor %}
+                            </ul>
+                        {% endif %}
+                        <div>
+                            {% if user.is_authenticated %}
+                                Signed in as <strong>{{ user.username }}</strong>.
+                            {% endif %}
+                        </div>
+                        <ul class="nav">
+                            {% if user.is_authenticated %}
+                                <li class="nav-item">
+                                    <a class="nav-link" href="{% url 'logout' %}">Log Out</a>
+                                </li>
+                            {% else %}
+                                <li class="nav-item">
+                                    <a class="nav-link" href="{% url 'login' %}">Log In</a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link" href="{% url 'register' %}">Register</a>
+                                </li>
+                            {% endif %}
                         </ul>
-                    {% endif %}
-                    <div>
-                        {% if user.is_authenticated %}
-                            Signed in as <strong>{{ user.username }}</strong>.
-                        {% endif %}
+                        <hr>
                     </div>
-                    <ul class="nav">
-                        {% if user.is_authenticated %}                                         
-                            <li class="nav-item">
-                                <a class="nav-link" href="{% url 'logout' %}">Log Out</a>
-                            </li>
-                        {% else %}
-                            <li class="nav-item">
-                                <a class="nav-link" href="{% url 'login' %}">Log In</a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link" href="{% url 'register' %}">Register</a>
-                            </li>
-                        {% endif %}
-                    </ul>
-                    <hr>
-                    {% block body %}
-                    {% endblock %}
-                
-                </body>
+                </div>
             </div>
         </div>
 
-    </div>
+    {% block body %}
+    {% endblock %}
+
+    </body>
+
 </html>
