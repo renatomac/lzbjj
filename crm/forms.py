@@ -9,7 +9,7 @@ from localflavor.us.forms import USStateSelect
 from phonenumber_field.formfields import PhoneNumberField
 from .models import (
     User, Member, Staff, Plan, Membership, Payment,
-    Class, Attendance, BeltPromotion, Contact,BeltRank,
+    Class, Attendance, BeltPromotion, Contact,BeltRank,WaiverSignature
 )
 
 User = get_user_model()
@@ -83,7 +83,6 @@ class MemberForm(forms.ModelForm):
             "membership_start_date",
             "membership_end_date",
             "plan",
-            "waivers_signed",
             "notes",
         ]
         widgets = {
@@ -327,3 +326,60 @@ class BeltPromotionForm(forms.ModelForm):
             label="New Rank",
             widget=forms.Select(attrs={'class': 'form-select'})
         )
+
+
+# WAIVER FORMS
+
+class BaseWaiverForm(forms.ModelForm):
+    agreed = forms.BooleanField(
+        required=True,
+        label="I have read and understand this waiver and agree to its terms."
+    )
+
+    class Meta:
+        model = WaiverSignature
+        fields = [
+            "participant_full_name",
+            "participant_dob",
+            "guardian_full_name",
+            "guardian_relationship",
+            "signature",
+            "agreed",
+        ]
+        widgets = {
+            "signature": forms.TextInput(
+                attrs={"placeholder": "Type full legal name"}
+            )
+        }
+
+class AdultWaiverForm(BaseWaiverForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # Guardian fields not used
+        self.fields["guardian_full_name"].required = False
+        self.fields["guardian_relationship"].required = False
+
+    def clean(self):
+        cleaned = super().clean()
+
+        if not cleaned.get("participant_full_name"):
+            raise forms.ValidationError("Full legal name is required.")
+
+        return cleaned
+    
+class MinorWaiverForm(BaseWaiverForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.fields["guardian_full_name"].required = True
+        self.fields["guardian_relationship"].required = True
+        self.fields["participant_dob"].required = True
+
+    def clean(self):
+        cleaned = super().clean()
+
+        if not cleaned.get("guardian_full_name"):
+            raise forms.ValidationError("Parent or guardian name is required.")
+
+        return cleaned

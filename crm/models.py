@@ -18,6 +18,7 @@ class UserRole(enum.Enum):
     STAFF = "staff"
     MEMBER = "member"
     RESPONSIBLE = "responsible"
+
 class BeltRank(models.TextChoices):
     WHITE = 'white', 'White'
     GRAY_WHITE = 'gray-white', 'Gray / White'
@@ -41,7 +42,6 @@ class BeltRank(models.TextChoices):
     RED = 'red', 'Red'
 
 class User(AbstractUser):
-
     is_coach = models.BooleanField(
         _("coach status"),
         default=False,
@@ -142,16 +142,48 @@ class Member(models.Model):
     membership_end_date = models.DateField(null=True, blank=True)
     plan = models.ForeignKey("Plan", on_delete=models.PROTECT, related_name="members", null=True, blank=True)
 
-
-    # Waivers
-    waivers_signed = models.BooleanField(default=False)
-
     notes = models.TextField(null=True, blank=True)
     timestamp = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return f"{self.first_name} {self.last_name} ({self.belt_rank})"
+    
+    def required_waiver_type(self):
+        """
+        Returns the waiver type this member must sign
+        based on their member_type.
+        """
+        return (
+            WaiverSignature.MINOR
+            if self.member_type == "child"
+            else WaiverSignature.ADULT
+        )
+    
+    @property
+    def has_valid_waiver(self):
+        return self.waivers.filter(
+            agreed=True
+        ).exists()
+    
+    @property
+    def has_latest_waiver(self):
+        WaiverVersion = apps.get_model("crm", "WaiverVersion")
+
+        latest_version = (
+            WaiverVersion.objects
+            .filter(is_active=True)
+            .order_by("-created_at")
+            .first()
+        )
+
+        if not latest_version:
+            return False
+
+        return self.waivers.filter(
+            waiver_version=latest_version,
+            agreed=True
+        ).exists()
 
 
 class Staff(models.Model):
@@ -446,3 +478,74 @@ class Curriculum(models.Model):
 
     def __str__(self):
         return f"Curriculum of {self.year}, week {self.week} is {self.theme}"
+    
+
+# WAIVER MODELS
+
+# User = settings.AUTH_USER_MODEL
+
+class WaiverVersion(models.Model):
+    title = models.CharField(max_length=200)
+    text = models.TextField()
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.title} (v{self.id})"
+    
+class WaiverSignature(models.Model):
+    ADULT = "adult"
+    MINOR = "minor"
+
+    PARTICIPANT_TYPE_CHOICES = [
+        (ADULT, "Adult"),
+        (MINOR, "Minor"),
+    ]
+
+    participant_type = models.CharField(
+        max_length=10,
+        choices=PARTICIPANT_TYPE_CHOICES
+    )
+
+    waiver_version = models.ForeignKey(
+        WaiverVersion,
+        on_delete=models.PROTECT
+    )
+
+    # Linked member (optional but recommended)
+    member = models.ForeignKey(
+    Member,
+    on_delete=models.CASCADE,
+    related_name="waivers",
+    null=True,
+    blank=True
+    )
+
+    # Adult participant
+    participant_full_name = models.CharField(max_length=200)
+    participant_dob = models.DateField(null=True, blank=True)
+
+    # Parent / Guardian (required for minors)
+    guardian_full_name = models.CharField(
+        max_length=200,
+        blank=True
+    )
+    guardian_relationship = models.CharField(
+        max_length=100,
+        blank=True
+    )
+
+    # Signature data
+    signature = models.TextField(
+        help_text="Typed name or base64 image data"
+    )
+
+    agreed = models.BooleanField(default=False)
+
+    # Audit trail
+    signed_at = models.DateTimeField(auto_now_add=True)
+    ip_address = models.GenericIPAddressField()
+    user_agent = models.TextField(blank=True)
+
+    def __str__(self):
+        return f"{self.participant_full_name} – {self.participant_type}"

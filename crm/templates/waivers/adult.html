@@ -1,0 +1,22 @@
+
+{% block title %}Dashboard{% endblock %}
+{% block header_title %}Dashboard{% endblock %}
+
+{% block content %}
+
+<h2>{{ waiver.title }}</h2>
+
+<div class="waiver-text">
+  {{ waiver.text|linebreaks }}
+</div>
+
+<form method="post">
+  {% csrf_token %}
+  {{ form.as_p }}
+
+  <button type="submit" class="btn btn-primary">
+    Sign Waiver & Agree
+  </button>
+</form>
+
+{% endblock %}

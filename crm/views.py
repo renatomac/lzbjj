@@ -13,8 +13,8 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import  require_POST
-from .models import User, Plan, Member, Membership, BeltPromotion, Staff, Contact, Class, Attendance, Technique, Position, ClassSession, SessionAttendance, SessionTechnique
-from .forms import PlanForm, StaffForm , MemberForm, MembershipForm, ClassForm, ContactFormSet, ContactForm,BeltPromotionForm, AttendanceForm 
+from .models import User, Plan, Member, Membership, BeltPromotion, Staff, Contact, Class, Attendance, Technique, Position, ClassSession, SessionAttendance, SessionTechnique, WaiverVersion, WaiverSignature
+from .forms import PlanForm, StaffForm , MemberForm, MembershipForm, ClassForm, ContactFormSet, ContactForm,BeltPromotionForm, AttendanceForm, MinorWaiverForm, AdultWaiverForm
 from datetime import datetime, date, timedelta
 from crm.utils import *
 
@@ -25,8 +25,75 @@ def index(request):
 
     # Authenticated users view the Dashboard
     if request.user.is_authenticated:
-        return render(request, "dashboard/index.html")
+        today = timezone.localdate()
+        weekday = today.strftime("%A")
+        shortWeekday = today.strftime("%a").lower()[:3]
+        sessions = (
+        ClassSession.objects
+        .filter(date=today)
+        .annotate(
+            effective_start_time_db=Coalesce(
+                "start_time",
+                F("class_template__start_time")
+            )
+        )
+        .order_by("effective_start_time_db")
+        )
+        # Dashboard metrix
+        oneMonthLess = timezone.localdate()-timedelta(days=30)
+        oneMonthMore = timezone.localdate()+timedelta(days=30)
+        active=Member.objects.filter(is_active = True).count()
+        inactive=Member.objects.filter(is_active = False).count()
+        total=Member.objects.all().count()
+        # members enrolled in the last 30 days
+        newMembers=Member.objects.filter(membership_start_date__gte = oneMonthLess).values()
+        newMembersCount=Member.objects.filter(membership_start_date__gte = oneMonthLess).count()
+        # membership exping in the next 30 days
+        expiring= Member.objects.filter(membership_start_date__lt = oneMonthMore ).values()
+        expiringCount= Member.objects.filter(membership_start_date__lt = oneMonthMore ).count()
+        classesCount = classesThisWeek()
+        # members age
+        members_age = [
+        {**m, 'age': calculateAge(m['date_of_birth'])} for m in newMembers
+        ]
+        # Totals
+        ak_distrib = adult_kids_distrib()
+        birthdays = birthdays_of_the_month()
+        summary = {
+            'active':active,
+            'inactive':inactive,
+            'total':total,
+            # members enrolled in the last 30 days
+            'newMembers':members_age,
+            'newMembersCount':newMembersCount,
+            # membership exping in the next 30 days
+            'expiring': expiring,
+            'expiringCount': expiringCount,
+            "sessions":sessions,
+            "today":today,
+            "weekday":weekday,
+            "classesCount":classesCount,
+            "ak_distrib" : ak_distrib, 
+            "birthdays": birthdays,
+            }
 
+        # Belt Distribution
+        belt_counts = (Member.objects.values("belt_rank").annotate(count=Count("id")))
+
+        total_members_with_belts = sum(item["count"] for item in belt_counts)
+
+        belt_distribution = {}
+        if total_members_with_belts > 0:
+            for item in belt_counts:
+                belt = item["belt_rank"]
+                count = item["count"]
+                belt_distribution[belt] = round((count / total_members_with_belts) * 100, 2)
+
+        return render(request, "dashboard/index.html", {
+            "summary" : summary,
+            "belt_distribution":belt_distribution,
+
+            })
     # Everyone else is prompted to sign in
     else:
         return HttpResponseRedirect(reverse("login"))
@@ -806,3 +873,48 @@ def session_activate(request, session_id ):
         session.is_canceled = False
         session.save()    
     return redirect("attendanceRecord", session_id=session_id)
+
+
+'''WAIVER VIEWS'''
+
+def adult_waiver(request, member_id=None):
+    waiver = get_object_or_404(WaiverVersion, is_active=True)
+
+    if request.method == "POST":
+        form = AdultWaiverForm(request.POST)
+        if form.is_valid():
+            sig = form.save(commit=False)
+            sig.participant_type = WaiverSignature.ADULT
+            sig.waiver_version = waiver
+            sig.ip_address = get_client_ip(request)
+            sig.user_agent = request.META.get("HTTP_USER_AGENT", "")
+            sig.save()
+            return redirect("waiver_success")
+    else:
+        form = AdultWaiverForm()
+
+    return render(request, "crm/waivers/adult.html", {
+        "form": form,
+        "waiver": waiver,
+    })
+
+def minor_waiver(request, member_id=None):
+    waiver = get_object_or_404(WaiverVersion, is_active=True)
+
+    if request.method == "POST":
+        form = MinorWaiverForm(request.POST)
+        if form.is_valid():
+            sig = form.save(commit=False)
+            sig.participant_type = WaiverSignature.MINOR
+            sig.waiver_version = waiver
+            sig.ip_address = get_client_ip(request)
+            sig.user_agent = request.META.get("HTTP_USER_AGENT", "")
+            sig.save()
+            return redirect("waiver_success")
+    else:
+        form = MinorWaiverForm()
+
+    return render(request, "crm/waivers/minor.html", {
+        "form": form,
+        "waiver": waiver,
+    })
