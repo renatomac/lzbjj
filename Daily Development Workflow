@@ -3,9 +3,7 @@ Local Development
 Make changes in VS Code.
 
 Run tests locally:
-
-python manage.py runserver
-
+    python manage.py runserver
 
 Commit and push:
 
@@ -15,7 +13,11 @@ git push origin main
 
 Update PythonAnywhere
 
-SSH in and pull:
+SSH in
+From VSCode terminal:
+    ssh pythonanywhere
+
+and pull:
 
 cd ~/myproject
 git pull origin main

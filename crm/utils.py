@@ -71,6 +71,7 @@ def create_attendance_for_session(session):
             defaults={"present": False}
         )
 
+# THIS IS TO BE USED WHEN AN INDIVIDUAL CLASS SESSION NEEDS TO BE CHANGED (TIME OR INSTRUCTOR)
 def edit_future_sessions(class_id):
     today = timezone.localdate()
 
@@ -102,6 +103,8 @@ def edit_future_sessions(class_id):
 
             if updated:
                 session.save()
+
+
         
 # REGENERATE CLASS SESSIONS WHEN YOU CHANGE THE CLASS DATE
 

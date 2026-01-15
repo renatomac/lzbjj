@@ -478,8 +478,7 @@ def editClass(request, class_id):
         form = ClassForm(request.POST, instance=instance)
         if form.is_valid():
             form.save()
-            edit_future_sessions(class_id)
-            create_future_sessions(30)
+            regenerate_future_sessions(class_id)
             return redirect('classes')
     else:
         form = ClassForm(instance=instance)
