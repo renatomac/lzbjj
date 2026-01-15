@@ -60,7 +60,10 @@ class MemberForm(forms.ModelForm):
         help_text="Select an existing user (adult members only)"
     )
 
-    phone = PhoneNumberField(required=False)
+    phone = PhoneNumberField(
+        required=False,
+        region="US",
+    )
 
     class Meta:
         model = Member
@@ -86,6 +89,7 @@ class MemberForm(forms.ModelForm):
             "notes",
         ]
         widgets = {
+            'phone': forms.TextInput(attrs={'class': 'form-control'}),
             "belt_rank":  USStateSelect(attrs={"class": "form-control"}),
             "state": USStateSelect(attrs={"class": "form-control"}),
             "date_of_birth": forms.DateInput(attrs={"type": "date"}),

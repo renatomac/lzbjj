@@ -22,12 +22,78 @@ from crm.utils import *
 WEEKDAY_CODES = ['mon','tue','wed','thu','fri','sat','sun']
 
 def index(request):
-
-    # Authenticated users view the Dashboard
+# Authenticated users view the Dashboard
     if request.user.is_authenticated:
-        return render(request, "dashboard/index.html")
+        today = timezone.localdate()
+        weekday = today.strftime("%A")
+        shortWeekday = today.strftime("%a").lower()[:3]
+        sessions = (
+        ClassSession.objects
+        .filter(date=today)
+        .annotate(
+            effective_start_time_db=Coalesce(
+                "start_time",
+                F("class_template__start_time")
+            )
+        )
+        .order_by("effective_start_time_db")
+        )
+        # Dashboard metrix
+        oneMonthLess = timezone.localdate()-timedelta(days=30)
+        oneMonthMore = timezone.localdate()+timedelta(days=30)
+        active=Member.objects.filter(is_active = True).count()
+        inactive=Member.objects.filter(is_active = False).count()
+        total=Member.objects.all().count()
+        # members enrolled in the last 30 days
+        newMembers=Member.objects.filter(membership_start_date__gte = oneMonthLess).values()
+        newMembersCount=Member.objects.filter(membership_start_date__gte = oneMonthLess).count()
+        # membership exping in the next 30 days
+        expiring= Member.objects.filter(membership_start_date__lt = oneMonthMore ).values()
+        expiringCount= Member.objects.filter(membership_start_date__lt = oneMonthMore ).count()
+        classesCount = classesThisWeek()
+        # members age
+        members_age = [
+        {**m, 'age': calculateAge(m['date_of_birth'])} for m in newMembers
+        ]
+        # Totals
+        ak_distrib = adult_kids_distrib()
+        birthdays = birthdays_of_the_month()
+        summary = {
+            'active':active,
+            'inactive':inactive,
+            'total':total,
+            # members enrolled in the last 30 days
+            'newMembers':members_age,
+            'newMembersCount':newMembersCount,
+            # membership exping in the next 30 days
+            'expiring': expiring,
+            'expiringCount': expiringCount,
+            "sessions":sessions,
+            "today":today,
+            "weekday":weekday,
+            "classesCount":classesCount,
+            "ak_distrib" : ak_distrib,
+            "birthdays": birthdays,
+            }
 
-    # Everyone else is prompted to sign in
+        # Belt Distribution
+        belt_counts = (Member.objects.values("belt_rank").annotate(count=Count("id")))
+
+        total_members_with_belts = sum(item["count"] for item in belt_counts)
+
+        belt_distribution = {}
+        if total_members_with_belts > 0:
+            for item in belt_counts:
+                belt = item["belt_rank"]
+                count = item["count"]
+                belt_distribution[belt] = round((count / total_members_with_belts) * 100, 2)
+
+        return render(request, "dashboard/index.html", {
+            "summary" : summary,
+            "belt_distribution":belt_distribution,
+
+            })
+        # Everyone else is prompted to sign in
     else:
         return HttpResponseRedirect(reverse("login"))
 
@@ -86,92 +152,93 @@ def register(request):
         return render(request, "login/register.html")
 
 def dashboard(request):
-    today = timezone.localdate()
-    weekday = today.strftime("%A")
-    shortWeekday = today.strftime("%a").lower()[:3]
-    sessions = (
-    ClassSession.objects
-    .filter(date=today)
-    .annotate(
-        effective_start_time_db=Coalesce(
-            "start_time",
-            F("class_template__start_time")
+    # Authenticated users view the Dashboard
+    if request.user.is_authenticated:
+        today = timezone.localdate()
+        weekday = today.strftime("%A")
+        shortWeekday = today.strftime("%a").lower()[:3]
+        sessions = (
+        ClassSession.objects
+        .filter(date=today)
+        .annotate(
+            effective_start_time_db=Coalesce(
+                "start_time",
+                F("class_template__start_time")
+            )
         )
-    )
-    .order_by("effective_start_time_db")
-    )
-    # Dashboard metrix
-    oneMonthLess = timezone.localdate()-timedelta(days=30)
-    oneMonthMore = timezone.localdate()+timedelta(days=30)
-    active=Member.objects.filter(is_active = True).count()
-    inactive=Member.objects.filter(is_active = False).count()
-    total=Member.objects.all().count()
-    # members enrolled in the last 30 days
-    newMembers=Member.objects.filter(membership_start_date__gte = oneMonthLess).values()
-    newMembersCount=Member.objects.filter(membership_start_date__gte = oneMonthLess).count()
-    # membership exping in the next 30 days
-    expiring= Member.objects.filter(membership_start_date__lt = oneMonthMore ).values()
-    expiringCount= Member.objects.filter(membership_start_date__lt = oneMonthMore ).count()
-    classesCount = classesThisWeek()
-    # members age
-    members_age = [
-    {**m, 'age': calculateAge(m['date_of_birth'])} for m in newMembers
-    ]
-    # Totals
-    ak_distrib = adult_kids_distrib()
-    birthdays = birthdays_of_the_month()
-    summary = {
-        'active':active,
-        'inactive':inactive,
-        'total':total,
+        .order_by("effective_start_time_db")
+        )
+        # Dashboard metrix
+        oneMonthLess = timezone.localdate()-timedelta(days=30)
+        oneMonthMore = timezone.localdate()+timedelta(days=30)
+        active=Member.objects.filter(is_active = True).count()
+        inactive=Member.objects.filter(is_active = False).count()
+        total=Member.objects.all().count()
         # members enrolled in the last 30 days
-        'newMembers':members_age,
-        'newMembersCount':newMembersCount,
+        newMembers=Member.objects.filter(membership_start_date__gte = oneMonthLess).values()
+        newMembersCount=Member.objects.filter(membership_start_date__gte = oneMonthLess).count()
         # membership exping in the next 30 days
-        'expiring': expiring,
-        'expiringCount': expiringCount,
-        "sessions":sessions,
-        "today":today,
-        "weekday":weekday,
-        "classesCount":classesCount,
-        "ak_distrib" : ak_distrib,
-        "birthdays": birthdays,
-        }
+        expiring= Member.objects.filter(membership_start_date__lt = oneMonthMore ).values()
+        expiringCount= Member.objects.filter(membership_start_date__lt = oneMonthMore ).count()
+        classesCount = classesThisWeek()
+        # members age
+        members_age = [
+        {**m, 'age': calculateAge(m['date_of_birth'])} for m in newMembers
+        ]
+        # Totals
+        ak_distrib = adult_kids_distrib()
+        birthdays = birthdays_of_the_month()
+        summary = {
+            'active':active,
+            'inactive':inactive,
+            'total':total,
+            # members enrolled in the last 30 days
+            'newMembers':members_age,
+            'newMembersCount':newMembersCount,
+            # membership exping in the next 30 days
+            'expiring': expiring,
+            'expiringCount': expiringCount,
+            "sessions":sessions,
+            "today":today,
+            "weekday":weekday,
+            "classesCount":classesCount,
+            "ak_distrib" : ak_distrib,
+            "birthdays": birthdays,
+            }
 
-    # Belt Distribution
-    belt_counts = (Member.objects.values("belt_rank").annotate(count=Count("id")))
+        # Belt Distribution
+        belt_counts = (Member.objects.values("belt_rank").annotate(count=Count("id")))
 
-    total_members_with_belts = sum(item["count"] for item in belt_counts)
+        total_members_with_belts = sum(item["count"] for item in belt_counts)
 
-    belt_distribution = {}
-    if total_members_with_belts > 0:
-        for item in belt_counts:
-            belt = item["belt_rank"]
-            count = item["count"]
-            belt_distribution[belt] = round((count / total_members_with_belts) * 100, 2)
+        belt_distribution = {}
+        if total_members_with_belts > 0:
+            for item in belt_counts:
+                belt = item["belt_rank"]
+                count = item["count"]
+                belt_distribution[belt] = round((count / total_members_with_belts) * 100, 2)
 
-    return render(request, "dashboard/index.html", {
-        "summary" : summary,
-        "belt_distribution":belt_distribution,
+        return render(request, "dashboard/index.html", {
+            "summary" : summary,
+            "belt_distribution":belt_distribution,
 
-        })
-
-    # Age distribution
-
-    # gender distribution
+            })
+        # Everyone else is prompted to sign in
+    else:
+        return HttpResponseRedirect(reverse("login"))
 
 def view_session(request):
     return render(request, "classes/index.html")
 
-def members(request):
+'''def members(request):
     query = request.GET.get("query", "")
     status = request.GET.get("status", "")
     if status == "active":
-        all_members = Member.objects.filter(is_active = True).values()
+        all_members = Member.objects.filter(is_active = True).order_by("first_name")
     elif status == "inactive":
-        all_members = Member.objects.filter(is_active = False).values()
+        all_members = Member.objects.filter(is_active = False).order_by("first_name")
     else:
-        all_members = Member.objects.all().values()
+        all_members = Member.objects.order_by("first_name", "last_name")
     if query:
         all_members = all_members.filter(
             Q(first_name__icontains=query) |
@@ -184,7 +251,58 @@ def members(request):
     return render(request, "members/index.html", {
         'all_members' : all_members_age,
         'summary': summary
-        })
+        })'''
+
+def members(request):
+    query = request.GET.get("query", "")
+    status = request.GET.get("status", "")
+
+    # Base queryset
+    all_members = Member.objects.all()
+
+    # Filter by status
+    if status == "active":
+        all_members = all_members.filter(is_active=True)
+    elif status == "inactive":
+        all_members = all_members.filter(is_active=False)
+
+    # Filter by search query
+    if query:
+        all_members = all_members.filter(
+            Q(first_name__icontains=query) |
+            Q(last_name__icontains=query)
+        )
+
+    # Order by last name, first name
+    all_members = all_members.order_by("first_name", "last_name")
+
+    # Summary counts (aggregated)
+    summary = all_members.aggregate(
+        active=Count('id', filter=Q(is_active=True)),
+        inactive=Count('id', filter=Q(is_active=False)),
+        total=Count('id')
+    )
+
+    # Add age to each member
+    members_with_age = [
+        {
+            'id': m.id,
+            'first_name': m.first_name,
+            'last_name': m.last_name,
+            'phone': m.phone,
+            'age': m.age,  # use the property directly
+            'is_active': m.is_active,
+            'belt_rank': m.belt_rank,
+        }
+        for m in all_members
+    ]
+
+    return render(request, "members/index.html", {
+        'all_members': members_with_age,
+        'summary': summary,
+        'query': query,
+        'status': status,
+    })
 
 @transaction.atomic
 def addMember(request):

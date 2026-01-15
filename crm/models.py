@@ -185,6 +185,45 @@ class Member(models.Model):
             agreed=True
         ).exists()
 
+    @property
+    def age(self):
+        """Return the member's age in years."""
+        if not self.date_of_birth:
+            return None  # or 0 if you prefer
+
+        today = timezone.localdate()
+        years = today.year - self.date_of_birth.year
+
+        # Subtract one if birthday hasn't happened yet this year
+        if (today.month, today.day) < (self.date_of_birth.month, self.date_of_birth.day):
+            years -= 1
+
+        return years
+
+    @property
+    def age_with_months(self):
+        """
+        Return the member's age as a string, e.g., '12 years, 3 months'.
+        Works for adults and kids.
+        """
+        if not self.date_of_birth:
+            return None
+
+        today = date.today()
+        years = today.year - self.date_of_birth.year
+        months = today.month - self.date_of_birth.month
+        days = today.day - self.date_of_birth.day
+
+        if days < 0:
+            months -= 1
+        if months < 0:
+            years -= 1
+            months += 12
+
+        if years > 0:
+            return f"{years} year{'s' if years != 1 else ''}, {months} month{'s' if months != 1 else ''}"
+        else:
+            return f"{months} month{'s' if months != 1 else ''}"
 
 class Staff(models.Model):
     GENDER = [
@@ -216,6 +255,46 @@ class Staff(models.Model):
         if self.user:
             return f"{self.first_name}  {self.last_name} ({self.role})"
         return f"Staff #{self.id} ({self.role})"
+    
+    @property
+    def age(self):
+        """Return the member's age in years."""
+        if not self.date_of_birth:
+            return None  # or 0 if you prefer
+
+        today = timezone.localdate()
+        years = today.year - self.date_of_birth.year
+
+        # Subtract one if birthday hasn't happened yet this year
+        if (today.month, today.day) < (self.date_of_birth.month, self.date_of_birth.day):
+            years -= 1
+
+        return years
+
+    @property
+    def age_with_months(self):
+        """
+        Return the member's age as a string, e.g., '12 years, 3 months'.
+        Works for adults and kids.
+        """
+        if not self.date_of_birth:
+            return None
+
+        today = date.today()
+        years = today.year - self.date_of_birth.year
+        months = today.month - self.date_of_birth.month
+        days = today.day - self.date_of_birth.day
+
+        if days < 0:
+            months -= 1
+        if months < 0:
+            years -= 1
+            months += 12
+
+        if years > 0:
+            return f"{years} year{'s' if years != 1 else ''}, {months} month{'s' if months != 1 else ''}"
+        else:
+            return f"{months} month{'s' if months != 1 else ''}"
 
 
 class Plan(models.Model):

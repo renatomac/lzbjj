@@ -35,3 +35,8 @@ DASHBOARD
 KPIs
     * Create a KPI dashboard to show the gym performance
 
+TRANSLATION
+    * Check how to translate the entire site to a different language
+    * At minimum, change local formats like phone numbers, zip-code, etc. 
+    
+
