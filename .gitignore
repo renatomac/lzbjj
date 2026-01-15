@@ -78,3 +78,9 @@ __pycache__/
 .local/
 .ipython/
 .virtualenvs/
+
+# SSH keys
+.ssh/
+
+# Django static root
+staticfiles/
