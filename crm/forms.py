@@ -121,14 +121,16 @@ class MemberForm(forms.ModelForm):
 
     def clean(self):
         cleaned_data = super().clean()
+
         member_type = cleaned_data.get("member_type")
-        user = cleaned_data.get("user")
         phone = cleaned_data.get("phone")
         dob = cleaned_data.get("date_of_birth")
 
-        # Validate user for adults
-        if member_type == "adult" and not user:
-            self.add_error("user", "Adult members must be linked to an existing user.")
+        # Validate user for adults ONLY if field exists
+        if member_type == "adult" and "user" in self.fields:
+            user = cleaned_data.get("user")
+            if not user:
+                self.add_error("user", "Adult members must be linked to an existing user.")
 
         # Conditional phone validation (21+)
         if dob:

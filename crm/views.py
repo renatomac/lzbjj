@@ -14,7 +14,7 @@ from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import  require_POST
 from .models import User, Plan, Member, Membership, BeltPromotion, Staff, Contact, Class, Attendance, Technique, Position, ClassSession, SessionAttendance, SessionTechnique
-from .forms import PlanForm, StaffForm , MemberForm, MembershipForm, ClassForm, ContactFormSet, ContactForm,BeltPromotionForm, AttendanceForm 
+from .forms import PlanForm, StaffForm , MemberForm, MembershipForm, ClassForm, ContactFormSet, ContactForm,BeltPromotionForm, AttendanceForm
 from datetime import datetime, date, timedelta
 from crm.utils import *
 
@@ -25,7 +25,8 @@ def index(request):
 
     # Authenticated users view the Dashboard
     if request.user.is_authenticated:
-        return render(request, "dashboard/index.html")
+        return HttpResponseRedirect(reverse("dashboard"))
+        #return render(request, "dashboard/index.html")
 
     # Everyone else is prompted to sign in
     else:
@@ -134,7 +135,7 @@ def dashboard(request):
         "today":today,
         "weekday":weekday,
         "classesCount":classesCount,
-        "ak_distrib" : ak_distrib, 
+        "ak_distrib" : ak_distrib,
         "birthdays": birthdays,
         }
 
@@ -408,7 +409,7 @@ def attendance(request):
         )
     )
     .order_by("date", "effective_start_time_db")
-    )   
+    )
 
     return render(request, "attendance/index.html", {
         "sessions":sessions,
@@ -433,7 +434,7 @@ def attendanceRecord(request, session_id):
         sessionSelected = session_id
     else:
         sessionSelected = int(sessionSelectedStr)
-    
+
     weekday = today.strftime("%A")
 
     if session.is_canceled == False:
@@ -444,8 +445,8 @@ def attendanceRecord(request, session_id):
         else:
             attending_list = SessionAttendance.objects.filter(session = sessionSelected, present = False)
     else:
-        attending_list = None    
-    
+        attending_list = None
+
 
     technics = Technique.objects.all().values()
     techniques = SessionTechnique.objects.filter(session=session).select_related("technique")
@@ -461,7 +462,7 @@ def attendanceRecord(request, session_id):
     "sessionTechniques":names,
     "technics": technics,
     "attending_list":attending_list,
-    "todaySessions":todaySessions, 
+    "todaySessions":todaySessions,
     "filter": filter,
     })
 
@@ -738,7 +739,7 @@ def saveTechnique(request):
 
     for id in technique_id:
         print(id)
-        if int(id) == 0: 
+        if int(id) == 0:
             pass
         else:
             technique = get_object_or_404(Technique, id=int(id))
@@ -751,7 +752,7 @@ def saveTechnique(request):
 
 def create_sessions(request):
     create_future_sessions(days_ahead=30)
-    return HttpResponse("Future sessions created!")
+    return HttpResponseRedirect(reverse("classes"))
 
 def sessions(request):
     sessions = (ClassSession.objects
@@ -776,7 +777,7 @@ def session_delete(request, session_id ):
     classWeekday = classDate.strftime("%A")
     classShortWeekday = classDate.strftime("%a").lower()[:3]
     today = timezone.localdate()
-    
+
     mode = request.POST.get("mode")
 
     if mode == "all":
@@ -796,7 +797,7 @@ def session_cancel(request, session_id ):
     session = get_object_or_404(ClassSession, id=session_id)
     if session.is_canceled == False:
         session.is_canceled = True
-        session.save()    
+        session.save()
     return redirect("attendanceRecord", session_id=session_id)
 
 @require_POST
@@ -804,5 +805,5 @@ def session_activate(request, session_id ):
     session = get_object_or_404(ClassSession, id=session_id)
     if session.is_canceled == True:
         session.is_canceled = False
-        session.save()    
+        session.save()
     return redirect("attendanceRecord", session_id=session_id)
