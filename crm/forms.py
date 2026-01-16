@@ -131,10 +131,11 @@ class MemberForm(forms.ModelForm):
         dob = cleaned_data.get("date_of_birth")
 
         # Validate user for adults ONLY if field exists
-        if member_type == "adult" and "user" in self.fields:
+        # DISABLED UNTIL WE GOT THE DIGITAL WAIVER DONE. 
+        '''if member_type == "adult" and "user" in self.fields:
             user = cleaned_data.get("user")
             if not user:
-                self.add_error("user", "Adult members must be linked to an existing user.")
+                self.add_error("user", "Adult members must be linked to an existing user.")'''
 
         # Conditional phone validation (21+)
         if dob:
