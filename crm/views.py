@@ -17,6 +17,8 @@ from .forms import PlanForm, StaffForm , MemberForm, MembershipForm, ClassForm, 
 from .formsets import SessionAttendanceFormSet
 from datetime import datetime, date, timedelta
 from crm.utils import *
+from datetime import date
+from django.db.models.functions import ExtractYear, ExtractMonth
 
 
 WEEKDAY_CODES = ['mon','tue','wed','thu','fri','sat','sun']
@@ -870,15 +872,147 @@ def create_sessions(request):
     create_future_sessions(days_ahead=30)
     return HttpResponseRedirect(reverse("classes"))
 
+
 def sessions(request):
-    sessions = (ClassSession.objects
-        .select_related('class_template', 'instructor')
-        .order_by("date", "start_time")
-        .exclude(id__isnull=True)  # <-- make sure all have an ID
-    )
+    today = timezone.localdate()
+    sessions_qs = ClassSession.objects.select_related("class_template", "instructor")
+
+    # GET filters
+    filter_year = request.GET.get("filterYear")
+    filter_month = request.GET.get("filterMonth")
+    filter_class = request.GET.get("filterClass")
+    filter_instructor = request.GET.get("filterInstructor")
+
+    # Defaults to current year/month if not provided
+    filter_year = int(filter_year) if filter_year else today.year
+    filter_month = int(filter_month) if filter_month else today.month
+
+    # Apply year/month filter
+    sessions_qs = sessions_qs.filter(date__year=filter_year, date__month=filter_month)
+
+    if filter_class:
+        sessions_qs = sessions_qs.filter(class_template__name=filter_class)
+    if filter_instructor:
+        sessions_qs = sessions_qs.filter(instructor_id=int(filter_instructor))
+
+    sessions_qs = sessions_qs.order_by("date", "start_time")
+
+    # ---- Dropdowns ----
+    years = ClassSession.objects.annotate(year=ExtractYear("date")).values_list("year", flat=True).distinct().order_by("-year")
+    
+    import calendar
+    months = [(i, calendar.month_name[i]) for i in range(1, 13)]
+    
+    classes = ClassSession.objects.select_related("class_template").values_list("class_template__name", flat=True).distinct().order_by("class_template__name")
+    
+    instructors = Staff.objects.order_by("first_name", "last_name")
+
+    print("Filtered sessions count:", sessions_qs.count())
+
     return render(request, "attendance/sessions.html", {
-        'sessions': sessions,
+        "sessions": sessions_qs,   # rename page_obj → sessions
+        "years": years,
+        "months": months,
+        "classes": classes,
+        "instructors": instructors,
+        "selected_year": filter_year,
+        "selected_month": filter_month,
+        "selected_class": filter_class,
+        "selected_instructor": filter_instructor,
     })
+
+'''def sessions(request):
+    today = timezone.localdate()
+
+    # -----------------------
+    # Read filters (GET)
+    # -----------------------
+    filter_year = request.GET.get("filterYear")
+    filter_month = request.GET.get("filterMonth")
+    filter_class = request.GET.get("filterClass")
+    filter_instructor = request.GET.get("filterInstructor")
+
+    # Default year/month = current
+    if not filter_year:
+        filter_year = today.year
+    if not filter_month:
+        filter_month = today.month
+
+    # -----------------------
+    # Base queryset
+    # -----------------------
+    sessions_qs = (
+        ClassSession.objects
+        .select_related("class_template", "instructor")
+        .order_by("date", "start_time")
+    )
+
+    # -----------------------
+    # Apply filters
+    # -----------------------
+    if filter_year:
+        sessions_qs = sessions_qs.filter(date__year=filter_year)
+
+    if filter_month:
+        sessions_qs = sessions_qs.filter(date__month=filter_month)
+
+    if filter_class:
+        sessions_qs = sessions_qs.filter(class_template__name=filter_class)
+
+    if filter_instructor:
+        sessions_qs = sessions_qs.filter(instructor_id=filter_instructor)
+
+    # -----------------------
+    # Data for select boxes
+    # -----------------------
+    years = (
+        ClassSession.objects
+        .annotate(year=ExtractYear("date"))
+        .values_list("year", flat=True)
+        .distinct()
+        .order_by("-year")
+    )
+    print(years)
+
+    months = range(1, 13)
+
+    classes = (
+        ClassSession.objects
+        .select_related("class_template")
+        .values_list("class_template__name", flat=True)
+        .distinct()
+        .order_by("class_template__name")
+    )
+
+    instructors = (
+        ClassSession.objects
+        .select_related("instructor")
+        .values_list(
+            "instructor__id",
+            "instructor__first_name",
+            "instructor__last_name",
+        )
+        .distinct()
+    )
+
+    return render(request, "attendance/sessions.html", {
+        "sessions": sessions_qs,
+
+        # select options
+        "years": years,
+        "months": months,
+        "classes": classes,
+        "instructors": [
+            {"id": i[0], "first_name": i[1], "last_name": i[2]}
+            for i in instructors if i[0]
+        ],
+
+        # selected values (important!)
+        "filterYear": int(filter_year),
+        "filterMonth": int(filter_month),
+        "filterClass": filter_class,
+        "filterInstructor": filter_instructor,
+    })'''
 
 
 def session_edit(request, session_id):

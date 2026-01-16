@@ -2,53 +2,121 @@
 
 {% block title %}All Scheduled Classes{% endblock %}
 
-{% block extra_head %}
-
-{% endblock %}
-
 {% block header_title %}All Scheduled Classes{% endblock %}
 
 {% block content %}
 <div class="container-fluid py-4">
     <div class="row justify-content-center">
         <div class="col-12 col-lg-10">
-            <div class="card p-4">
-                <div class="table-responsive">
-                    <table class="table table-hover align-middle px-3 py-2">
-                        <thead>
-                            <tr>
-                            <th>Date</th>
-                            <th>Weekday</th>
-                            <th>Start</th>
-                            <th>End</th>
-                            <th>Class</th>
-                            <th>Instructor</th>
-                            <th>Canceled?</th>
-                            <th>Notes</th>
-                            </tr>
-                        </thead>
-                        <tbody>                            
-                            {% for s in sessions %}
-                            <tr>                                
-                                <td>
-                                    <a href="{% url 'session_edit' s.id %}"> {{ s.date|date:"Y-m-d" }} </a>
-                                </td>
-                                <td>{{ s.date|date:"l" }}</td>
-                                <td>{{ s.effective_start_time|time:"g:i a" }}</td>
-                                <td>{{ s.effective_end_time|time:"g:i a" }}</td>
-                                <td>{{ s.class_template.name }}</td>
-                                <td>{{ s.effective_instructor|default:"—" }}</td>
-                                <td>{{ s.is_canceled|yesno:"Yes,No" }}</td>
-                                <td>{{ s.notes|default_if_none:""|linebreaksbr }}</td>
-                            </tr>
-                            {% empty %}
-                            <tr><td colspan="7" class="text-muted">No sessions found.</td></tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+            <div class="card shadow-sm rounded-4 p-0 mb-3">
+                <div class="card-body">
+                    <a href="{% url 'dashboard' %}" class="btn btn-custom-ghost ms-auto mb-3">
+                        <i class="fa-solid fa-arrow-left me-2"></i> Back to Dashboard
+                    </a>
+
+                    <form method="GET" id="filterForm" class="row g-3">
+                        <div class="d-flex flex-wrap gap-2 mb-3 align-items-left">
+
+                            <!-- Year -->
+                            <div class="p-2 flex-fill">
+                                <select name="filterYear" class="form-select filter-input">
+                                    <option value="">Year</option>
+                                    {% for year in years %}
+                                        <option value="{{ year }}" {% if year == selected_year %}selected{% endif %}>
+                                            {{ year }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <!-- Month -->
+                            <div class="p-2 flex-fill">
+                                <select name="filterMonth" class="form-select filter-input">
+                                    <option value="">Month</option>
+                                    {% for month_num, month_name in months %}
+                                        <option value="{{ month_num }}" {% if month_num == selected_month %}selected{% endif %}>
+                                            {{ month_name }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <!-- Class -->
+                            <div class="p-2 flex-fill">
+                                <select name="filterClass" class="form-select filter-input">
+                                    <option value="">Class name</option>
+                                    {% for class_name in classes %}
+                                        <option value="{{ class_name }}" {% if class_name == selected_class %}selected{% endif %}>
+                                            {{ class_name }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <!-- Instructor -->
+                            <div class="p-2 flex-fill">
+                                <select name="filterInstructor" class="form-select filter-input">
+                                    <option value="">All Instructors</option>
+                                    {% for instructor in instructors %}
+                                        <option value="{{ instructor.id }}" {% if instructor.id|stringformat:"s" == selected_instructor|stringformat:"s" %}selected{% endif %}>
+                                            {{ instructor.first_name }} {{ instructor.last_name }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                        </div>
+                    </form>
+
+                    <div class="card p-4 mt-3">
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle px-3 py-2">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Weekday</th>
+                                        <th>Start</th>
+                                        <th>End</th>
+                                        <th>Class</th>
+                                        <th>Instructor</th>
+                                        <th>Canceled?</th>
+                                        <th>Notes</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for s in sessions %}
+                                        <tr>
+                                            <td><a href="{% url 'session_edit' s.id %}">{{ s.date|date:"Y-m-d" }}</a></td>
+                                            <td>{{ s.date|date:"l" }}</td>
+                                            <td>{{ s.effective_start_time|time:"g:i a" }}</td>
+                                            <td>{{ s.effective_end_time|time:"g:i a" }}</td>
+                                            <td>{{ s.class_template.name }}</td>
+                                            <td>{{ s.effective_instructor|default:"—" }}</td>
+                                            <td>{{ s.is_canceled|yesno:"Yes,No" }}</td>
+                                            <td>{{ s.notes|default_if_none:""|linebreaksbr }}</td>
+                                        </tr>
+                                    {% empty %}
+                                        <tr>
+                                            <td colspan="8" class="text-muted">No sessions found.</td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<!-- Auto-submit JS -->
+<script>
+document.querySelectorAll('.filter-input').forEach(el => {
+    el.addEventListener('change', () => {
+        document.getElementById('filterForm').submit();
+    });
+});
+</script>
 {% endblock %}

@@ -9,6 +9,7 @@
 TO FIX:
 
 PRIORITIES
+
     * HTMX toggle attendance without page reload
     * Fix the sessions creation so when you edit an existing class the system will update all comminng sessions
         for instance, if you change the star-time it should reflect in all comming sessions
@@ -20,6 +21,7 @@ GENERAL
     * Create admin.py
     * improve the forms look and feel using CSS
     * add the logged username on the botton of the sidebar
+    * Make the messages better. Now, after closing a message a line with a different background color remains 
     
 ADD STAFF
     * Create drop down menu for Gender

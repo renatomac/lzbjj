@@ -505,7 +505,12 @@ document.addEventListener("click", function (event) {
 });
 
 
-/* MODEAL CONFIGURATION  */
+// Auto-submit when any select changes
+document.querySelectorAll(".filter-input").forEach(function(el) {
+    el.addEventListener("change", function() {
+        document.getElementById("filterForm").submit();
+    });
+});
 
 
 
