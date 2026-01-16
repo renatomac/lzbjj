@@ -11,14 +11,14 @@
 {% block content %}
 <div class="container-fluid py-4">
     <div class="row justify-content-center">
-        <div class="col-lg-8">
+        <div class="col-12 col-lg-10">
             <div class="card p-4">
                 <div class="table-responsive">
                     <table class="table table-hover align-middle px-3 py-2">
                         <thead>
                             <tr>
-                            
                             <th>Date</th>
+                            <th>Weekday</th>
                             <th>Start</th>
                             <th>End</th>
                             <th>Class</th>
@@ -31,10 +31,11 @@
                             {% for s in sessions %}
                             <tr>                                
                                 <td>
-                                    <a href="{% url 'session_edit' s.pk %}"> {{ s.date|date:"Y-m-d" }} </a>
+                                    <a href="{% url 'session_edit' s.id %}"> {{ s.date|date:"Y-m-d" }} </a>
                                 </td>
-                                <td>{{ s.effective_start_time|time:"H:i" }}</td>
-                                <td>{{ s.effective_end_time|time:"H:i" }}</td>
+                                <td>{{ s.date|date:"l" }}</td>
+                                <td>{{ s.effective_start_time|time:"g:i a" }}</td>
+                                <td>{{ s.effective_end_time|time:"g:i a" }}</td>
                                 <td>{{ s.class_template.name }}</td>
                                 <td>{{ s.effective_instructor|default:"—" }}</td>
                                 <td>{{ s.is_canceled|yesno:"Yes,No" }}</td>

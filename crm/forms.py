@@ -9,7 +9,8 @@ from localflavor.us.forms import USStateSelect
 from phonenumber_field.formfields import PhoneNumberField
 from .models import (
     User, Member, Staff, Plan, Membership, Payment,
-    Class, Attendance, BeltPromotion, Contact,BeltRank,WaiverSignature
+    Class, Attendance, BeltPromotion, Contact,BeltRank,WaiverSignature, 
+    SessionAttendance, ClassSession, 
 )
 
 User = get_user_model()
@@ -389,3 +390,47 @@ class MinorWaiverForm(BaseWaiverForm):
             raise forms.ValidationError("Parent or guardian name is required.")
 
         return cleaned
+    
+
+# SESSION FORMS
+
+class ClassSessionForm(forms.ModelForm):
+    class Meta:
+        model = ClassSession
+        fields = ["date", "start_time", "end_time", "instructor", "is_canceled", "notes"]
+        widgets = {
+            "date": forms.DateInput(attrs={"type": "date", "class": "form-control"}),
+            "start_time": forms.TimeInput(attrs={"type": "time", "class": "form-control"}),
+            "end_time": forms.TimeInput(attrs={"type": "time", "class": "form-control"}),
+            "instructor": forms.Select(attrs={"class": "form-control"}),
+            "is_canceled": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "notes": forms.Textarea(attrs={"rows": 3, "class": "form-control"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        instance = getattr(self, 'instance', None)
+
+        # Prefill times
+        if instance:
+            if instance.start_time is None and instance.effective_start_time:
+                self.fields["start_time"].widget.attrs["value"] = instance.effective_start_time.strftime("%H:%M")
+            if instance.end_time is None and instance.effective_end_time:
+                self.fields["end_time"].widget.attrs["value"] = instance.effective_end_time.strftime("%H:%M")
+
+            # Prefill instructor: use self.initial dict
+            if instance.instructor is None and instance.effective_instructor:
+                self.initial['instructor'] = instance.effective_instructor
+
+class SessionAttendanceForm(forms.ModelForm):
+    class Meta:
+        model = SessionAttendance
+        fields = ['member', 'present']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Make the checkbox not required
+        self.fields['present'].required = False
+        # Optional: render it as a checkbox explicitly
+        self.fields['present'].widget = forms.CheckboxInput()
+

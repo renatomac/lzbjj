@@ -8,7 +8,7 @@ urlpatterns = [
     path("register", views.register, name="register"),
     path("dashboard", views.dashboard, name="dashboard"),
     path("session/<int:session_id>/", views.view_session, name="view_session"),
-    path("session_edit/<int:session_id>/", views.session_edit, name="session_edit"),
+    path("session/<int:session_id>/edit/", views.session_edit, name="session_edit"),
     path("session/<int:session_id>/delete/", views.session_delete, name="session_delete"),
     path("session/<int:session_id>/cancel/", views.session_cancel, name="session_cancel"),
     path("session/<int:session_id>/activate/", views.session_activate, name="session_activate"),
@@ -24,7 +24,6 @@ urlpatterns = [
     path("typesClasses", views.typesClasses, name="typesClasses"),
     path("attendance", views.attendance, name="attendance"),
     path("attendanceRecord/<int:session_id>/", views.attendanceRecord, name="attendanceRecord"),
- 
     path("getSessionsByDate/<str:date>/", views.getSessionsByDate, name="getSessionsByDate"),
     path("billing", views.billing, name="billing"),
     path("reports", views.reports, name="reports"),

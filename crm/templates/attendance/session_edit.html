@@ -1,18 +1,36 @@
 {% extends "layout.html" %}
 
-{% block title %}All Scheduled Classes{% endblock %}
-
-{% block extra_head %}
-
-{% endblock %}
-
-{% block header_title %}All Scheduled Classes{% endblock %}
-
 {% block content %}
 <div class="container-fluid py-4">
+
     <div class="row justify-content-center">
-        
-    
+        <div class="col-12 col-lg-6">
+            <h3>{{session.class_template.name}}</h3>
+            <form method="post">
+                {% csrf_token %}
+
+                <h5>Session Details</h5>
+                {{ session_form.as_p }}
+
+                <h5>Attendance</h5>
+                {{ attendance_formset.management_form }}
+                {% for form in attendance_formset %}
+                    {{ form.id }}                <!-- hidden id for existing objects -->
+                    {{ form.member.as_hidden }}  <!-- member hidden field, so no select menu -->
+                    <div>
+                        <label>
+                            {{ form.present }} {{ form.instance.member }}  <!-- show checkbox + member name -->
+                        </label>
+                    </div>
+
+                    {% if form.errors %}
+                        <div class="text-danger">{{ form.errors }}</div>
+                    {% endif %}
+                {% endfor %}
+
+                <button type="submit" class="btn btn-primary mt-3">Save</button>
+            </form>
+        </div>
     </div>
 </div>
 {% endblock %}

@@ -1,5 +1,4 @@
 import json
-from django.shortcuts import render
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
@@ -14,7 +13,8 @@ from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import  require_POST
 from .models import User, Plan, Member, Membership, BeltPromotion, Staff, Contact, Class, Attendance, Technique, Position, ClassSession, SessionAttendance, SessionTechnique, WaiverVersion, WaiverSignature
-from .forms import PlanForm, StaffForm , MemberForm, MembershipForm, ClassForm, ContactFormSet, ContactForm,BeltPromotionForm, AttendanceForm, MinorWaiverForm, AdultWaiverForm
+from .forms import PlanForm, StaffForm , MemberForm, MembershipForm, ClassForm, ContactFormSet, ContactForm,BeltPromotionForm, AttendanceForm, MinorWaiverForm, AdultWaiverForm, ClassSessionForm
+from .formsets import SessionAttendanceFormSet
 from datetime import datetime, date, timedelta
 from crm.utils import *
 
@@ -872,19 +872,45 @@ def create_sessions(request):
 
 def sessions(request):
     sessions = (ClassSession.objects
-    .select_related('class_template', 'instructor')
-    .order_by("date", "start_time"))
+        .select_related('class_template', 'instructor')
+        .order_by("date", "start_time")
+        .exclude(id__isnull=True)  # <-- make sure all have an ID
+    )
     return render(request, "attendance/sessions.html", {
         'sessions': sessions,
     })
 
-@require_POST
-def session_edit(request, session_id ):
+
+def session_edit(request, session_id):
     session = get_object_or_404(ClassSession, id=session_id)
-    print (session)
-    return render(request, "attendance/session_edit.html", {
-        'session': session,
-    })
+
+    if request.method == "POST":
+        session_form = ClassSessionForm(request.POST, instance=session)
+        attendance_formset = SessionAttendanceFormSet(request.POST, instance=session)
+
+        if session_form.is_valid() and attendance_formset.is_valid():
+            session_form.save()
+            attendance_formset.save()
+            messages.success(request, "Session and attendance saved successfully.")
+            return redirect("sessions")
+        else:
+            messages.error(request, "Please correct the errors below.")
+            print("Session form errors:", session_form.errors)
+            print("Attendance formset errors:", attendance_formset.errors)
+
+    else:
+        session_form = ClassSessionForm(instance=session)
+        attendance_formset = SessionAttendanceFormSet(instance=session)
+
+    return render(
+        request,
+        "attendance/session_edit.html",
+        {
+            "session": session,
+            "session_form": session_form,
+            "attendance_formset": attendance_formset,
+        },
+    )
 
 @require_POST
 def session_delete(request, session_id ):

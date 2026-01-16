@@ -409,6 +409,10 @@ class Class(models.Model):
     def __str__(self):
         return self.name
     
+# SESSION MODELS. SESSIONS ARE INDIVIDUAL INSTANCES OF THE CLASS TEMPLATE
+# EVERY SESSION WILL HERITE THE CLASS DATE AND TIME AND HAVE A 
+# ATTENDANCE LIST. 
+
 class ClassSession(models.Model):
     class_template = models.ForeignKey(
         Class,
