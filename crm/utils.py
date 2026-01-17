@@ -152,19 +152,11 @@ def edit_future_sessions(class_id):
             current += timedelta(days=1)'''
 
 def regenerate_future_sessions(class_id):
-    from django.db import transaction
-    from datetime import date, timedelta
-    import logging
-
-    logger = logging.getLogger(__name__)
     today = timezone.localdate()
     template_class = get_object_or_404(Class, id=class_id)
 
-    try:
-        target_weekdays = {WEEKDAY_MAP[d] for d in template_class.days_of_week}
-    except Exception as e:
-        logger.error(f"Error parsing weekdays: {e}")
-        target_weekdays = set()
+    # Safe weekday mapping
+    target_weekdays = {WEEKDAY_MAP[d] for d in getattr(template_class, "days_of_week", []) if d in WEEKDAY_MAP}
 
     future_sessions = ClassSession.objects.filter(
         class_template=template_class,
@@ -173,15 +165,12 @@ def regenerate_future_sessions(class_id):
 
     existing_dates = {s.date for s in future_sessions}
 
-    # Fields to copy from template_class to session
     fields_to_copy = ["start_time", "end_time", "instructor", "notes", "location"]
 
     with transaction.atomic():
         # Remove invalid weekday sessions
         for session in future_sessions:
-            if session.date.weekday() not in target_weekdays:
-                if session.is_canceled:
-                    continue
+            if session.date.weekday() not in target_weekdays and not session.is_canceled:
                 session.delete()
 
         # Update valid future sessions
@@ -193,26 +182,19 @@ def regenerate_future_sessions(class_id):
                 session.save(update_fields=[f for f in fields_to_copy if hasattr(template_class, f)])
 
         # Create missing sessions until Dec 30
-        current_year = today.year
-        try:
-            end_date = template_class.end_date or date(current_year, 12, 30)
-        except Exception as e:
-            logger.error(f"Error determining end_date: {e}")
-            end_date = date(current_year, 12, 30)
+        start_date = template_class.start_date or today
+        end_date = template_class.end_date or date(today.year, 12, 30)
 
-        current = max(today, template_class.start_date or today)
-
+        current = max(today, start_date)
         while current <= end_date:
             if current.weekday() in target_weekdays and current not in existing_dates:
-                session_data = {field: getattr(template_class, field) for field in fields_to_copy if hasattr(template_class, field)}
+                session_data = {f: getattr(template_class, f) for f in fields_to_copy if hasattr(template_class, f)}
                 ClassSession.objects.create(
                     class_template=template_class,
                     date=current,
                     **session_data
                 )
             current += timedelta(days=1)
-
-    logger.info(f"Regenerated sessions for class {template_class.id}")
 
 # Distributions
 
