@@ -154,53 +154,65 @@ def edit_future_sessions(class_id):
 def regenerate_future_sessions(class_id):
     from django.db import transaction
     from datetime import date, timedelta
+    import logging
 
+    logger = logging.getLogger(__name__)
     today = timezone.localdate()
     template_class = get_object_or_404(Class, id=class_id)
 
-    # Map template_class weekdays to Python weekday numbers
-    target_weekdays = {WEEKDAY_MAP[d] for d in template_class.days_of_week}
+    try:
+        target_weekdays = {WEEKDAY_MAP[d] for d in template_class.days_of_week}
+    except Exception as e:
+        logger.error(f"Error parsing weekdays: {e}")
+        target_weekdays = set()
 
     future_sessions = ClassSession.objects.filter(
         class_template=template_class,
         date__gte=today,
     )
 
-    existing_dates = {s.date: s for s in future_sessions}
+    existing_dates = {s.date for s in future_sessions}
 
     # Fields to copy from template_class to session
-    fields_to_copy = ["start_time", "end_time", "instructor", "notes", "location"]  # add any others here
+    fields_to_copy = ["start_time", "end_time", "instructor", "notes", "location"]
 
     with transaction.atomic():
-
-        # 1️⃣ Remove sessions on invalid weekdays
+        # Remove invalid weekday sessions
         for session in future_sessions:
             if session.date.weekday() not in target_weekdays:
-                if session.is_canceled:  # skip canceled sessions
+                if session.is_canceled:
                     continue
                 session.delete()
 
-        # 2️⃣ Update remaining future sessions with template_class info
+        # Update valid future sessions
         for session in future_sessions:
             if not session.is_canceled:
                 for field in fields_to_copy:
-                    setattr(session, field, getattr(template_class, field))
-                session.save(update_fields=fields_to_copy)
+                    if hasattr(template_class, field):
+                        setattr(session, field, getattr(template_class, field))
+                session.save(update_fields=[f for f in fields_to_copy if hasattr(template_class, f)])
 
-        # 3️⃣ Create missing sessions until December 30
+        # Create missing sessions until Dec 30
         current_year = today.year
-        end_date = template_class.end_date or date(current_year, 12, 30)
-        current = max(today, template_class.start_date)
+        try:
+            end_date = template_class.end_date or date(current_year, 12, 30)
+        except Exception as e:
+            logger.error(f"Error determining end_date: {e}")
+            end_date = date(current_year, 12, 30)
+
+        current = max(today, template_class.start_date or today)
 
         while current <= end_date:
             if current.weekday() in target_weekdays and current not in existing_dates:
-                session_data = {field: getattr(template_class, field) for field in fields_to_copy}
+                session_data = {field: getattr(template_class, field) for field in fields_to_copy if hasattr(template_class, field)}
                 ClassSession.objects.create(
                     class_template=template_class,
                     date=current,
                     **session_data
                 )
             current += timedelta(days=1)
+
+    logger.info(f"Regenerated sessions for class {template_class.id}")
 
 # Distributions
 
