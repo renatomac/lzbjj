@@ -1,0 +1,148 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Edit Waiver</h2>
+
+    <form method="post" novalidate>
+        {% csrf_token %}
+        <!-- warning placeholder -->
+        <div id="member-name-warning" class="alert alert-warning d-none mt-2">
+            ⚠️ The selected member name does not match the participant’s name.
+            Please confirm this is correct.
+        </div>
+        <!-- Member Auto-suggest -->
+        <div class="mb-3 position-relative">
+            <label class="form-label">Linked Member</label>
+            {{ form.member_search }}
+            {{ form.member }}
+            <div id="member-results"
+                 class="list-group position-absolute w-100"
+                 style="z-index: 1000;"></div>
+        </div>
+
+        <!-- Participant -->
+        <div class="mb-3">
+            <label class="form-label">{{ form.participant_first_name.label }}</label>
+            {{ form.participant_first_name }}
+            {{ form.participant_first_name.errors }}
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">{{ form.participant_last_name.label }}</label>
+            {{ form.participant_last_name }}
+            {{ form.participant_last_name.errors }}
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">{{ form.participant_dob.label }}</label>
+            {{ form.participant_dob }}
+            {{ form.participant_dob.errors }}
+        </div>
+
+        <!-- Guardian (minor only, but safe to show) -->
+        <div class="mb-3">
+            <label class="form-label">{{ form.guardian_first_name.label }}</label>
+            {{ form.guardian_first_name }}
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">{{ form.guardian_last_name.label }}</label>
+            {{ form.guardian_last_name }}
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">{{ form.guardian_relationship.label }}</label>
+            {{ form.guardian_relationship }}
+        </div>
+
+        <!-- Read-only signature info -->
+        <div class="alert alert-secondary mt-4">
+            <strong>Signature locked</strong><br>
+            This waiver has already been signed and cannot be re-signed or voided.
+        </div>
+
+        <button class="btn btn-primary">Save Changes</button>
+        <a href="{% url 'waivers'%}" class="btn btn-secondary">
+            Cancel
+        </a>
+    </form>
+</div>
+
+<!-- Member Auto-complete JS -->
+<script>
+const input = document.getElementById("id_member_search");
+const resultsBox = document.getElementById("member-results");
+const memberField = document.getElementById("id_member");
+
+const participantFirst = document.getElementById("id_participant_first_name");
+const participantLast = document.getElementById("id_participant_last_name");
+const warningBox = document.getElementById("member-name-warning");
+
+let selectedMemberName = "";
+let controller;
+
+function normalize(name) {
+    return name.toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+function checkNameMismatch() {
+    if (!selectedMemberName) {
+        warningBox.classList.add("d-none");
+        return;
+    }
+
+    const participantName = normalize(
+        `${participantFirst.value} ${participantLast.value}`
+    );
+
+    const memberName = normalize(selectedMemberName);
+
+    if (participantName && memberName && participantName !== memberName) {
+        warningBox.classList.remove("d-none");
+    } else {
+        warningBox.classList.add("d-none");
+    }
+}
+
+input.addEventListener("input", () => {
+    const query = input.value.trim();
+
+    if (query.length < 2) {
+        resultsBox.innerHTML = "";
+        return;
+    }
+
+    if (controller) controller.abort();
+    controller = new AbortController();
+
+    fetch(`/ajax/members/?q=${encodeURIComponent(query)}`, {
+        signal: controller.signal
+    })
+    .then(res => res.json())
+    .then(data => {
+        resultsBox.innerHTML = "";
+
+        data.forEach(item => {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "list-group-item list-group-item-action";
+            btn.textContent = item.label;
+
+            btn.onclick = () => {
+                input.value = item.label;
+                memberField.value = item.id;
+                selectedMemberName = item.label;
+                resultsBox.innerHTML = "";
+                checkNameMismatch();
+            };
+
+            resultsBox.appendChild(btn);
+        });
+    });
+});
+
+participantFirst.addEventListener("input", checkNameMismatch);
+participantLast.addEventListener("input", checkNameMismatch);
+</script>
+{% endblock %}

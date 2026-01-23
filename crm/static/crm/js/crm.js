@@ -512,6 +512,48 @@ document.querySelectorAll(".filter-input").forEach(function(el) {
     });
 });
 
+// Edit Waiver - auto suggest member
+const input = document.getElementById("id_member_search");
+const resultsBox = document.getElementById("member-results");
+const memberField = document.getElementById("id_member");
+
+let controller;
+
+input.addEventListener("input", () => {
+    const query = input.value.trim();
+
+    if (query.length < 2) {
+        resultsBox.innerHTML = "";
+        return;
+    }
+
+    if (controller) controller.abort();
+    controller = new AbortController();
+
+    fetch(`/ajax/members/?q=${encodeURIComponent(query)}`, {
+        signal: controller.signal
+    })
+    .then(res => res.json())
+    .then(data => {
+        resultsBox.innerHTML = "";
+
+        data.forEach(item => {
+            const el = document.createElement("button");
+            el.type = "button";
+            el.className = "list-group-item list-group-item-action";
+            el.textContent = item.label;
+
+            el.onclick = () => {
+                input.value = item.label;
+                memberField.value = item.id;
+                resultsBox.innerHTML = "";
+            };
+
+            resultsBox.appendChild(el);
+        });
+    });
+});
+
 
 
 

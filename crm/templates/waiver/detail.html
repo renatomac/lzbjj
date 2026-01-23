@@ -1,0 +1,33 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<div class="container mt-4">
+  <div class="card shadow-sm p-4">
+
+    <h3 class="mb-3">Signed Waiver</h3>
+
+    <div class="border p-3 mb-4">
+      {{ waiver.content|safe }}
+    </div>
+
+    <hr>
+
+    <h5>Signature Details</h5>
+    <ul class="list-unstyled">
+      <li><strong>Participant:</strong> {{ signature.participant_full_name }}</li>
+      <li><strong>Type:</strong> {{ signature.get_participant_type_display }}</li>
+      <li><strong>Signed at:</strong> {{ signature.signed_at }}</li>
+      <li><strong>IP Address:</strong> {{ signature.ip_address }}</li>
+      <li><strong>User Agent:</strong> {{ signature.user_agent }}</li>
+    </ul>
+
+    <div class="mt-4">
+      <a href="{% url 'waiver_pdf' signature.id %}" class="btn btn-outline-secondary">
+        Download PDF
+      </a>
+    </div>
+
+  </div>
+</div>
+
+{% endblock %}

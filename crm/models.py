@@ -6,9 +6,13 @@ from django.conf import settings
 from multiselectfield import MultiSelectField
 from django.core.validators import MaxValueValidator, MinValueValidator
 from phonenumber_field.modelfields import PhoneNumberField
-import enum, datetime
+import enum
 from localflavor.us.models import USStateField
 from functools import cached_property
+import hashlib
+from datetime import date, datetime
+from django.apps import apps
+
 # Create your models here.
 
 
@@ -159,6 +163,12 @@ class Member(models.Model):
             if self.member_type == "child"
             else WaiverSignature.ADULT
         )
+    
+    def clean_member(self):
+        member = self.cleaned_data.get("member")
+        if not member:
+            raise forms.ValidationError("Please select a valid member.")
+        return member
     
     @property
     def has_valid_waiver(self):
@@ -568,13 +578,47 @@ class Curriculum(models.Model):
 # User = settings.AUTH_USER_MODEL
 
 class WaiverVersion(models.Model):
-    title = models.CharField(max_length=200)
-    text = models.TextField()
+
+    ADULT = "adult"
+    MINOR = "minor"
+
+    WAIVER_TYPE_CHOICES = [
+        (ADULT, "Adult Waiver"),
+        (MINOR, "Minor Waiver"),
+    ]
+
+    waiver_type = models.CharField(
+        max_length=10,
+        choices=WAIVER_TYPE_CHOICES,
+        #default=ADULT,          # ✅ TEMP DEFAULT
+    )
+
+    version = models.CharField(
+        max_length=20,
+        help_text="Legal version label, e.g. 2025-01",
+        #default="legacy",       # ✅ TEMP DEFAULT
+    )
+
+    content = models.TextField(default="Temp")
+
     is_active = models.BooleanField(default=True)
+
+    effective_date = models.DateField(
+        #default=timezone.localdate # ✅ TEMP DEFAULT
+        )
+
     created_at = models.DateTimeField(auto_now_add=True)
 
+    class Meta:
+        ordering = ["-effective_date"]
+        unique_together = ("waiver_type", "version")
+
     def __str__(self):
-        return f"{self.title} (v{self.id})"
+        return f"{self.get_waiver_type_display()} v{self.version}"
+    
+    def content_hash(self):
+        return hashlib.sha256(self.content.encode("utf-8")).hexdigest()
+
     
 class WaiverSignature(models.Model):
     ADULT = "adult"
@@ -597,22 +641,21 @@ class WaiverSignature(models.Model):
 
     # Linked member (optional but recommended)
     member = models.ForeignKey(
-    Member,
-    on_delete=models.CASCADE,
-    related_name="waivers",
-    null=True,
-    blank=True
+        Member,
+        on_delete=models.CASCADE,
+        related_name="waivers",
+        null=True,
+        blank=True
     )
 
-    # Adult participant
-    participant_full_name = models.CharField(max_length=200)
+    # Participant names
+    participant_first_name = models.CharField(max_length=100)
+    participant_last_name = models.CharField(max_length=100)
     participant_dob = models.DateField(null=True, blank=True)
 
     # Parent / Guardian (required for minors)
-    guardian_full_name = models.CharField(
-        max_length=200,
-        blank=True
-    )
+    guardian_first_name = models.CharField(max_length=100, blank=True)
+    guardian_last_name = models.CharField(max_length=100, blank=True)
     guardian_relationship = models.CharField(
         max_length=100,
         blank=True
@@ -630,5 +673,23 @@ class WaiverSignature(models.Model):
     ip_address = models.GenericIPAddressField()
     user_agent = models.TextField(blank=True)
 
+    # Voiding
+    is_void = models.BooleanField(default=False)
+    void_reason = models.TextField(blank=True)
+
     def __str__(self):
-        return f"{self.participant_full_name} – {self.participant_type}"
+        if self.participant_type == WaiverSignature.MINOR:
+            return f"{self.participant_first_name} {self.participant_last_name} – {self.participant_type} (Guardian: {self.guardian_first_name} {self.guardian_last_name})"
+        return f"{self.participant_first_name} {self.participant_last_name} – {self.participant_type}"
+    
+    @property
+    def participant_full_name(self):
+        """Return participant's full name."""
+        return f"{self.participant_first_name} {self.participant_last_name}"
+
+    @property
+    def guardian_full_name(self):
+        """Return guardian's full name."""
+        if self.guardian_first_name or self.guardian_last_name:
+            return f"{self.guardian_first_name} {self.guardian_last_name}".strip()
+        return ""

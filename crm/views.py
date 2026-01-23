@@ -13,7 +13,7 @@ from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import  require_POST
 from .models import User, Plan, Member, Membership, BeltPromotion, Staff, Contact, Class, Attendance, Technique, Position, ClassSession, SessionAttendance, SessionTechnique, WaiverVersion, WaiverSignature
-from .forms import PlanForm, StaffForm , MemberForm, MembershipForm, ClassForm, ContactFormSet, ContactForm,BeltPromotionForm, AttendanceForm, MinorWaiverForm, AdultWaiverForm, ClassSessionForm
+from .forms import PlanForm, StaffForm , MemberForm, MembershipForm, ClassForm, ContactFormSet, ContactForm,BeltPromotionForm, AttendanceForm, MinorWaiverForm, AdultWaiverForm, ClassSessionForm, WaiverEditForm
 from .formsets import SessionAttendanceFormSet
 from datetime import datetime, date, timedelta
 from crm.utils import *
@@ -1087,8 +1087,35 @@ def session_activate(request, session_id ):
 
 '''WAIVER VIEWS'''
 
+def waivers(request):
+    show_voided = request.GET.get("voided") == "1"
+
+    qs = WaiverSignature.objects.select_related("member", "waiver_version")
+
+    if not show_voided:
+        qs = qs.filter(is_void=False)
+
+    all_waivers = qs.order_by("-signed_at")
+
+    return render(
+        request,
+        "waiver/index.html",
+        {
+            "all_waivers": all_waivers,
+            "show_voided": show_voided,
+        }
+    )
+
+
 def adult_waiver(request, member_id=None):
-    waiver = get_object_or_404(WaiverVersion, is_active=True)
+    # Get the latest active adult waiver
+    waiver = WaiverVersion.objects.filter(
+        waiver_type=WaiverVersion.ADULT,
+        is_active=True
+    ).order_by('-effective_date').first()
+    
+    if not waiver:
+        return render(request, "waiver/no_waiver.html")  # handle case with no active waiver
 
     if request.method == "POST":
         form = AdultWaiverForm(request.POST)
@@ -1096,20 +1123,30 @@ def adult_waiver(request, member_id=None):
             sig = form.save(commit=False)
             sig.participant_type = WaiverSignature.ADULT
             sig.waiver_version = waiver
-            sig.ip_address = get_client_ip(request)
+            sig.ip_address = request.META.get("REMOTE_ADDR"),
             sig.user_agent = request.META.get("HTTP_USER_AGENT", "")
+            if member_id:
+                sig.member_id = member_id
             sig.save()
             return redirect("waiver_success")
     else:
         form = AdultWaiverForm()
 
-    return render(request, "crm/waivers/adult.html", {
+    return render(request, "waiver/adult.html", {
         "form": form,
         "waiver": waiver,
     })
 
+
 def minor_waiver(request, member_id=None):
-    waiver = get_object_or_404(WaiverVersion, is_active=True)
+    # Get the latest active minor waiver
+    waiver = WaiverVersion.objects.filter(
+        waiver_type=WaiverVersion.MINOR,
+        is_active=True
+    ).order_by('-effective_date').first()
+    
+    if not waiver:
+        return render(request, "waiver/no_waiver.html")  # handle case with no active waiver
 
     if request.method == "POST":
         form = MinorWaiverForm(request.POST)
@@ -1117,14 +1154,105 @@ def minor_waiver(request, member_id=None):
             sig = form.save(commit=False)
             sig.participant_type = WaiverSignature.MINOR
             sig.waiver_version = waiver
-            sig.ip_address = get_client_ip(request)
+            sig.ip_address = request.META.get("REMOTE_ADDR")
             sig.user_agent = request.META.get("HTTP_USER_AGENT", "")
+            if member_id:
+                sig.member_id = member_id
             sig.save()
+            messages.success(request, "Waiver signed successfully.")
             return redirect("waiver_success")
+        else:
+            messages.error(request, "There was a problem with the form. Please check the fields below.")
+
     else:
         form = MinorWaiverForm()
 
-    return render(request, "crm/waivers/minor.html", {
+    return render(request, "waiver/minor.html", {
         "form": form,
         "waiver": waiver,
     })
+
+def waiver_success(request):
+    return render(request, "waiver/success.html")
+
+def waiver_detail(request, pk):
+    signature = get_object_or_404(
+        WaiverSignature.objects.select_related("waiver_version"),
+        pk=pk
+    )
+
+    return render(request, "waiver/detail.html", {
+        "signature": signature,
+        "waiver": signature.waiver_version,
+    })
+
+def waiver_pdf(request, pk):
+    signature = get_object_or_404(
+        WaiverSignature.objects.select_related("waiver_version"),
+        pk=pk
+    )
+
+    return render(request, "waiver/pdf.html", {
+        "signature": signature,
+        "waiver": signature.waiver_version,
+    })
+
+def waiver_edit(request, pk):
+    waiver = get_object_or_404(WaiverSignature, pk=pk, is_void=False)
+
+    if request.method == "POST":
+        form = WaiverEditForm(request.POST, instance=waiver)
+        if form.is_valid():
+            waiver = form.save()
+
+            # ensure related member reflects the change
+            if waiver.member:
+                waiver.member.save(update_fields=["updated_at"])
+
+            return redirect("waiver_detail", pk=waiver.pk)
+    else:
+        form = WaiverEditForm(instance=waiver)
+
+    return render(
+        request,
+        "waiver/edit.html",
+        {
+            "waiver": waiver,
+            "form": form,
+        }
+    )
+
+def waiver_delete(request, pk):
+    waiver = get_object_or_404(WaiverSignature, pk=pk, is_void=False)
+
+    if request.method == "POST":
+        waiver.is_void = True
+        waiver.void_reason = request.POST.get(
+            "reason", "Voided by staff"
+        )
+        waiver.save()
+        return redirect("waivers")
+
+    return render(request, "waiver/delete.html", {
+        "waiver": waiver,
+    })
+
+def member_autocomplete(request):
+    q = request.GET.get("q", "").strip()
+
+    results = []
+    if len(q) >= 2:
+        members = Member.objects.filter(
+            Q(first_name__icontains=q) |
+            Q(last_name__icontains=q)
+        )[:10]
+
+        results = [
+            {
+                "id": m.id,
+                "label": f"{m.first_name} {m.last_name}",
+            }
+            for m in members
+        ]
+
+    return JsonResponse(results, safe=False)

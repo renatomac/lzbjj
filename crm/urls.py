@@ -51,5 +51,14 @@ urlpatterns = [
     path("getContacts/<int:member_id>/", views.getContacts, name="getContacts"),
     path("create_sessions", views.create_sessions, name="create_sessions"),
     path("sessions", views.sessions, name="sessions"),
+    path("waivers/", views.waivers, name="waivers"),
+    path("waivers/adult/", views.adult_waiver, name="adult_waiver"),
+    path("waivers/minor/", views.minor_waiver, name="minor_waiver"),
+    path("waivers/success/", views.waiver_success, name="waiver_success"),
+    path("waivers/<int:pk>/", views.waiver_detail, name="waiver_detail"),
+    path("waivers/<int:pk>/pdf/", views.waiver_pdf, name="waiver_pdf"),
+    path("waivers/<int:pk>/edit/", views.waiver_edit, name="waiver_edit"),
+    path("waivers/<int:pk>/delete/", views.waiver_delete, name="waiver_delete"),
+    path("ajax/members/", views.member_autocomplete, name="member_autocomplete"),
     # API Routes
 ]

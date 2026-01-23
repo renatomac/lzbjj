@@ -1,0 +1,12 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container mt-5 text-center">
+    <h2>Waiver Signed Successfully</h2>
+    <p>Thank you. Your waiver has been securely recorded.</p>
+
+    <a href="{% url 'all_waivers' %}" class="btn btn-primary mt-3">
+        Return to waivers
+    </a>
+</div>
+{% endblock %}

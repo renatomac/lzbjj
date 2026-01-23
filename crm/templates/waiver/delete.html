@@ -1,0 +1,25 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<h2>Void Waiver</h2>
+
+<p>
+  You are about to void the waiver signed by
+  <strong>{{ waiver.participant_full_name }}</strong>.
+</p>
+
+<form method="post">
+  {% csrf_token %}
+
+  <label>Reason (optional)</label>
+  <textarea name="reason" class="form-control"></textarea>
+
+  <button class="btn btn-danger mt-3">
+    Void Waiver
+  </button>
+
+  <a href="{% url 'waiver_detail' waiver.id %}" class="btn btn-secondary mt-3">
+    Cancel
+  </a>
+</form>
+{% endblock %}

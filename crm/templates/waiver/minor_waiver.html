@@ -1,0 +1,69 @@
+<form method="post">
+  {% csrf_token %}
+
+  <h2 class="text-center"><u>Minor Activity Waiver & Parental Consent</u></h2>
+
+  <p>
+    I, <strong>{{ guardian.full_name }}</strong>, am the parent or legal guardian
+    of <strong>{{ member.full_name }}</strong> (“Minor Participant”).
+  </p>
+
+  <hr>
+
+  <h4>1. Activity</h4>
+  <p>Brazilian Jiu-Jitsu classes and related training activities.</p>
+
+  <h4>2. Assumption of Risk</h4>
+  <p>
+    I understand the risks of Brazilian Jiu-Jitsu and voluntarily assume all risks
+    on behalf of the Minor Participant.
+  </p>
+
+  <h4>3. Release and Indemnification</h4>
+  <p>
+    I release and indemnify the Activity Provider from any claims arising from
+    participation, including negligence claims.
+  </p>
+
+  <h4>4. Fitness to Participate</h4>
+  <p>
+    I certify that the Minor Participant is physically and mentally capable
+    of participation.
+  </p>
+
+  <h4>5. Media Release</h4>
+  <p>
+    I grant permission for photos or videos of the Minor Participant to be used
+    for promotional purposes.
+  </p>
+
+  <h4>6. Electronic Signature Consent</h4>
+  <p>
+    I agree to electronic execution of this Waiver.
+  </p>
+
+  <h4>7. Governing Law</h4>
+  <p>This Waiver is governed by Illinois law.</p>
+
+  <hr>
+
+  <h4>Emergency Contact</h4>
+  <input type="text" name="emergency_name" required class="form-control">
+  <input type="text" name="emergency_phone" required class="form-control">
+
+  <hr>
+
+  <div class="form-check mt-3">
+    <input class="form-check-input" type="checkbox" name="agree" required>
+    <label class="form-check-label">
+      I am the legal guardian and agree to this Waiver
+    </label>
+  </div>
+
+  <label class="mt-3">Guardian Full Legal Name (Signature)</label>
+  <input type="text" name="signature_name" required class="form-control">
+
+  <button type="submit" class="btn btn-primary mt-4">
+    Sign Waiver
+  </button>
+</form>

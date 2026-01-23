@@ -1,0 +1,88 @@
+<form method="post">
+  {% csrf_token %}
+
+  <h2 class="text-center"><u>Adult Activity Waiver and Release of Liability</u></h2>
+
+  <p>
+    <strong>THIS ACTIVITY WAIVER FORM</strong> (“Waiver”) is made on
+    <strong>{{ today }}</strong>.
+  </p>
+
+  <p>
+    IN CONSIDERATION of being allowed to participate in the Activity, I,
+    <strong>{{ member.full_name }}</strong>,
+    agree with Lake Zurich Brazilian Jiu-Jitsu, 575 N Rand Rd, Lake Zurich, IL 60047
+    (“Activity Provider”), as follows:
+  </p>
+
+  <hr>
+
+  <h4>1. Details of Activity</h4>
+  <p>Brazilian Jiu-Jitsu classes and related training activities.</p>
+
+  <h4>2. Assumption of Risk</h4>
+  <p>
+    Brazilian Jiu-Jitsu is a physical contact sport involving inherent risks,
+    including but not limited to joint injuries, fractures, choking,
+    loss of consciousness, paralysis, or death. I voluntarily assume all risks.
+  </p>
+
+  <h4>3. Release and Consideration</h4>
+  <p>
+    I release and forever discharge the Activity Provider and its owners,
+    instructors, employees, and agents from all claims, including those caused
+    by negligence.
+  </p>
+
+  <h4>4. Voluntary Participation</h4>
+  <p>My participation is voluntary and not coerced.</p>
+
+  <h4>5. Fitness to Participate</h4>
+  <p>
+    I certify that I am physically and mentally fit to participate and will
+    obtain medical clearance if necessary.
+  </p>
+
+  <h4>6. Media Release</h4>
+  <p>
+    I grant permission for photos or videos taken during training to be used
+    for promotional purposes without compensation.
+  </p>
+
+  <h4>7. Electronic Signature Consent</h4>
+  <p>
+    I agree that this Waiver may be signed electronically and that my electronic
+    signature has the same legal effect as a handwritten signature.
+  </p>
+
+  <h4>8. Governing Law & Severability</h4>
+  <p>
+    This Waiver is governed by Illinois law. If any provision is invalid,
+    the remaining provisions remain enforceable.
+  </p>
+
+  <hr>
+
+  <h4>Emergency Contact</h4>
+  <label>Name</label>
+  <input type="text" name="emergency_name" required class="form-control">
+
+  <label>Phone</label>
+  <input type="text" name="emergency_phone" required class="form-control">
+
+  <hr>
+
+  <div class="form-check mt-3">
+    <input class="form-check-input" type="checkbox" name="agree" required>
+    <label class="form-check-label">
+      I have read and agree to this Waiver
+    </label>
+  </div>
+
+  <label class="mt-3">Type your full legal name as signature</label>
+  <input type="text" name="signature_name" required class="form-control">
+
+  <button type="submit" class="btn btn-primary mt-4">
+    Sign Waiver
+  </button>
+</form>

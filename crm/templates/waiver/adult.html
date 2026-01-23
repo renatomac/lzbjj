@@ -1,0 +1,164 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container my-5">
+    <h1 class="mb-4">Adult Waiver</h1>
+
+    <div class="card mb-4">
+        <div class="card-body">
+            {{ waiver.content|safe }}
+        </div>
+    </div>
+
+    <form method="post" novalidate>
+        {% csrf_token %}
+
+        <div class="mb-3">
+            <label for="{{ form.participant_first_name.id_for_label }}">
+                {{ form.participant_first_name.label }}
+            </label>
+            {{ form.participant_first_name }}
+            {% if form.participant_first_name.errors %}
+                <div class="text-danger">
+                    {{ form.participant_first_name.errors }}
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="mb-3">
+            <label for="{{ form.participant_last_name.id_for_label }}">
+                {{ form.participant_last_name.label }}
+            </label>
+            {{ form.participant_last_name }}
+            {% if form.participant_last_name.errors %}
+                <div class="text-danger">
+                    {{ form.participant_last_name.errors }}
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="mb-3">
+            <label for="{{ form.participant_dob.id_for_label }}">
+                {{ form.participant_dob.label }}
+            </label>
+            {{ form.participant_dob }}
+            {% if form.participant_dob.errors %}
+                <div class="text-danger">
+                    {{ form.participant_dob.errors }}
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="mb-3">
+            <label for="{{ form.signature.id_for_label }}">
+                {{ form.signature.label }}
+            </label>
+            {{ form.signature }}
+            {% if form.signature.errors %}
+                <div class="text-danger">
+                    {{ form.signature.errors }}
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="form-check mb-3">
+            {{ form.agreed }}
+            <label class="form-check-label" for="{{ form.agreed.id_for_label }}">
+                {{ form.agreed.label }}
+            </label>
+            {% if form.agreed.errors %}
+                <div class="text-danger">
+                    {{ form.agreed.errors }}
+                </div>
+            {% endif %}
+        </div>
+
+        {% if form.non_field_errors %}
+            <div class="alert alert-danger">
+                {{ form.non_field_errors }}
+            </div>
+        {% endif %}
+
+        <button type="submit" class="btn btn-primary">
+            Sign Waiver
+        </button>
+    </form>
+</div>
+{% endblock %}
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Edit Waiver</h2>
+
+    <div class="alert alert-info">
+        <i class="fas fa-lock me-2"></i>
+        This waiver has already been signed. Signature and agreement cannot be changed.
+    </div>
+
+    <form method="post">
+        {% csrf_token %}
+
+        <!-- Member selection -->
+        <div class="mb-3">
+            <label class="form-label">Linked Member</label>
+            {{ form.member }}
+        </div>
+
+        <hr>
+
+        <!-- Participant -->
+        <div class="mb-3">
+            {{ form.participant_first_name.label_tag }}
+            {{ form.participant_first_name }}
+        </div>
+
+        <div class="mb-3">
+            {{ form.participant_last_name.label_tag }}
+            {{ form.participant_last_name }}
+        </div>
+
+        <div class="mb-3">
+            {{ form.participant_dob.label_tag }}
+            {{ form.participant_dob }}
+        </div>
+
+        <!-- Guardian (only relevant for minors, harmless for adults) -->
+        <div class="mb-3">
+            {{ form.guardian_first_name.label_tag }}
+            {{ form.guardian_first_name }}
+        </div>
+
+        <div class="mb-3">
+            {{ form.guardian_last_name.label_tag }}
+            {{ form.guardian_last_name }}
+        </div>
+
+        <div class="mb-3">
+            {{ form.guardian_relationship.label_tag }}
+            {{ form.guardian_relationship }}
+        </div>
+
+        <hr>
+
+        <!-- Locked fields -->
+        <div class="mb-3">
+            {{ form.signature.label_tag }}
+            {{ form.signature }}
+        </div>
+
+        <div class="form-check mb-3">
+            {{ form.agreed }}
+            {{ form.agreed.label_tag }}
+        </div>
+
+        <button class="btn btn-primary">
+            <i class="fas fa-save me-1"></i> Save Changes
+        </button>
+
+        <a href="{% url 'waiver_detail' waiver.id %}" class="btn btn-secondary">
+            Cancel
+        </a>
+    </form>
+</div>
+{% endblock %}

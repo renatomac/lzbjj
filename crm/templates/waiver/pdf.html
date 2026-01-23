@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Waiver PDF</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .meta {
+      margin-top: 30px;
+      font-size: 11px;
+    }
+  </style>
+</head>
+<body>
+
+  {{ waiver.content|safe }}
+
+  <div class="meta">
+    <hr>
+    <p><strong>Signed by:</strong> {{ signature.participant_full_name }}</p>
+    <p><strong>Signed at:</strong> {{ signature.signed_at }}</p>
+    <p><strong>IP Address:</strong> {{ signature.ip_address }}</p>
+    <p><strong>User Agent:</strong> {{ signature.user_agent }}</p>
+    <p><strong>Waiver Version:</strong> {{ waiver.version }}</p>
+  </div>
+
+</body>
+</html>

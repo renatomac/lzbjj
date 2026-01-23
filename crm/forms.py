@@ -123,6 +123,9 @@ class MemberForm(forms.ModelForm):
                 self.fields["phone"].widget.attrs["readonly"] = True
                 self.fields["phone"].widget.attrs["placeholder"] = "Optional for members under 21"
 
+    def __str__(self):
+        return f"{self.first_name} {self.last_name}"
+
     def clean(self):
         cleaned_data = super().clean()
 
@@ -185,6 +188,10 @@ class StaffForm(forms.ModelForm):
             self.fields["belt_rank"].initial = "white"
             self.fields["stripes"].initial = 0
             self.fields["is_active"].initial = True
+
+    def __str__(self):
+        return f"{self.first_name} {self.last_name}"
+
 
     def clean(self):
         cleaned_data = super().clean()
@@ -343,48 +350,78 @@ class BaseWaiverForm(forms.ModelForm):
     class Meta:
         model = WaiverSignature
         fields = [
-            "participant_full_name",
+            "participant_first_name",
+            "participant_last_name",
             "participant_dob",
-            "guardian_full_name",
+            "guardian_first_name",
+            "guardian_last_name",
             "guardian_relationship",
             "signature",
             "agreed",
         ]
         widgets = {
+            "participant_first_name": forms.TextInput(attrs={"class": "form-control"}),
+            "participant_last_name": forms.TextInput(attrs={"class": "form-control"}),
+            "participant_dob": forms.DateInput(
+                attrs={"class": "form-control", "type": "date"}
+            ),
+            "guardian_first_name": forms.TextInput(attrs={"class": "form-control"}),
+            "guardian_last_name": forms.TextInput(attrs={"class": "form-control"}),
+            "guardian_relationship": forms.TextInput(attrs={"class": "form-control"}),
             "signature": forms.TextInput(
-                attrs={"placeholder": "Type full legal name"}
-            )
+                attrs={
+                    "class": "form-control",
+                    "placeholder": "Type full legal name as signature",
+                }
+            ),
         }
+
 
 class AdultWaiverForm(BaseWaiverForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        # Guardian fields not used
-        self.fields["guardian_full_name"].required = False
+        # Guardian fields not used for adults
+        self.fields["guardian_first_name"].required = False
+        self.fields["guardian_last_name"].required = False
         self.fields["guardian_relationship"].required = False
+
+        # DOB optional for adults
+        self.fields["participant_dob"].required = False
 
     def clean(self):
         cleaned = super().clean()
 
-        if not cleaned.get("participant_full_name"):
-            raise forms.ValidationError("Full legal name is required.")
+        if not cleaned.get("participant_first_name") or not cleaned.get("participant_last_name"):
+            raise forms.ValidationError(
+                "Participant full legal name is required."
+            )
 
         return cleaned
-    
+
+
 class MinorWaiverForm(BaseWaiverForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.fields["guardian_full_name"].required = True
+        # Required for minors
+        self.fields["guardian_first_name"].required = True
+        self.fields["guardian_last_name"].required = True
         self.fields["guardian_relationship"].required = True
         self.fields["participant_dob"].required = True
 
     def clean(self):
         cleaned = super().clean()
 
-        if not cleaned.get("guardian_full_name"):
-            raise forms.ValidationError("Parent or guardian name is required.")
+        if not cleaned.get("participant_first_name") or not cleaned.get("participant_last_name"):
+            raise forms.ValidationError(
+                "Participant full legal name is required."
+            )
+
+        if not cleaned.get("guardian_first_name") or not cleaned.get("guardian_last_name"):
+            raise forms.ValidationError(
+                "Parent or guardian full legal name is required."
+            )
 
         return cleaned
     
@@ -430,4 +467,80 @@ class SessionAttendanceForm(forms.ModelForm):
         self.fields['present'].required = False
         # Optional: render it as a checkbox explicitly
         self.fields['present'].widget = forms.CheckboxInput()
+
+class WaiverEditForm(forms.ModelForm):
+    member_search = forms.CharField(
+        required=False,
+        label="Member",
+        widget=forms.TextInput(
+            attrs={
+                "class": "form-control",
+                "placeholder": "Start typing member name…",
+                "autocomplete": "off",
+            }
+        ),
+    )
+
+    class Meta:
+        model = WaiverSignature
+        fields = [
+            "member",
+            "participant_first_name",
+            "participant_last_name",
+            "participant_dob",
+            "guardian_first_name",
+            "guardian_last_name",
+            "guardian_relationship",
+            "signature",
+            "agreed",
+        ]
+        widgets = {
+            "member": forms.HiddenInput(),
+            "participant_first_name": forms.TextInput(attrs={"class": "form-control"}),
+            "participant_last_name": forms.TextInput(attrs={"class": "form-control"}),
+            "participant_dob": forms.DateInput(
+                attrs={"class": "form-control", "type": "date"}
+            ),
+            "guardian_first_name": forms.TextInput(attrs={"class": "form-control"}),
+            "guardian_last_name": forms.TextInput(attrs={"class": "form-control"}),
+            "guardian_relationship": forms.TextInput(attrs={"class": "form-control"}),
+            "signature": forms.TextInput(attrs={"class": "form-control", "readonly": True}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.waiver = kwargs.get("instance")
+
+        # Lock signature and agreed
+        self.fields["signature"].disabled = True
+        self.fields["agreed"].disabled = True
+
+        # Hide guardian fields for adults
+        if self.waiver and self.waiver.participant_type == WaiverSignature.ADULT:
+            for field in ["guardian_first_name", "guardian_last_name", "guardian_relationship"]:
+                self.fields.pop(field, None)
+
+        # Pre-fill member search if exists
+        if self.waiver and self.waiver.member:
+            self.fields["member_search"].initial = str(self.waiver.member)
+
+    def clean_signature(self):
+        # Prevent changing signature
+        return self.instance.signature
+
+    def clean_agreed(self):
+        # Prevent changing agreed checkbox
+        return self.instance.agreed
+
+    def clean_member(self):
+        member = self.cleaned_data.get("member")
+        # Warning: participant name differs from member
+        if member:
+            participant_name = f"{self.cleaned_data.get('participant_first_name', '')} {self.cleaned_data.get('participant_last_name', '')}".strip()
+            if participant_name.lower() != str(member).lower():
+                raise forms.ValidationError(
+                    "Warning: Participant name does not match selected member!"
+                )
+        return member
 

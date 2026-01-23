@@ -118,6 +118,14 @@
                     </a>
                 </li>
 
+                <li class="nav-item">
+                    <a href="{% url 'waivers' %}"
+                       class="nav-link text-white d-flex align-items-center gap-3 rounded-3
+                       {% if request.resolver_match.app_name == 'waivers' %}active{% endif %}">
+                        <i class="fas fa-cog"></i> Waiver
+                    </a>
+                </li>
+
             </ul>
         </nav>
 

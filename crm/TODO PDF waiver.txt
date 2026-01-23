@@ -1,0 +1,138 @@
+Perfect choice 👍
+For legal waivers, WeasyPrint is the right tool. It renders real HTML + CSS, supports page breaks, headers, footers, and produces court-grade PDFs. xhtml2pdf is weaker and breaks on modern HTML.
+
+Below is a clean, minimal, production-ready WeasyPrint setup that fits your current architecture exactly.
+
+✅ 1️⃣ Install WeasyPrint
+Linux / PythonAnywhere / most servers
+pip install weasyprint
+
+Windows (important)
+
+You must install GTK first:
+
+👉 https://github.com/tschoonj/GTK-for-Windows-Runtime-Environment-Installer
+
+Then:
+
+pip install weasyprint
+
+
+Test:
+
+python -c "from weasyprint import HTML; print('OK')"
+
+✅ 2️⃣ PDF View (REAL PDF)
+views.py
+from django.http import HttpResponse
+from django.template.loader import render_to_string
+from weasyprint import HTML
+from .models import WaiverSignature
+
+
+def waiver_pdf(request, pk):
+    signature = WaiverSignature.objects.select_related(
+        "waiver_version"
+    ).get(pk=pk)
+
+    html_string = render_to_string(
+        "waiver/pdf.html",
+        {
+            "signature": signature,
+            "waiver": signature.waiver_version,
+        }
+    )
+
+    pdf = HTML(
+        string=html_string,
+        base_url=request.build_absolute_uri("/")
+    ).write_pdf()
+
+    response = HttpResponse(pdf, content_type="application/pdf")
+    response["Content-Disposition"] = (
+        f'inline; filename="waiver-{signature.id}.pdf"'
+    )
+
+    return response
+
+
+✔ base_url is critical for CSS, images, logos
+✔ inline displays in browser (change to attachment if you want download)
+
+✅ 3️⃣ PDF Template (Print-Optimized)
+templates/waiver/pdf.html
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+
+  <style>
+    @page {
+      size: Letter;
+      margin: 1in;
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      font-size: 12px;
+      line-height: 1.6;
+      color: #000;
+    }
+
+    h2, h3, h4 {
+      margin-top: 20px;
+    }
+
+    .footer {
+      margin-top: 40px;
+      font-size: 10px;
+    }
+  </style>
+</head>
+<body>
+
+  {{ waiver.content|safe }}
+
+  <div class="footer">
+    <hr>
+    <p><strong>Participant:</strong> {{ signature.participant_full_name }}</p>
+    <p><strong>Signed At:</strong> {{ signature.signed_at }}</p>
+    <p><strong>IP Address:</strong> {{ signature.ip_address }}</p>
+    <p><strong>User Agent:</strong> {{ signature.user_agent }}</p>
+    <p><strong>Waiver Version:</strong> {{ waiver.version }}</p>
+  </div>
+
+</body>
+</html>
+
+✅ 4️⃣ URLs (if not added yet)
+path("waivers/<int:pk>/pdf/", views.waiver_pdf, name="waiver_pdf"),
+
+✅ 5️⃣ Button in UI
+<a href="{% url 'waiver_pdf' signature.id %}" class="btn btn-outline-secondary">
+  Download PDF
+</a>
+
+✅ 6️⃣ Why WeasyPrint is the correct legal choice
+
+✔ Real HTML/CSS rendering
+✔ Stable layout (no random line breaks)
+✔ Supports @page, margins, headers, footers
+✔ Accepts your stored waiver HTML directly
+✔ Used by law firms, hospitals, financial institutions
+
+This is court-safe documentation.
+
+🚀 Optional (next-level, tell me if you want)
+
+Header/footer with logo + page numbers
+
+Digital signature hash embedded in PDF
+
+PDF stored permanently (S3 / local)
+
+Email PDF automatically after signing
+
+Lock waiver edits once signed
+
+You’re building this the right way.
