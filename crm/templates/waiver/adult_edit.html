@@ -1,0 +1,77 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Edit Waiver</h2>
+
+    <div class="alert alert-info">
+        <i class="fas fa-lock me-2"></i>
+        This waiver has already been signed. Signature and agreement cannot be changed.
+    </div>
+
+    <form method="post">
+        {% csrf_token %}
+
+        <!-- Member selection -->
+        <div class="mb-3">
+            <label class="form-label">Linked Member</label>
+            {{ form.member }}
+        </div>
+
+        <hr>
+
+        <!-- Participant -->
+        <div class="mb-3">
+            {{ form.participant_first_name.label_tag }}
+            {{ form.participant_first_name }}
+        </div>
+
+        <div class="mb-3">
+            {{ form.participant_last_name.label_tag }}
+            {{ form.participant_last_name }}
+        </div>
+
+        <div class="mb-3">
+            {{ form.participant_dob.label_tag }}
+            {{ form.participant_dob }}
+        </div>
+
+        <!-- Guardian (only relevant for minors, harmless for adults) -->
+        <div class="mb-3">
+            {{ form.guardian_first_name.label_tag }}
+            {{ form.guardian_first_name }}
+        </div>
+
+        <div class="mb-3">
+            {{ form.guardian_last_name.label_tag }}
+            {{ form.guardian_last_name }}
+        </div>
+
+        <div class="mb-3">
+            {{ form.guardian_relationship.label_tag }}
+            {{ form.guardian_relationship }}
+        </div>
+
+        <hr>
+
+        <!-- Locked fields -->
+        <div class="mb-3">
+            {{ form.signature.label_tag }}
+            {{ form.signature }}
+        </div>
+
+        <div class="form-check mb-3">
+            {{ form.agreed }}
+            {{ form.agreed.label_tag }}
+        </div>
+
+        <button class="btn btn-primary">
+            <i class="fas fa-save me-1"></i> Save Changes
+        </button>
+
+        <a href="{% url 'waiver_detail' waiver.id %}" class="btn btn-secondary">
+            Cancel
+        </a>
+    </form>
+</div>
+{% endblock %}

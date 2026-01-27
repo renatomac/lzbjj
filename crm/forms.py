@@ -342,10 +342,6 @@ class BeltPromotionForm(forms.ModelForm):
 # WAIVER FORMS
 
 class BaseWaiverForm(forms.ModelForm):
-    agreed = forms.BooleanField(
-        required=True,
-        label="I have read and understand this waiver and agree to its terms."
-    )
 
     class Meta:
         model = WaiverSignature
@@ -357,7 +353,6 @@ class BaseWaiverForm(forms.ModelForm):
             "guardian_last_name",
             "guardian_relationship",
             "signature",
-            "agreed",
         ]
         widgets = {
             "participant_first_name": forms.TextInput(attrs={"class": "form-control"}),
@@ -378,6 +373,15 @@ class BaseWaiverForm(forms.ModelForm):
 
 
 class AdultWaiverForm(BaseWaiverForm):
+    agreed = forms.BooleanField(
+        required=True,
+        label=(
+            "I have read this Waiver, understand its terms, and understand I am giving up legal rights. I had the opportunity to ask questions before signing."
+        ),
+    )
+
+    class Meta(BaseWaiverForm.Meta):
+        fields = BaseWaiverForm.Meta.fields + ["agreed"]
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -401,6 +405,20 @@ class AdultWaiverForm(BaseWaiverForm):
 
 
 class MinorWaiverForm(BaseWaiverForm):
+
+    agreed = forms.BooleanField(
+        required=True,
+        label=(
+            "I have read this waiver in full, understand its terms, and understand that\
+            I am giving up legal rights on behalf of the minor participant and myself, \
+            I had the opportunity to ask questions before signing.\
+            I am the parent or legal guardian of the Minor Participant and have authority to sign this Waiver."
+        ),
+    )
+
+    class Meta(BaseWaiverForm.Meta):
+        fields = BaseWaiverForm.Meta.fields + ["agreed"]
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
