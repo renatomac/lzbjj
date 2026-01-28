@@ -3,6 +3,8 @@ from django.contrib.auth.models import AbstractUser, Group, Permission
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
 from django.conf import settings
+from django.core.exceptions import ValidationError
+from django.apps import apps
 from multiselectfield import MultiSelectField
 from django.core.validators import MaxValueValidator, MinValueValidator
 from phonenumber_field.modelfields import PhoneNumberField
@@ -11,7 +13,7 @@ from localflavor.us.models import USStateField
 from functools import cached_property
 import hashlib
 from datetime import date, datetime
-from django.apps import apps
+
 
 # Create your models here.
 
@@ -46,6 +48,7 @@ class BeltRank(models.TextChoices):
     RED = 'red', 'Red'
 
 class User(AbstractUser):
+    email = models.EmailField(unique=True, blank=False, null=False)
     is_coach = models.BooleanField(
         _("coach status"),
         default=False,
@@ -95,7 +98,7 @@ class Contact(models.Model):
     member = models.ForeignKey("Member", related_name='contacts', on_delete=models.CASCADE)
     name = models.CharField(max_length=100)
     phone = models.CharField(max_length=20, blank=True, null=True)
-    email = models.EmailField(blank=True, null=True)
+    email = models.EmailField(blank=True, null=True, db_index=True)
     relationship = models.CharField(max_length=50, choices=RELATIONSHIP_TYPES, default='parent')
     contact_type = models.CharField(max_length=20, choices=CONTACT_TYPES, default='responsible')
 
@@ -127,6 +130,8 @@ class Member(models.Model):
 
     first_name = models.CharField(max_length=150)
     last_name = models.CharField(max_length=150)
+    email = models.EmailField(blank=True, null=True)
+
     gender = models.CharField(max_length=20, choices = GENDER, null=True, blank=True)
     date_of_birth = models.DateField()
     join_date = models.DateTimeField(auto_now_add=True)
@@ -164,11 +169,49 @@ class Member(models.Model):
             else WaiverSignature.ADULT
         )
     
-    def clean_member(self):
-        member = self.cleaned_data.get("member")
-        if not member:
-            raise forms.ValidationError("Please select a valid member.")
-        return member
+    
+    
+    
+    def clean(self):
+        super().clean()
+
+        # ----------------------------
+        # 1) CHILD MEMBER VALIDATION
+        # ----------------------------
+        if self.member_type == 'child':
+            has_responsible_contact_email = self.contacts.filter(
+                contact_type='responsible',
+                email__isnull=False
+            ).exclude(email='').exists()
+
+            has_user_email = bool(self.user and self.user.email)
+            has_member_email = bool(self.email)
+
+            if not (has_responsible_contact_email or has_user_email or has_member_email):
+                raise ValidationError(
+                    "A responsible contact email or linked user/member email is required for child members."
+                )
+
+        # ----------------------------
+        # 2) ADULT MEMBER VALIDATION
+        # ----------------------------
+        if self.member_type == 'adult':
+            has_user_email = bool(self.user and self.user.email)
+            has_member_email = bool(self.email)
+
+            if not (has_user_email or has_member_email):
+                raise ValidationError(
+                    "Adult members must have either a linked user email or a member email."
+                )
+
+        # ----------------------------
+        # 3) DATE OF BIRTH VALIDATION
+        # ----------------------------
+        if self.date_of_birth and self.date_of_birth > timezone.localdate():
+            raise ValidationError("Date of birth cannot be in the future.")
+
+
+
     
     @property
     def has_valid_waiver(self):
@@ -234,6 +277,34 @@ class Member(models.Model):
             return f"{years} year{'s' if years != 1 else ''}, {months} month{'s' if months != 1 else ''}"
         else:
             return f"{months} month{'s' if months != 1 else ''}"
+        
+
+    @property
+    def primary_email(self) -> str | None:
+        """
+        Returns the best email to contact about this member:
+        Priority:
+          1) Linked User email (if present)
+          2) Responsible contact email (first one with email)
+          3) Member.email (if set)
+        """
+        # 1) If member has a linked user with email, prefer it
+        if self.user and getattr(self.user, "email", None):
+            return self.user.email
+
+        # 2) Try responsible contact email
+        responsible = self.contacts.filter(
+            Q(contact_type='responsible') & Q(email__isnull=False) & ~Q(email__exact='')
+        ).first()
+        if responsible:
+            return responsible.email
+
+        # 3) Fallback to member.email
+        if getattr(self, "email", None):
+            return self.email
+
+        return None
+
 
 class Staff(models.Model):
     GENDER = [

@@ -56,7 +56,7 @@ ContactFormSet = inlineformset_factory(
 class MemberForm(forms.ModelForm):
 
     user = forms.ModelChoiceField(
-        queryset=User.objects.filter(is_active=True),
+        queryset=User.objects.filter(is_active=True, member__isnull=True),  # avoid users already linked to a Member
         required=False,
         help_text="Select an existing user (adult members only)"
     )
@@ -72,6 +72,7 @@ class MemberForm(forms.ModelForm):
             "user",
             "is_active",
             "member_type",
+            "email",
             "first_name",
             "last_name",
             "phone",
@@ -91,7 +92,7 @@ class MemberForm(forms.ModelForm):
         ]
         widgets = {
             'phone': forms.TextInput(attrs={'class': 'form-control'}),
-            "belt_rank":  USStateSelect(attrs={"class": "form-control"}),
+            "belt_rank":  forms.Select(attrs={"class": "form-control"}),
             "state": USStateSelect(attrs={"class": "form-control"}),
             "date_of_birth": forms.DateInput(attrs={"type": "date"}),
             "membership_start_date": forms.DateInput(attrs={"type": "date"}),
@@ -122,9 +123,6 @@ class MemberForm(forms.ModelForm):
                 # Option 1: disable the field
                 self.fields["phone"].widget.attrs["readonly"] = True
                 self.fields["phone"].widget.attrs["placeholder"] = "Optional for members under 21"
-
-    def __str__(self):
-        return f"{self.first_name} {self.last_name}"
 
     def clean(self):
         cleaned_data = super().clean()
