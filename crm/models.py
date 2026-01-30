@@ -170,10 +170,13 @@ class Member(models.Model):
         )
     
     
-    
-    
+        
     def clean(self):
         super().clean()
+
+        # 🚨 Prevent reverse relationship access before object is saved
+        if not self.pk:
+            return
 
         # ----------------------------
         # 1) CHILD MEMBER VALIDATION
@@ -209,6 +212,7 @@ class Member(models.Model):
         # ----------------------------
         if self.date_of_birth and self.date_of_birth > timezone.localdate():
             raise ValidationError("Date of birth cannot be in the future.")
+
 
 
 
