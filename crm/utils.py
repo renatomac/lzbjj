@@ -58,11 +58,11 @@ def create_attendance_for_period(days_ahead=30):
     
 def create_attendance_for_session(session):
     if session.class_template.type == 'open':
-        active_members = Member.objects.filter(is_active = True)
+        active_members = Member.objects.filter(is_active = True).order_by('first_name', 'last_name')
     elif session.class_template.type == 'adult':
-        active_members = Member.objects.filter(is_active = True, member_type='adult')
+        active_members = Member.objects.filter(is_active = True, member_type='adult').order_by('first_name', 'last_name')
     elif session.class_template.type == 'kids':
-        active_members = Member.objects.filter(is_active = True, member_type='child')
+        active_members = Member.objects.filter(is_active = True, member_type='child').order_by('first_name', 'last_name')
 
     for member in active_members:
         SessionAttendance.objects.get_or_create(
@@ -104,52 +104,8 @@ def edit_future_sessions(class_id):
             if updated:
                 session.save()
 
-
         
 # REGENERATE CLASS SESSIONS WHEN YOU CHANGE THE CLASS DATE
-
-'''def regenerate_future_sessions(class_id):
-    today = timezone.localdate()
-    template_class = get_object_or_404(Class, id=class_id)
-
-    target_weekdays = {
-        WEEKDAY_MAP[d] for d in template_class.days_of_week
-    }
-
-    future_sessions = ClassSession.objects.filter(
-        class_template=template_class,
-        date__gte=today,
-    )
-
-    existing_dates = {
-        s.date: s for s in future_sessions
-    }
-
-    with transaction.atomic():
-
-        # 1️⃣ Remove sessions on invalid weekdays
-        for session in future_sessions:
-            if session.date.weekday() not in target_weekdays:
-                # Optional: skip manually edited or canceled sessions
-                if session.is_canceled:
-                    continue
-                session.delete()
-
-        # 2️⃣ Create missing sessions (next X weeks)
-        end_date = template_class.end_date or (today + timedelta(weeks=12))
-        current = max(today, template_class.start_date)
-
-        while current <= end_date:
-            if current.weekday() in target_weekdays:
-                if current not in existing_dates:
-                    ClassSession.objects.create(
-                        class_template=template_class,
-                        date=current,
-                        start_time=None,
-                        end_time=None,
-                        instructor=None,
-                    )
-            current += timedelta(days=1)'''
 
 def regenerate_future_sessions(class_id):
     today = timezone.localdate()

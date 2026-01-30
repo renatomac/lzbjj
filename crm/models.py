@@ -1,4 +1,4 @@
-from django.db import models
+from django.db import models, transaction
 from django.contrib.auth.models import AbstractUser, Group, Permission
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
@@ -213,9 +213,6 @@ class Member(models.Model):
         if self.date_of_birth and self.date_of_birth > timezone.localdate():
             raise ValidationError("Date of birth cannot be in the future.")
 
-
-
-
     
     @property
     def has_valid_waiver(self):
@@ -308,6 +305,70 @@ class Member(models.Model):
             return self.email
 
         return None
+    
+    def sync_future_sessions(self):
+        """
+        Ensure this member is enrolled ONLY in the future sessions
+        they are allowed to attend based on member_type and membership dates.
+        """
+        today = timezone.localdate()
+
+        # Optional: handle inactive members
+        if not self.is_active:
+            removed = SessionAttendance.objects.filter(
+                member=self,
+                session__date__gte=today,
+            ).delete()[0]
+            return {"added": 0, "removed": removed}
+
+        # Determine allowed class types
+        if self.member_type == "child":
+            allowed_types = ["kids"]
+        else:
+            allowed_types = ["adult", "open"]
+
+        with transaction.atomic():
+            # Remove invalid future attendance
+            future_attendance = SessionAttendance.objects.filter(
+                member=self,
+                session__date__gte=today,
+            )
+
+            removed_count = future_attendance.exclude(
+                session__class_template__type__in=allowed_types
+            ).delete()[0]
+
+            # Add missing attendance
+            allowed_sessions = ClassSession.objects.filter(
+                class_template__type__in=allowed_types,
+                date__gte=today,
+                is_canceled=False,
+            )
+
+            if self.membership_start_date:
+                allowed_sessions = allowed_sessions.filter(
+                    date__gte=self.membership_start_date
+                )
+
+            if self.membership_end_date:
+                allowed_sessions = allowed_sessions.filter(
+                    date__lte=self.membership_end_date
+                )
+
+            created_count = 0
+            for session in allowed_sessions:
+                _, created = SessionAttendance.objects.get_or_create(
+                    session=session,
+                    member=self,
+                    defaults={"present": False},
+                )
+                if created:
+                    created_count += 1
+
+        return {
+            "added": created_count,
+            "removed": removed_count,
+        }
 
 
 class Staff(models.Model):

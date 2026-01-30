@@ -338,7 +338,6 @@ def addMember(request):
         })
 
 def editMember(request, member_id):
-
     member = get_object_or_404(Member, pk=member_id)
     ContactFormSet = inlineformset_factory(
         Member, Contact, form=ContactForm, extra=1, can_delete=True
@@ -557,11 +556,11 @@ def attendanceRecord(request, session_id):
 
     if session.is_canceled == False:
         if filter == "all":
-            attending_list = SessionAttendance.objects.filter(session = sessionSelected)
+            attending_list = SessionAttendance.objects.filter(session=sessionSelected).order_by('member__first_name', 'member__last_name')
         elif filter == "checked":
-            attending_list = SessionAttendance.objects.filter(session = sessionSelected, present = True)
+            attending_list = SessionAttendance.objects.filter(session=sessionSelected, present=True).order_by('member__first_name', 'member__last_name')
         else:
-            attending_list = SessionAttendance.objects.filter(session = sessionSelected, present = False)
+            attending_list = SessionAttendance.objects.filter(session=sessionSelected, present=False).order_by('member__first_name', 'member__last_name')
     else:
         attending_list = None
 
@@ -569,8 +568,6 @@ def attendanceRecord(request, session_id):
     technics = Technique.objects.all().values()
     techniques = SessionTechnique.objects.filter(session=session).select_related("technique")
     names = [st.technique.name for st in techniques if st.technique]
-
-
 
     return render(request, "attendance/attendance.html", {
     "session":session,
