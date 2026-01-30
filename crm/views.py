@@ -83,16 +83,9 @@ def index(request):
 
         total_members_with_belts = sum(item["count"] for item in belt_counts)
 
-        belt_distribution = {}
-        if total_members_with_belts > 0:
-            for item in belt_counts:
-                belt = item["belt_rank"]
-                count = item["count"]
-                belt_distribution[belt] = round((count / total_members_with_belts) * 100, 2)
-
         return render(request, "dashboard/index.html", {
             "summary" : summary,
-            "belt_distribution":belt_distribution,
+            "belt_distribution":belt_distribution(),
 
             })
         # Everyone else is prompted to sign in
@@ -180,8 +173,8 @@ def dashboard(request):
         newMembers=Member.objects.filter(membership_start_date__gte = oneMonthLess).values()
         newMembersCount=Member.objects.filter(membership_start_date__gte = oneMonthLess).count()
         # membership exping in the next 30 days
-        expiring= Member.objects.filter(membership_start_date__lt = oneMonthMore ).values()
-        expiringCount= Member.objects.filter(membership_start_date__lt = oneMonthMore ).count()
+        expiring= Member.objects.filter(membership_end_date__lt = oneMonthMore ).values()
+        expiringCount= Member.objects.filter(membership_end_date__lt = oneMonthMore ).count()
         classesCount = classesThisWeek()
         # members age
         members_age = [
@@ -213,16 +206,9 @@ def dashboard(request):
 
         total_members_with_belts = sum(item["count"] for item in belt_counts)
 
-        belt_distribution = {}
-        if total_members_with_belts > 0:
-            for item in belt_counts:
-                belt = item["belt_rank"]
-                count = item["count"]
-                belt_distribution[belt] = round((count / total_members_with_belts) * 100, 2)
-
         return render(request, "dashboard/index.html", {
             "summary" : summary,
-            "belt_distribution":belt_distribution,
+            "belt_distribution":belt_distribution(),
 
             })
         # Everyone else is prompted to sign in

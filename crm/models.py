@@ -47,6 +47,33 @@ class BeltRank(models.TextChoices):
     RED_WHITE = 'red-white', 'Red & White'
     RED = 'red', 'Red'
 
+ADULT_BELT_ORDER = [
+    BeltRank.WHITE,
+    BeltRank.BLUE,
+    BeltRank.PURPLE,
+    BeltRank.BROWN,
+    BeltRank.BLACK,
+    BeltRank.RED_BLACK,
+    BeltRank.RED_WHITE,
+    BeltRank.RED,
+]
+
+KID_BELT_ORDER = [
+    BeltRank.WHITE,
+    BeltRank.GRAY_WHITE,
+    BeltRank.GRAY,
+    BeltRank.GRAY_BLACK,
+    BeltRank.YELLOW_WHITE,
+    BeltRank.YELLOW,
+    BeltRank.YELLOW_BLACK,
+    BeltRank.ORANGE_WHITE,
+    BeltRank.ORANGE,
+    BeltRank.ORANGE_BLACK,
+    BeltRank.GREEN_WHITE,
+    BeltRank.GREEN,
+    BeltRank.GREEN_BLACK,
+]
+
 class User(AbstractUser):
     email = models.EmailField(unique=True, blank=False, null=False)
     is_coach = models.BooleanField(
@@ -382,54 +409,61 @@ class Staff(models.Model):
         on_delete=models.CASCADE,
         related_name="staff",
     )
+    member_profile = models.OneToOneField(
+        "Member",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="staff_profile",
+        help_text="Optional link if staff also trains as a member"
+    )
+
     is_active = models.BooleanField(default=True)
     first_name = models.CharField(max_length=150)
     last_name = models.CharField(max_length=150)
-    role = models.CharField(max_length=120)
-    gender = models.CharField(max_length=20, choices = GENDER, null=True, blank=True)
+    role = models.CharField(max_length=120)  # e.g., Instructor, Assistant
+    gender = models.CharField(max_length=20, choices=GENDER, null=True, blank=True)
     address = models.CharField(max_length=200, null=True, blank=True)
     city = models.CharField(max_length=100, null=True, blank=True)
     state = models.CharField(max_length=50, null=True, blank=True)
     zip_code = models.CharField(max_length=10, null=True, blank=True)
     date_of_birth = models.DateField(null=True, blank=True)
     join_date = models.DateField()
+    photo = models.CharField(max_length=200, null=True, blank=True)
+
+    # Optional belt info if staff doesn't have a member profile
     belt_rank = models.CharField(max_length=50, choices=BeltRank.choices, default=BeltRank.WHITE)
     stripes = models.SmallIntegerField(validators=[MinValueValidator(0), MaxValueValidator(12)], default=0)
-    photo = models.CharField(max_length=200, null=True, blank=True)
 
     def __str__(self):
         if self.user:
-            return f"{self.first_name}  {self.last_name}"
+            return f"{self.first_name} {self.last_name}"
         return f"Staff #{self.id} ({self.role})"
-    
+
     @property
     def age(self):
-        """Return the member's age in years."""
-        if not self.date_of_birth:
-            return None  # or 0 if you prefer
+        """Return the staff's age in years."""
+        dob = self.date_of_birth or (self.member_profile.date_of_birth if self.member_profile else None)
+        if not dob:
+            return None
 
         today = timezone.localdate()
-        years = today.year - self.date_of_birth.year
-
-        # Subtract one if birthday hasn't happened yet this year
-        if (today.month, today.day) < (self.date_of_birth.month, self.date_of_birth.day):
+        years = today.year - dob.year
+        if (today.month, today.day) < (dob.month, dob.day):
             years -= 1
-
         return years
 
     @property
     def age_with_months(self):
-        """
-        Return the member's age as a string, e.g., '12 years, 3 months'.
-        Works for adults and kids.
-        """
-        if not self.date_of_birth:
+        """Return age as 'X years, Y months'."""
+        dob = self.date_of_birth or (self.member_profile.date_of_birth if self.member_profile else None)
+        if not dob:
             return None
 
         today = date.today()
-        years = today.year - self.date_of_birth.year
-        months = today.month - self.date_of_birth.month
-        days = today.day - self.date_of_birth.day
+        years = today.year - dob.year
+        months = today.month - dob.month
+        days = today.day - dob.day
 
         if days < 0:
             months -= 1
@@ -441,6 +475,20 @@ class Staff(models.Model):
             return f"{years} year{'s' if years != 1 else ''}, {months} month{'s' if months != 1 else ''}"
         else:
             return f"{months} month{'s' if months != 1 else ''}"
+
+    @property
+    def effective_belt_rank(self):
+        """Return belt rank from member profile if available, else staff field."""
+        if self.member_profile:
+            return self.member_profile.belt_rank
+        return self.belt_rank
+
+    @property
+    def effective_stripes(self):
+        """Return stripes from member profile if available, else staff field."""
+        if self.member_profile:
+            return self.member_profile.stripes
+        return self.stripes
 
 
 class Plan(models.Model):
@@ -680,10 +728,16 @@ class BeltPromotion(models.Model):
         related_name="belt_promotions",
     )
     old_rank = models.CharField(max_length=50, choices=BeltRank.choices)
-    old_stripes = models.SmallIntegerField(validators=[MinValueValidator(0), MaxValueValidator(12)], default=0)
+    old_stripes = models.SmallIntegerField(
+        validators=[MinValueValidator(0), MaxValueValidator(12)],
+        default=0
+    )
     new_rank = models.CharField(max_length=50, choices=BeltRank.choices)
-    new_stripes = models.SmallIntegerField(validators=[MinValueValidator(0), MaxValueValidator(12)], default=0)
-    promotion_date = models.DateField(auto_now_add=False)
+    new_stripes = models.SmallIntegerField(
+        validators=[MinValueValidator(0), MaxValueValidator(12)],
+        default=0
+    )
+    promotion_date = models.DateField()
     promoted_by = models.ForeignKey(
         "Staff",
         on_delete=models.SET_NULL,
@@ -693,6 +747,50 @@ class BeltPromotion(models.Model):
     notes = models.TextField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    # ----------------------------
+    # Belt helpers
+    # ----------------------------
+    @staticmethod
+    def belt_index(belt):
+        return BELT_ORDER.index(belt)
+
+    @staticmethod
+    def is_higher_belt(old, new):
+        return BeltPromotion.belt_index(new) > BeltPromotion.belt_index(old)
+
+    # ----------------------------
+    # Validation
+    # ----------------------------
+    def clean(self):
+        super().clean()
+
+        if not self.old_rank or not self.new_rank:
+            return
+
+        # 1️⃣ Belt rank must move forward
+        if self.belt_index(self.new_rank) < self.belt_index(self.old_rank):
+            raise ValidationError(
+                {"new_rank": "New belt rank cannot be lower than the current rank."}
+            )
+
+        # 2️⃣ Same belt → stripes must increase
+        if self.new_rank == self.old_rank:
+            if self.new_stripes <= self.old_stripes:
+                raise ValidationError(
+                    {"new_stripes": "Stripes must increase when promoting within the same belt."}
+                )
+
+        # 3️⃣ New belt → stripes must reset
+        if self.new_rank != self.old_rank and self.new_stripes != 0:
+            raise ValidationError(
+                {"new_stripes": "Stripes must be 0 when moving to a new belt."}
+            )
+        
+    def save(self, *args, **kwargs):
+        if not self.old_rank:
+            self.old_rank = self.member.belt_rank
+            self.old_stripes = self.member.stripes
+        super().save(*args, **kwargs)
 
 
 class Curriculum(models.Model):

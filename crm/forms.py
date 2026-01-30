@@ -5,12 +5,13 @@ from django.forms import inlineformset_factory
 from django.db import transaction
 from django.utils import timezone
 from datetime import timedelta, date
+from dateutil.relativedelta import relativedelta
 from localflavor.us.forms import USStateSelect
 from phonenumber_field.formfields import PhoneNumberField
 from .models import (
     User, Member, Staff, Plan, Membership, Payment,
     Class, Attendance, BeltPromotion, Contact,BeltRank,WaiverSignature, 
-    SessionAttendance, ClassSession, 
+    SessionAttendance, ClassSession, BeltPromotion, ADULT_BELT_ORDER, KID_BELT_ORDER
 )
 
 User = get_user_model()
@@ -109,6 +110,8 @@ class MemberForm(forms.ModelForm):
             self.fields["belt_rank"].initial = "white"
             self.fields["stripes"].initial = 0
             self.fields["is_active"].initial = True
+            self.fields["membership_start_date"].initial = timezone.localdate()
+            self.fields["membership_end_date"].initial = timezone.localdate() + relativedelta(months=12)
 
         # Hide user field for children
         if self.instance.pk and self.instance.member_type == "child":
@@ -117,7 +120,7 @@ class MemberForm(forms.ModelForm):
         # Disable or hide phone if under 21
         dob = self.initial.get("date_of_birth") or getattr(self.instance, "date_of_birth", None)
         if dob:
-            today = date.today()
+            today = timezone.localdate()
             age = today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
             if age < 21:
                 # Option 1: disable the field
@@ -301,40 +304,88 @@ class AttendanceForm(forms.ModelForm):
 class BeltPromotionForm(forms.ModelForm):
     class Meta:
         model = BeltPromotion
-        fields = ['member', 'old_rank','old_stripes', 'new_rank',  'new_stripes', 'promotion_date', 'promoted_by', 'notes']
+        exclude = ["member"]
 
-        widgets = {
-                'promotion_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
-            }
-
-    def clean_promotion_date(self):
-        promotion_date = self.cleaned_data.get('promotion_date')
-        today = timezone.localdate()  # gives current date as datetime.date
-        if promotion_date > today:
-            raise forms.ValidationError("Promotion date cannot be in the future.")
-        return promotion_date
-
-    def __init__(self, *args, **kwargs):
-        member = kwargs.pop("member", None)
+    def __init__(self, *args, member=None, **kwargs):
         super().__init__(*args, **kwargs)
+        self.member = member
 
-        self.fields["member"].initial = member
+        if not member:
+            return
+
+        # ----------------------------
+        # Prefill old values
+        # ----------------------------
         self.fields["old_rank"].initial = member.belt_rank
         self.fields["old_stripes"].initial = member.stripes
-        self.fields["new_rank"].initial = member.belt_rank
-        self.fields["new_stripes"].initial = member.stripes
+
+        # ----------------------------
+        # Prefill promotion date
+        # ----------------------------
         self.fields["promotion_date"].initial = timezone.localdate()
-        self.fields["member"].disabled = True
-        self.fields["old_rank"].disabled = True
-        self.fields["old_stripes"].disabled = True
 
-        self.fields.pop("member")
+        # ----------------------------
+        # Make old values read-only
+        # ----------------------------
+        for field in ("old_rank", "old_stripes"):
+            self.fields[field].disabled = True
 
-        self.fields['new_rank'] = forms.ChoiceField(
-            choices=BeltRank.choices,
-            label="New Rank",
-            widget=forms.Select(attrs={'class': 'form-select'})
-        )
+        # ----------------------------
+        # Restrict new_rank choices
+        # ----------------------------
+        belt_order = KID_BELT_ORDER if member.member_type == "child" else ADULT_BELT_ORDER
+        try:
+            current_index = belt_order.index(member.belt_rank)
+        except ValueError:
+            current_index = 0
+
+        # Allow only current belt or next belt
+        allowed_ranks = belt_order[current_index : ]
+
+        # Map to (value, label) for choices
+        choices_dict = dict(self.fields["new_rank"].choices)
+        self.fields["new_rank"].choices = [
+            (rank, choices_dict.get(rank, rank))
+            for rank in allowed_ranks
+        ]
+
+        # Optional: limit stripes to 0-12
+        self.fields["new_stripes"].widget.attrs["min"] = 0
+        self.fields["new_stripes"].widget.attrs["max"] = 12
+
+    def clean(self):
+        cleaned = super().clean()
+
+        old_rank = cleaned.get("old_rank")
+        new_rank = cleaned.get("new_rank")
+        old_stripes = cleaned.get("old_stripes")
+        new_stripes = cleaned.get("new_stripes")
+
+        member = getattr(self, "member", None)
+        if not member or not old_rank or not new_rank:
+            return cleaned
+
+        belt_order = KID_BELT_ORDER if member.member_type == "child" else ADULT_BELT_ORDER
+
+        # ----------------------------
+        # Prevent demotion
+        # ----------------------------
+        if belt_order.index(new_rank) < belt_order.index(old_rank):
+            self.add_error("new_rank", "You cannot demote a belt.")
+
+        # ----------------------------
+        # Stripes must increase if same belt
+        # ----------------------------
+        if new_rank == old_rank and new_stripes <= old_stripes:
+            self.add_error("new_stripes", "Stripes must increase when staying in the same belt.")
+
+        # ----------------------------
+        # Reset stripes when moving to new belt
+        # ----------------------------
+        if new_rank != old_rank:
+            cleaned["new_stripes"] = 0
+
+        return cleaned
 
 
 # WAIVER FORMS

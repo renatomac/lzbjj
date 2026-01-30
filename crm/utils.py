@@ -5,6 +5,7 @@ from django.db import transaction
 from django.db.models import Count
 from django.db.models.functions import ExtractDay
 from django.utils import timezone
+from .models import ADULT_BELT_ORDER, KID_BELT_ORDER
 
 WEEKDAY_CODES = ['mon','tue','wed','thu','fri','sat','sun']
 WEEKDAY_MAP = {
@@ -165,18 +166,61 @@ def adult_kids_distrib():
     return distribution
 
 
-def belt_distrib():
-    belt_counts = (Member.objects.values("belt_rank").annotate(count=Count("id")))
+def belt_distribution():
+    distribution = {}
 
-    total_members_with_belts = sum(item["count"] for item in belt_counts)
+    # -----------------------
+    # Adult distribution
+    # -----------------------
+    adult_counts = (
+        Member.objects
+        .filter(member_type="adult")
+        .values("belt_rank")
+        .annotate(count=Count("id"))
+    )
+    adult_counts_dict = {item["belt_rank"]: item["count"] for item in adult_counts}
+    total_adults = sum(adult_counts_dict.values())
 
-    belt_distribution = {}
-    if total_members_with_belts > 0:
-        for item in belt_counts:
-            belt = item["belt_rank"]
-            count = item["count"]
-            belt_distribution[belt] = round((count / total_members_with_belts) * 100, 2)
-    return belt_distribution
+    adult_distribution = []
+    for rank in ADULT_BELT_ORDER:
+        count = adult_counts_dict.get(rank, 0)
+        if count == 0:
+            continue
+        percent = round((count / total_adults) * 100, 2) if total_adults > 0 else 0
+        adult_distribution.append({
+            "belt": rank,
+            "count": count,
+            "percent": percent,
+        })
+
+    # -----------------------
+    # Kid distribution
+    # -----------------------
+    kid_counts = (
+        Member.objects
+        .filter(member_type="child")
+        .values("belt_rank")
+        .annotate(count=Count("id"))
+    )
+    kid_counts_dict = {item["belt_rank"]: item["count"] for item in kid_counts}
+    total_kids = sum(kid_counts_dict.values())
+
+    kid_distribution = []
+    for rank in KID_BELT_ORDER:
+        count = kid_counts_dict.get(rank, 0)
+        if count == 0:
+            continue
+        percent = round((count / total_kids) * 100, 2) if total_kids > 0 else 0
+        kid_distribution.append({
+            "belt": rank,
+            "count": count,
+            "percent": percent,
+        })
+
+    distribution["adult"] = adult_distribution
+    distribution["kid"] = kid_distribution
+
+    return distribution
 
 def birthdays_of_the_month():
     today = timezone.localdate()
