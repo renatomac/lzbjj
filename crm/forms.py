@@ -1,6 +1,7 @@
 from django import forms
 from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
 from django.contrib.auth import get_user_model
+from django.contrib import messages
 from django.forms import inlineformset_factory
 from django.db import transaction
 from django.utils import timezone
@@ -13,6 +14,9 @@ from .models import (
     Class, Attendance, BeltPromotion, Contact,BeltRank,WaiverSignature, 
     SessionAttendance, ClassSession, BeltPromotion, ADULT_BELT_ORDER, KID_BELT_ORDER
 )
+import logging
+
+logger = logging.getLogger(__name__)
 
 User = get_user_model()
 
@@ -574,23 +578,23 @@ class WaiverEditForm(forms.ModelForm):
             "signature": forms.TextInput(attrs={"class": "form-control", "readonly": True}),
         }
 
+    
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # flag to communicate a non-blocking warning to the view
+        self._name_mismatch = False
 
-        self.waiver = kwargs.get("instance")
-
-        # Lock signature and agreed
+        # your existing init code (locking fields, hiding guardians for adults, etc.)
         self.fields["signature"].disabled = True
         self.fields["agreed"].disabled = True
 
-        # Hide guardian fields for adults
-        if self.waiver and self.waiver.participant_type == WaiverSignature.ADULT:
+        if self.instance and self.instance.participant_type == WaiverSignature.ADULT:
             for field in ["guardian_first_name", "guardian_last_name", "guardian_relationship"]:
                 self.fields.pop(field, None)
 
-        # Pre-fill member search if exists
-        if self.waiver and self.waiver.member:
-            self.fields["member_search"].initial = str(self.waiver.member)
+        if self.instance and self.instance.member:
+            self.fields["member_search"].initial = str(self.instance.member)
+
 
     def clean_signature(self):
         # Prevent changing signature
@@ -600,14 +604,21 @@ class WaiverEditForm(forms.ModelForm):
         # Prevent changing agreed checkbox
         return self.instance.agreed
 
+    
     def clean_member(self):
         member = self.cleaned_data.get("member")
-        # Warning: participant name differs from member
+        # Non-blocking check: record a warning if participant name differs from member
         if member:
-            participant_name = f"{self.cleaned_data.get('participant_first_name', '')} {self.cleaned_data.get('participant_last_name', '')}".strip()
-            if participant_name.lower() != str(member).lower():
-                raise forms.ValidationError(
-                    "Warning: Participant name does not match selected member!"
-                )
+            pf = (self.cleaned_data.get("participant_first_name") or "").strip().casefold()
+            pl = (self.cleaned_data.get("participant_last_name") or "").strip().casefold()
+            # Compare against member's actual first/last (more reliable than str(member))
+            mf = (getattr(member, "first_name", "") or "").strip().casefold()
+            ml = (getattr(member, "last_name", "") or "").strip().casefold()
+
+            if pf and pl and (pf != mf or pl != ml):
+                # set a flag instead of raising ValidationError
+                self._name_mismatch = True
+
         return member
+
 

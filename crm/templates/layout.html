@@ -188,6 +188,22 @@
             {% endfor %}
         </div>
         {% endif %}
+        
+        {% if form.errors or form.non_field_errors %}
+        <div class="alert alert-danger" role="alert">
+            <strong>There were errors:</strong>
+            <ul class="mb-0">
+            {% for field in form %}
+                {% for error in field.errors %}
+                <li><strong>{{ field.label }}:</strong> {{ error }}</li>
+                {% endfor %}
+            {% endfor %}
+            {% for error in form.non_field_errors %}
+                <li>{{ error }}</li>
+            {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
 
         <main class="flex-grow-1 overflow-auto bg-body-secondary p-4">
             {% block content %}{% endblock %}

@@ -20,6 +20,10 @@ from crm.utils import *
 from datetime import date
 from django.db.models.functions import ExtractYear, ExtractMonth
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 WEEKDAY_CODES = ['mon','tue','wed','thu','fri','sat','sun']
 
@@ -1180,30 +1184,35 @@ def waiver_pdf(request, pk):
         "waiver": signature.waiver_version,
     })
 
+
 def waiver_edit(request, pk):
     waiver = get_object_or_404(WaiverSignature, pk=pk, is_void=False)
 
     if request.method == "POST":
-        form = WaiverEditForm(request.POST, instance=waiver)
+        form = WaiverEditForm(request.POST, request.FILES or None, instance=waiver)
         if form.is_valid():
-            waiver = form.save()
+            instance = form.save()
 
-            # ensure related member reflects the change
-            if waiver.member:
-                waiver.member.save(update_fields=["updated_at"])
+            # Non-blocking warning coming from the form
+            if getattr(form, "_name_mismatch", False):
+                messages.warning(
+                    request,
+                    "Participant name does not match the selected member. Please confirm this is intentional."
+                )
 
-            return redirect("waiver_detail", pk=waiver.pk)
+            if instance.member:
+                instance.member.save(update_fields=["updated_at"])
+
+            messages.success(request, "Waiver updated successfully.")
+            return redirect("waiver_detail", pk=instance.pk)
+        else:
+            logger.warning("WaiverEditForm invalid for pk=%s: %s", pk, form.errors.as_json())
+            messages.error(request, "Please correct the errors below.")
     else:
         form = WaiverEditForm(instance=waiver)
 
-    return render(
-        request,
-        "waiver/edit.html",
-        {
-            "waiver": waiver,
-            "form": form,
-        }
-    )
+    return render(request, "waiver/edit.html", {"waiver": waiver, "form": form})
+
 
 def waiver_delete(request, pk):
     waiver = get_object_or_404(WaiverSignature, pk=pk, is_void=False)
