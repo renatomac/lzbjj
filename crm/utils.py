@@ -5,6 +5,7 @@ from django.db import transaction
 from django.db.models import Count
 from django.db.models.functions import ExtractDay
 from django.utils import timezone
+from dateutil.relativedelta import relativedelta
 from .models import ADULT_BELT_ORDER, KID_BELT_ORDER
 
 WEEKDAY_CODES = ['mon','tue','wed','thu','fri','sat','sun']
@@ -169,15 +170,21 @@ def adult_kids_distrib():
 def belt_distribution():
     distribution = {}
 
+    
+    # Age cutoff for adults (According to the IBJJF - 15 years old)
+    cutoff = date.today() - relativedelta(years=15)
+
     # -----------------------
-    # Adult distribution
+    # Adult distribution (age >= 15)
     # -----------------------
+    
     adult_counts = (
         Member.objects
-        .filter(member_type="adult")
+        .filter(date_of_birth__lte=cutoff, is_active=True)
         .values("belt_rank")
         .annotate(count=Count("id"))
     )
+
     adult_counts_dict = {item["belt_rank"]: item["count"] for item in adult_counts}
     total_adults = sum(adult_counts_dict.values())
 
@@ -198,7 +205,7 @@ def belt_distribution():
     # -----------------------
     kid_counts = (
         Member.objects
-        .filter(member_type="child")
+        .filter(date_of_birth__gt=cutoff, is_active=True)
         .values("belt_rank")
         .annotate(count=Count("id"))
     )
