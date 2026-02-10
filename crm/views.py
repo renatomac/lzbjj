@@ -284,7 +284,8 @@ def members(request):
             'phone': m.phone,
             'age': m.age,  # use the property directly
             'is_active': m.is_active,
-            'belt_rank': m.belt_rank,
+            'belt_rank': makeRank(m.belt_rank,m.stripes),
+            'belt_color': m.belt_rank,
         }
         for m in all_members
     ]
@@ -433,9 +434,10 @@ def addPromotion(request, member_id):
 def makeRank(belt, stripes):
     belt = belt + ' belt'
     for x in range(stripes):
-        belt = belt + " \u25CF"
+        belt = belt + " \u235F"
     belt = belt.capitalize()
     return belt
+    
 
 
 def addClasses(request):

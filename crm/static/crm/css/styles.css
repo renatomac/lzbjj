@@ -143,7 +143,7 @@ body {
   background-image: var(--belt-gradient, none);
   background-size: 200% 100%;
   background-position: 100% 0;
-  border: 1px solid var(--belt-bg);
+  border: 1px solid var(--belt-border);
   padding: 0.5rem 1rem;
   border-radius: 0.25rem;
 }
@@ -161,36 +161,42 @@ body {
   --belt-bg: #ffffff;
   --belt-text: #000000;
   --belt-name: "White Belt";
+  --belt-border: #000000;
 }
 
 .blue-belt {
   --belt-bg: #007bff;
   --belt-text: #ffffff;
   --belt-name: "Blue Belt";
+  --belt-border: #007bff;
 }
 
 .purple-belt {
   --belt-bg: #6a0dad;
   --belt-text: #ffffff;
   --belt-name: "Purple Belt";
+  --belt-border: #6a0dad;
 }
 
 .brown-belt {
   --belt-bg: #7d5b4a;
   --belt-text: #ffffff;
   --belt-name: "Brown Belt";
+  --belt-border:
 }
 
 .black-belt {
   --belt-bg: #000000;
   --belt-text: #ffffff;
   --belt-name: "Black Belt";
+  --belt-border: #000000;
 }
 
 .red-white-belt {
   --belt-bg: #ff0000;
   --belt-text: #000000;
   --belt-name: "Red/White Belt";
+  --belt-border: #ff0000;
   --belt-gradient: linear-gradient(to right, #ffffff 3%,#ff0000 97% );
 }
 
@@ -198,6 +204,7 @@ body {
   --belt-bg: #ff0000;
   --belt-text: #000000;
   --belt-name: "Red/Black Belt (CORAL)";
+  --belt-border: #ff0101;
   --belt-gradient: linear-gradient(to right, #000000 3%, #ff0101 97%);
 }
 
@@ -205,6 +212,7 @@ body {
   --belt-bg: #ff0000;
   --belt-text: #000000;
   --belt-name: "Red Belt";
+  --belt-border: #ff0000;
 }
 /* =========================================================
    KIDS BELTS – GRAY
@@ -214,6 +222,7 @@ body {
   --belt-bg: #555454;
   --belt-text: #ffffff;
   --belt-name: "Gray / White Belt";
+  --belt-border: #555454;
   --belt-gradient: linear-gradient(to right, #f7f7f7 3%, #555454 97%);
 }
 
@@ -221,12 +230,14 @@ body {
   --belt-bg: #555454;
   --belt-text: #ffffff;
   --belt-name: "Gray Belt";
+  --belt-border: #555454;
 }
 
 .gray-black-belt {
   --belt-bg: #555454;
   --belt-text: #ffffff;
   --belt-name: "Gray / Black Belt";
+  --belt-border: #555454;
   --belt-gradient: linear-gradient(to right, #000000 3%, #555454 97%);
 }
 
@@ -238,6 +249,7 @@ body {
   --belt-bg: #f8e90f;
   --belt-text: #000000;
   --belt-name: "Yellow / White Belt";
+  --belt-border: #f8e90f;
   --belt-gradient: linear-gradient(to right, #f7f7f7 2%, #f8e90f 97%);
 }
 
@@ -245,12 +257,14 @@ body {
   --belt-bg: #f8e90f;
   --belt-text: #000000;
   --belt-name: "Yellow Belt";
+  --belt-border: #f8e90f;
 }
 
 .yellow-black-belt {
   --belt-bg: #f8e90f;
   --belt-text: #000000;
   --belt-name: "Yellow / Black Belt";
+  --belt-border: #f8e90f;
   --belt-gradient: linear-gradient(to right, #000000 3%, #f8e90f 97%);
 }
 
@@ -262,6 +276,7 @@ body {
   --belt-bg: #ffa500;
   --belt-text: #000000;
   --belt-name: "Orange / White Belt";
+  --belt-border: #ffa500;
   --belt-gradient: linear-gradient(to right, #f7f7f7 3%, #ffa500 97%);
 }
 
@@ -269,12 +284,14 @@ body {
   --belt-bg: #ff8c00;
   --belt-text: #000000;
   --belt-name: "Orange Belt";
+  --belt-border: #ff8c00;
 }
 
 .orange-black-belt {
   --belt-bg: #ff8c00;
   --belt-text: #000000;
   --belt-name: "Orange / Black Belt";
+  --belt-border: #ff8c00;
   --belt-gradient: linear-gradient(to right, #000000 3%, #ff8c00 97%);
 }
 
@@ -286,6 +303,7 @@ body {
   --belt-bg: #0bc20b;
   --belt-text: #ffffff;
   --belt-name: "Green / White Belt";
+  --belt-border:  #0bc20b;
   --belt-gradient: linear-gradient(to right, #f7f7f7 3%, #0bc20b 97%);
 }
 
@@ -293,12 +311,14 @@ body {
   --belt-bg: #0bc20b;
   --belt-text: #ffffff;
   --belt-name: "Green Belt";
+  --belt-border: #0bc20b;
 }
 
 .green-black-belt {
   --belt-bg: #0bc20b;
   --belt-text: #ffffff;
   --belt-name: "Green / Black Belt";
+  --belt-border: #0bc20b;
   --belt-gradient: linear-gradient(to right, #000000 3%, #0bc20b 97%);
 }
 

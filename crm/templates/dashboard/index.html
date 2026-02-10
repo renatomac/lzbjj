@@ -197,7 +197,7 @@
                             <div class="col-2 text-muted small">{{ item.belt|title }}</div>
                             <div class="col-8">
                                 <div class="progress border" role="progressbar" aria-label="{{ item.belt|title }} belt distribution" aria-valuenow="{{ item.percent|floatformat:0 }}" aria-valuemin="0" aria-valuemax="100" style="height: 1rem;">
-                                    <div class="progress-bar belt {{ item.belt }}-belt" style="width: {{ item.percent|floatformat:0 }}%;">
+                                    <div class="progress-bar belt {{ item.belt }}-belt" style="width: {{ item.percent|floatformat:0 }}%">
                                         {{ item.percent|floatformat:0 }}%
                                     </div>
                                 </div>
@@ -214,7 +214,7 @@
                             <div class="col-2 text-muted small">{{ item.belt|title }}</div>
                             <div class="col-8">
                                 <div class="progress border" role="progressbar" aria-label="{{ item.belt|title }} belt distribution" aria-valuenow="{{ item.percent|floatformat:0 }}" aria-valuemin="0" aria-valuemax="100" style="height: 1rem;">
-                                    <div class="progress-bar belt {{ item.belt }}-belt" style="width: {{ item.percent|floatformat:0 }}%;">
+                                    <div class="progress-bar belt {{ item.belt }}-belt" style="width: {{ item.percent|floatformat:0 }}%">
                                         {{ item.percent|floatformat:0 }}%
                                     </div>
                                 </div>
@@ -238,7 +238,7 @@
                             <div class="col-2 text-muted small">Adult</div>
                             <div class="col-8">
                                 <div class="progress border" role="progressbar" aria-valuenow="{{ summary.ak_distrib.adult|floatformat:0 }}" aria-valuemin="0" aria-valuemax="100" style="height: 1rem;">
-                                    <div class="progress-bar belt yellow-belt" style="width: {{ summary.ak_distrib.adult|floatformat:0 }}%;">
+                                    <div class="progress-bar belt yellow-belt" style="width: {{ summary.ak_distrib.adult|floatformat:0 }}%">
                                         {{ summary.ak_distrib.adult|floatformat:0 }}%
                                     </div>
                                 </div>
@@ -250,7 +250,7 @@
                             <div class="col-2 text-muted small">Children</div>
                             <div class="col-8">
                                 <div class="progress border" role="progressbar" aria-valuenow="{{ summary.ak_distrib.child|floatformat:0 }}" aria-valuemin="0" aria-valuemax="100" style="height: 1rem;">
-                                    <div class="progress-bar belt blue-belt" style="width: {{ summary.ak_distrib.child|floatformat:0 }}%;">
+                                    <div class="progress-bar belt blue-belt" style="width: {{ summary.ak_distrib.child|floatformat:0 }}%">
                                         {{ summary.ak_distrib.child|floatformat:0 }}%
                                     </div>
                                 </div>

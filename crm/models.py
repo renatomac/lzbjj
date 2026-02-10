@@ -5,6 +5,7 @@ from django.utils import timezone
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.apps import apps
+from django.db.models import Q
 from multiselectfield import MultiSelectField
 from django.core.validators import MaxValueValidator, MinValueValidator
 from phonenumber_field.modelfields import PhoneNumberField
@@ -750,9 +751,19 @@ class BeltPromotion(models.Model):
     # ----------------------------
     # Belt helpers
     # ----------------------------
+    
     @staticmethod
     def belt_index(belt):
-        return BELT_ORDER.index(belt)
+        """
+        Return the index of a belt in the correct belt hierarchy.
+        Works for both adult belts and kid belts.
+        """
+        if belt in ADULT_BELT_ORDER:
+            return ADULT_BELT_ORDER.index(belt)
+        if belt in KID_BELT_ORDER:
+            return KID_BELT_ORDER.index(belt)
+        return -1  # unknown belt
+
 
     @staticmethod
     def is_higher_belt(old, new):
