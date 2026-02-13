@@ -21,7 +21,8 @@
 
   <div class="meta">
     <hr>
-    <p><strong>Signed by:</strong> {{ signature.participant_full_name }}</p>
+    <p><strong>Participant:</strong> {{ signature.participant_full_name }}</p>
+    <p><strong>Signed by:</strong> {% if signature.guardian_full_name %}{{ signature.guardian_full_name }}{% else %}{{ signature.participant_full_name }}{% endif %}</p>
     <p><strong>Signed at:</strong> {{ signature.signed_at }}</p>
     <p><strong>IP Address:</strong> {{ signature.ip_address }}</p>
     <p><strong>User Agent:</strong> {{ signature.user_agent }}</p>
