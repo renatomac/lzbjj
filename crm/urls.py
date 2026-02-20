@@ -60,5 +60,6 @@ urlpatterns = [
     path("waivers/<int:pk>/edit/", views.waiver_edit, name="waiver_edit"),
     path("waivers/<int:pk>/delete/", views.waiver_delete, name="waiver_delete"),
     path("ajax/members/", views.member_autocomplete, name="member_autocomplete"),
+    path("read/<int:pk>/", views.mark_notification_read, name="mark_read"),
     # API Routes
 ]
