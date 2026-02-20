@@ -117,7 +117,6 @@ def regenerate_future_sessions(class_id):
     template_class = get_object_or_404(Class, id=class_id)
 
     # Map your multi-select day labels to weekday ints (0=Mon ... 6=Sun)
-    # Assumes you already have WEEKDAY_MAP like {"MON": 0, "TUE": 1, ...}
     target_weekdays = {
         WEEKDAY_MAP[d]
         for d in getattr(template_class, "days_of_week", [])
@@ -132,38 +131,46 @@ def regenerate_future_sessions(class_id):
         )
     )
 
-    # Track which dates already have a session (include canceled ones so we don't recreate those dates)
+    # Track which dates already have a session
     existing_dates = {s.date for s in future_sessions}
 
-    # Only copy fields that exist on BOTH models
-    # From your models: start_time, end_time, instructor
     fields_to_copy = ["start_time", "end_time", "instructor"]
 
     with transaction.atomic():
         # 1) Remove invalid weekday sessions (keep canceled sessions as-is)
+        sessions_to_delete = []
         kept = []
+        
         for session in future_sessions:
             if session.is_canceled:
                 kept.append(session)
                 continue
 
             if session.date.weekday() not in target_weekdays:
-                session.delete()
-                existing_dates.discard(session.date)  # keep set in sync
+                sessions_to_delete.append(session)
+                existing_dates.discard(session.date)
             else:
                 kept.append(session)
-
+        
+        # Perform bulk delete instead of individual deletes
+        if sessions_to_delete:
+            ClassSession.objects.filter(
+                id__in=[s.id for s in sessions_to_delete]
+            ).delete()
+        
         future_sessions = kept
 
         # 2) Update valid future sessions to match the template
-        # These are DB-backed instances (have PKs), so it's safe to use update_fields
-        update_fields = fields_to_copy[:]  # ['start_time', 'end_time', 'instructor']
+        # Only update sessions that are still in the database (have IDs)
+        update_fields = fields_to_copy[:]
         for session in future_sessions:
             if session.is_canceled:
                 continue
-            for field in update_fields:
-                setattr(session, field, getattr(template_class, field))
-            session.save(update_fields=update_fields)
+            # Verify the session still has an ID before updating
+            if session.id:
+                for field in update_fields:
+                    setattr(session, field, getattr(template_class, field))
+                session.save(update_fields=update_fields)
 
         # 3) Create missing sessions until end date
         start_date = template_class.start_date or today
@@ -181,7 +188,6 @@ def regenerate_future_sessions(class_id):
                         **session_data,
                     )
                 )
-                # prevent duplicates within the loop
                 existing_dates.add(current)
             current += timedelta(days=1)
 
