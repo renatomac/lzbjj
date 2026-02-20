@@ -7,6 +7,7 @@ from django.db.models.functions import ExtractDay
 from django.utils import timezone
 from dateutil.relativedelta import relativedelta
 from .models import ADULT_BELT_ORDER, KID_BELT_ORDER
+from notifications.models import Notification
 
 WEEKDAY_CODES = ['mon','tue','wed','thu','fri','sat','sun']
 WEEKDAY_MAP = {
@@ -109,50 +110,85 @@ def edit_future_sessions(class_id):
         
 # REGENERATE CLASS SESSIONS WHEN YOU CHANGE THE CLASS DATE
 
+
+
 def regenerate_future_sessions(class_id):
     today = timezone.localdate()
     template_class = get_object_or_404(Class, id=class_id)
 
-    # Safe weekday mapping
-    target_weekdays = {WEEKDAY_MAP[d] for d in getattr(template_class, "days_of_week", []) if d in WEEKDAY_MAP}
+    # Map your multi-select day labels to weekday ints (0=Mon ... 6=Sun)
+    # Assumes you already have WEEKDAY_MAP like {"MON": 0, "TUE": 1, ...}
+    target_weekdays = {
+        WEEKDAY_MAP[d]
+        for d in getattr(template_class, "days_of_week", [])
+        if d in WEEKDAY_MAP
+    }
 
-    future_sessions = ClassSession.objects.filter(
-        class_template=template_class,
-        date__gte=today,
+    # Materialize once to avoid lazy re-evaluation after deletions
+    future_sessions = list(
+        ClassSession.objects.filter(
+            class_template=template_class,
+            date__gte=today,
+        )
     )
 
+    # Track which dates already have a session (include canceled ones so we don't recreate those dates)
     existing_dates = {s.date for s in future_sessions}
 
-    fields_to_copy = ["start_time", "end_time", "instructor", "notes", "location"]
+    # Only copy fields that exist on BOTH models
+    # From your models: start_time, end_time, instructor
+    fields_to_copy = ["start_time", "end_time", "instructor"]
 
     with transaction.atomic():
-        # Remove invalid weekday sessions
+        # 1) Remove invalid weekday sessions (keep canceled sessions as-is)
+        kept = []
         for session in future_sessions:
-            if session.date.weekday() not in target_weekdays and not session.is_canceled:
+            if session.is_canceled:
+                kept.append(session)
+                continue
+
+            if session.date.weekday() not in target_weekdays:
                 session.delete()
+                existing_dates.discard(session.date)  # keep set in sync
+            else:
+                kept.append(session)
 
-        # Update valid future sessions
+        future_sessions = kept
+
+        # 2) Update valid future sessions to match the template
+        # These are DB-backed instances (have PKs), so it's safe to use update_fields
+        update_fields = fields_to_copy[:]  # ['start_time', 'end_time', 'instructor']
         for session in future_sessions:
-            if not session.is_canceled:
-                for field in fields_to_copy:
-                    if hasattr(template_class, field):
-                        setattr(session, field, getattr(template_class, field))
-                session.save(update_fields=[f for f in fields_to_copy if hasattr(template_class, f)])
+            if session.is_canceled:
+                continue
+            for field in update_fields:
+                setattr(session, field, getattr(template_class, field))
+            session.save(update_fields=update_fields)
 
-        # Create missing sessions until Dec 30
+        # 3) Create missing sessions until end date
         start_date = template_class.start_date or today
         end_date = template_class.end_date or date(today.year, 12, 30)
 
         current = max(today, start_date)
+        new_sessions = []
         while current <= end_date:
             if current.weekday() in target_weekdays and current not in existing_dates:
-                session_data = {f: getattr(template_class, f) for f in fields_to_copy if hasattr(template_class, f)}
-                ClassSession.objects.create(
-                    class_template=template_class,
-                    date=current,
-                    **session_data
+                session_data = {f: getattr(template_class, f) for f in fields_to_copy}
+                new_sessions.append(
+                    ClassSession(
+                        class_template=template_class,
+                        date=current,
+                        **session_data,
+                    )
                 )
+                # prevent duplicates within the loop
+                existing_dates.add(current)
             current += timedelta(days=1)
+
+        if new_sessions:
+            ClassSession.objects.bulk_create(new_sessions, batch_size=500)
+
+
 
 # Distributions
 
@@ -247,3 +283,15 @@ def get_client_ip(request):
         return x_forwarded_for.split(",")[0]
     return request.META.get("REMOTE_ADDR")
 
+
+# notifications/utils.py
+
+
+
+def create_notification(user, title, message="", url=""):
+    Notification.objects.create(
+        user=user,
+        title=title,
+        message=message,
+        url=url
+    )
