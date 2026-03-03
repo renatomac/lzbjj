@@ -1,11 +1,12 @@
 from django.db import models, transaction
-from django.contrib.auth.models import AbstractUser, Group, Permission
+from django.contrib.auth.models import AbstractUser, Group, Permission, User
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.apps import apps
 from django.db.models import Q
+from django.db import models
 from multiselectfield import MultiSelectField
 from django.core.validators import MaxValueValidator, MinValueValidator
 from phonenumber_field.modelfields import PhoneNumberField
@@ -938,3 +939,5 @@ class WaiverSignature(models.Model):
         if self.guardian_first_name or self.guardian_last_name:
             return f"{self.guardian_first_name} {self.guardian_last_name}".strip()
         return ""
+
+

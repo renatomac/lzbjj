@@ -19,6 +19,9 @@ PRIORITIES
 
 GENERAL
     * Create admin.py
+    * Adds peoples photo to the user card
+    * Add notifications
+    * Add email messages
     * improve the forms look and feel using CSS
     * add the logged username on the botton of the sidebar
     * Make the messages better. Now, after closing a message a line with a different background color remains 
@@ -30,8 +33,8 @@ ADD STAFF
     * Add sub rank for stripes
     * drop down menu for permissions
 
-MEMBER
-    * Digital waiver
+MEMBER - WAIVER
+    * Add the people with waither into the classes for two weeks. 
     * Convert waiver into membership
 
 

@@ -7,7 +7,7 @@ from django.db.models.functions import ExtractDay
 from django.utils import timezone
 from dateutil.relativedelta import relativedelta
 from .models import ADULT_BELT_ORDER, KID_BELT_ORDER
-from notifications.models import Notification
+#from notifications.models import Notification
 
 WEEKDAY_CODES = ['mon','tue','wed','thu','fri','sat','sun']
 WEEKDAY_MAP = {
@@ -152,7 +152,7 @@ def regenerate_future_sessions(class_id):
             else:
                 kept.append(session)
         
-        # Perform bulk delete instead of individual deletes
+        # Perform bulk delete
         if sessions_to_delete:
             ClassSession.objects.filter(
                 id__in=[s.id for s in sessions_to_delete]
@@ -161,16 +161,13 @@ def regenerate_future_sessions(class_id):
         future_sessions = kept
 
         # 2) Update valid future sessions to match the template
-        # Only update sessions that are still in the database (have IDs)
-        update_fields = fields_to_copy[:]
+        # Only update sessions that are still in the database
         for session in future_sessions:
-            if session.is_canceled:
+            if session.is_canceled or not session.id:
                 continue
-            # Verify the session still has an ID before updating
-            if session.id:
-                for field in update_fields:
-                    setattr(session, field, getattr(template_class, field))
-                session.save(update_fields=update_fields)
+            for field in fields_to_copy:
+                setattr(session, field, getattr(template_class, field))
+            session.save(update_fields=fields_to_copy)
 
         # 3) Create missing sessions until end date
         start_date = template_class.start_date or today
@@ -192,7 +189,7 @@ def regenerate_future_sessions(class_id):
             current += timedelta(days=1)
 
         if new_sessions:
-            ClassSession.objects.bulk_create(new_sessions, batch_size=500)
+            ClassSession.objects.bulk_create(new_sessions)
 
 
 

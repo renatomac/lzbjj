@@ -1,0 +1,106 @@
+{# notifications/templates/partials/navbar_bell.html #}
+{% load static %}
+
+<style>
+  .bell-wrapper {
+    position: relative;
+    display: inline-block;
+    margin-right: 1rem;
+    cursor: pointer;
+  }
+  .bell-badge {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    background: #dc3545; /* bootstrap danger */
+    color: white;
+    border-radius: 999px;
+    padding: 0 6px;
+    font-size: 0.70rem;
+    line-height: 1.2;
+    min-width: 18px;
+    text-align: center;
+  }
+  .dropdown-menu-notifs {
+    min-width: 320px;
+    max-width: 420px;
+  }
+  .notif-item {
+    white-space: normal;
+  }
+</style>
+
+{# If you use Bootstrap Icons, ensure the icon CSS is loaded in your base layout: #}
+{# <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"> #}
+
+<div class="dropdown">
+  <a class="bell-wrapper" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+    <i class="bi bi-bell" style="font-size: 1.3rem;"></i>
+    {% if notifications_unread_count and notifications_unread_count > 0 %}
+      <span class="bell-badge">{{ notifications_unread_count }}</span>
+    {% endif %}
+  </a>
+  <ul class="dropdown-menu dropdown-menu-end dropdown-menu-notifs">
+    {% if notifications_recent %}
+      {% for n in notifications_recent %}
+        <li class="dropdown-item notif-item d-flex justify-content-between align-items-start {% if not n.is_read %}fw-semibold{% endif %}">
+          <div class="me-2">
+            {{ n.message }}
+            {% if n.created_at %}
+              <div class="small text-muted">{{ n.created_at|date:"M d, Y H:i" }}</div>
+            {% endif %}
+          </div>
+          {% if not n.is_read %}
+            <span class="badge text-bg-primary">New</span>
+          {% endif %}
+        </li>
+        {% if not forloop.last %}<li><hr class="dropdown-divider"></li>{% endif %}
+      {% endfor %}
+      <li><hr class="dropdown-divider"></li>
+      <li>
+        <a class="dropdown-item text-center" href="{% url 'notifications:list' %}">View all notifications</a>
+      </li>
+    {% else %}
+      <li class="dropdown-item text-muted">No notifications</li>
+    {% endif %}
+  </ul>
+</div>
+<div class="dropdown">
+  <a class="nav-link dropdown-toggle bell-wrapper" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false" id="notifBell">
+    <i class="bi bi-bell" style="font-size: 1.3rem;"></i>
+    {% if notifications_unread_count and notifications_unread_count > 0 %}
+      <span class="bell-badge" id="notifBadge">{{ notifications_unread_count }}</span>
+    {% else %}
+      <span class="bell-badge" id="notifBadge" style="display:none;">0</span>
+    {% endif %}
+  </a>
+
+  <ul class="dropdown-menu dropdown-menu-end dropdown-menu-notifs" id="notifDropdown">
+    {% if notifications_recent %}
+      {% for n in notifications_recent %}
+        <li class="dropdown-item notif-item d-flex justify-content-between align-items-start {% if not n.is_read %}fw-semibold{% endif %}"
+            data-notif-id="{{ n.id }}" id="notif-item-{{ n.id }}">
+          <div class="me-2">
+            {{ n.message }}
+            {% if n.created_at %}
+              <div class="small text-muted">{{ n.created_at|date:"M d, Y H:i" }}</div>
+            {% endif %}
+          </div>
+          <div class="ms-2">
+            {% if not n.is_read %}
+              <a href="javascript:void(0)" class="btn btn-sm btn-link p-0 mark-read" data-id="{{ n.id }}" title="Marcar como lida">Mark</a>
+            {% endif %}
+          </div>
+        </li>
+        {% if not forloop.last %}<li><hr class="dropdown-divider"></li>{% endif %}
+      {% endfor %}
+      <li><hr class="dropdown-divider"></li>
+      <li class="dropdown-item d-flex justify-content-between align-items-center">
+        <a href="{% url 'notifications:list' %}" class="me-2">View all notifications</a>
+        <a href="javascript:void(0)" id="markAllRead" class="text-decoration-none">Mark all as read</a>
+      </li>
+    {% else %}
+      <li class="dropdown-item text-muted">No notifications</li>
+    {% endif %}
+  </ul>
+</div>

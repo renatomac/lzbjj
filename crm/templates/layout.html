@@ -21,6 +21,167 @@
     {% block extra_head %}{% endblock %}
 </head>
 
+
+<!-- Ably client library (load once, before your code) -->
+<script src="https://cdn.ably.com/lib/ably.min-1.js"></script>
+
+<script>
+// --- CSRF helper for fetch ---
+function getCookie(name) {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop().split(';').shift();
+}
+const csrftoken = getCookie('csrftoken');
+
+function csrfFetch(url, options = {}) {
+  options.headers = Object.assign({}, options.headers || {}, {
+    'X-CSRFToken': csrftoken,
+    'X-Requested-With': 'XMLHttpRequest',
+  });
+  return fetch(url, options);
+}
+
+// --- Badge helpers ---
+function setBadge(count) {
+  const badge = document.getElementById('notifBadge');
+  if (!badge) return;
+  const n = Number(count) || 0;
+  badge.textContent = n;
+  badge.style.display = n > 0 ? '' : 'none';
+}
+
+function decrementBadge() {
+  const badge = document.getElementById('notifBadge');
+  if (!badge) return;
+  const current = parseInt(badge.textContent || '0', 10) || 0;
+  const next = Math.max(0, current - 1);
+  setBadge(next);
+}
+
+// --- DOM updates ---
+function markItemReadInDOM(id) {
+  const li = document.getElementById(`notif-item-${id}`);
+  if (!li) return;
+  li.classList.remove('fw-semibold');
+  const btn = li.querySelector('.mark-read');
+  if (btn) btn.remove();
+}
+
+// --- Click handlers for mark / mark-all ---
+document.addEventListener('click', (e) => {
+  // Single mark
+  if (e.target && e.target.classList.contains('mark-read')) {
+    const id = e.target.getAttribute('data-id');
+    csrfFetch(`/notifications/mark/${id}/`, { method: 'POST' })
+      .then(r => r.json())
+      .then(data => {
+        if (data.status === 'ok') {
+          markItemReadInDOM(id);
+          setBadge(data.unread);
+        }
+      })
+      .catch(err => console.error('mark-read error', err));
+  }
+
+  // Mark all
+  if (e.target && e.target.id === 'markAllRead') {
+    csrfFetch(`/notifications/mark-all/`, { method: 'POST' })
+      .then(r => r.json())
+      .then(data => {
+        if (data.status === 'ok') {
+          document.querySelectorAll('#notifDropdown .notif-item').forEach(li => {
+            li.classList.remove('fw-semibold');
+            const btn = li.querySelector('.mark-read');
+            if (btn) btn.remove();
+          });
+          setBadge(0);
+        }
+      })
+      .catch(err => console.error('mark-all error', err));
+  }
+});
+
+// --- Ably realtime subscription (single instance & single subscription) ---
+document.addEventListener('DOMContentLoaded', async () => {
+  {% if user.is_authenticated %}
+  try {
+    // Create a single Ably instance per page
+    if (!window.__ablyInstance) {
+      window.__ablyInstance = new Ably.Realtime.Promise({
+        authUrl: "{% url 'notifications:ably_token' %}",
+      });
+      await window.__ablyInstance.connection.once('connected');
+      console.log('Ably connected');
+    }
+
+    const ably = window.__ablyInstance;
+    const channelName = "user-{{ request.user.id }}-notifications";
+    const channel = ably.channels.get(channelName);
+
+    // Guard to avoid duplicate subscription if scripts are included twice by mistake
+    if (!window.__notifSubscribed) {
+      channel.subscribe('new', (msg) => {
+        // 1) bump badge
+        const badge = document.getElementById('notifBadge');
+        const current = badge ? parseInt(badge.textContent || "0", 10) || 0 : 0;
+        setBadge(current + 1);
+
+        // 2) prepend to dropdown (optional but nice)
+        const dropdown = document.getElementById('notifDropdown');
+        if (!dropdown) return;
+
+        // Remove "No notifications" placeholder if present
+        const noItems = dropdown.querySelector('.dropdown-item.text-muted');
+        if (noItems) noItems.remove();
+
+        // New li (unread)
+        const li = document.createElement('li');
+        li.className = 'dropdown-item notif-item d-flex justify-content-between align-items-start fw-semibold';
+        li.id = `notif-item-${msg.data.id}`;
+        li.setAttribute('data-notif-id', msg.data.id);
+        li.innerHTML = `
+          <div class="me-2">
+            ${msg.data.message}
+            ${msg.data.created_at ? `<div class="small text-muted">${new Date(msg.data.created_at).toLocaleString()}</div>` : ''}
+          </div>
+          <div class="ms-2">
+            javascript:void(0)Mark</a>
+          </div>
+        `;
+        const first = dropdown.firstElementChild;
+        dropdown.insertBefore(li, first);
+        if (li.nextElementSibling) {
+          const divider = document.createElement('li');
+          divider.innerHTML = '<hr class="dropdown-divider">';
+          dropdown.insertBefore(divider, li.nextElementSibling);
+        }
+      });
+
+      // (Optional) keep other tabs in sync if you publish mark events from views:
+      channel.subscribe('marked', (msg) => {
+        const id = msg?.data?.id;
+        if (!id) return;
+        markItemReadInDOM(id);
+      });
+      channel.subscribe('marked_all', () => {
+        document.querySelectorAll('#notifDropdown .notif-item').forEach(li => {
+          li.classList.remove('fw-semibold');
+          const btn = li.querySelector('.mark-read');
+          if (btn) btn.remove();
+        });
+        setBadge(0);
+      });
+
+      window.__notifSubscribed = true;
+    }
+  } catch (e) {
+    console.error("Ably init failed", e);
+  }
+  {% endif %}
+});
+</script>
+
 <body class="bg-light">
 
 <div class="container-fluid d-flex vh-100 p-0">
@@ -165,14 +326,18 @@
                         {% block header_title %}{% endblock %}
                     </h2>
                 </div>  
+                
                 <div class="d-flex align-items-center">
-                    <span class="me-3 text-muted small d-none d-sm-inline">
-                        Hi!, {{ user.username }}
-                    </span>
-                    <a href="{% url 'logout' %}"
-                       class="text-muted text-decoration-none">
-                        <i class="fas fa-sign-out-alt"></i> Logout
-                    </a>
+                <span class="me-3 text-muted small d-none d-sm-inline">
+                    Hi!, {{ user.username }}
+                </span>
+
+                {# Notification bell dropdown #}
+                {% include 'partials/navbar_bell.html' %}
+
+                <a href="{% url 'logout' %}" class="ms-3 text-muted text-decoration-none">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </a>
                 </div>
             </div>
         </header>

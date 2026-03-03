@@ -13,12 +13,18 @@ from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import  require_POST
 from .models import User, Plan, Member, Membership, BeltPromotion, Staff, Contact, Class, Attendance, Technique, Position, ClassSession, SessionAttendance, SessionTechnique, WaiverVersion, WaiverSignature
+from notifications.models import Notification
 from .forms import PlanForm, StaffForm , MemberForm, MembershipForm, ClassForm, ContactFormSet, ContactForm,BeltPromotionForm, AttendanceForm, MinorWaiverForm, AdultWaiverForm, ClassSessionForm, WaiverEditForm
 from .formsets import SessionAttendanceFormSet
 from datetime import datetime, date, timedelta
 from crm.utils import *
 from datetime import date
 from django.db.models.functions import ExtractYear, ExtractMonth
+
+
+
+
+
 
 import logging
 
@@ -1250,3 +1256,11 @@ def member_autocomplete(request):
         ]
 
     return JsonResponse(results, safe=False)
+
+# notifications/
+
+def mark_notification_read(request, pk):
+    n = Notification.objects.get(pk=pk, user=request.user)
+    n.is_read = True
+    n.save()
+    return redirect(n.url or "/")

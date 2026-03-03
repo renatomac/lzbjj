@@ -1,0 +1,29 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="container py-3">
+  <h3>Notifications</h3>
+  <div class="mb-2">
+    <a href="javascript:void(0)" id="markAllRead" class="btn btn-sm btn-outline-primary">Mark all as read</a>
+  </div>
+  <ul class="list-group">
+    {% for n in notifications %}
+      <li class="list-group-item d-flex justify-content-between align-items-start {% if not n.is_read %}fw-semibold{% endif %}"
+          id="notif-item-{{ n.id }}" data-notif-id="{{ n.id }}">
+        <div>
+          {{ n.message }}
+          {% if n.created_at %}
+            <div class="small text-muted">{{ n.created_at|date:"M d, Y H:i" }}</div>
+          {% endif %}
+        </div>
+        <div>
+          {% if not n.is_read %}
+            <a href="javascript:void(0)" class="btn btn-sm btn-link mark-read" data-id="{{ n.id }}">Mark</a>
+          {% endif %}
+        </div>
+      </li>
+    {% empty %}
+      <li class="list-group-item text-muted">No notifications</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endblock %}

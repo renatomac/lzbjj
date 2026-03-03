@@ -23,7 +23,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('crm.urls')),
     path('notifications/', include('notifications.urls')),
-
+    #path('api/', include('api.urls')),
     # API Routes
 ]
 
