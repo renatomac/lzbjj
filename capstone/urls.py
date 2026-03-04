@@ -8,17 +8,21 @@ from django.conf.urls.static import static
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    
+
     # Main CRM
     path('', include('crm.urls')),
-    
-    # FIXED: register notifications with namespace
+
+    # Notifications (namespaced)
     path(
         'notifications/',
         include(('notifications.urls', 'notifications'), namespace='notifications')
     ),
 
-    # API routes may go here
+    # --- NEW: API routes (namespaced) ---
+    path(
+        'api/',
+        include(('api.urls', 'api'), namespace='api')
+    ),
 ]
 
 if settings.DEBUG:

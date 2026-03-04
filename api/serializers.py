@@ -1,19 +1,20 @@
+# api/serializers.py
 from rest_framework import serializers
-from crm.models import Student, Class, Attendance  # Adjust import based on your actual models
+from crm.models import Member, ClassSession, SessionAttendance  # align with CRM
 
-class StudentSyncSerializer(serializers.ModelSerializer):
+class MemberSyncSerializer(serializers.ModelSerializer):
     class Meta:
-        model = Student
-        fields = ['id', 'first_name', 'last_name', 'email', 'is_active']  # Add relevant fields
+        model = Member
+        fields = ['id', 'first_name', 'last_name', 'email', 'is_active', 'member_type']
 
-class ClassSyncSerializer(serializers.ModelSerializer):
+class ClassSessionSyncSerializer(serializers.ModelSerializer):
     class Meta:
-        model = Class
-        fields = ['id', 'name', 'date', 'time', 'duration']  # Add relevant fields
+        model = ClassSession
+        fields = ['id', 'date', 'start_time', 'end_time', 'class_template', 'is_canceled']
 
 class AttendanceReportSerializer(serializers.Serializer):
-    student_id = serializers.IntegerField()
-    class_id = serializers.IntegerField()
+    member_id = serializers.IntegerField()
+    session_id = serializers.IntegerField()
     timestamp = serializers.DateTimeField()
-    check_in_method = serializers.CharField(default='face_recognition')
+    check_in_method = serializers.CharField(default='device')
     local_attendance_id = serializers.IntegerField(required=False)
