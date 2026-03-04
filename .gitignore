@@ -84,3 +84,20 @@ __pycache__/
 
 # Django static root
 staticfiles/.viminfo
+
+
+# ---- Django static & media ----
+# Collected static files (collectstatic output)
+staticfiles/
+**/staticfiles/
+
+# Source static (keep if you treat as build input)
+# If you version-control your source static under 'static/', do NOT ignore this.
+# If you don't, uncomment the next two lines:
+# static/
+# **/static/
+
+# Media uploads (usually not in Git)
+media/
+**/media/
+
