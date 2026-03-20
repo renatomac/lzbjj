@@ -27,14 +27,9 @@
                         <i class="fas fa-id-card-alt me-2"></i>Membership
                     </a>
                 </li>
-                <li class="nav-item d-none">
-                    <a class="nav-link" id="details-tab" data-bs-toggle="tab" href="#details" role="tab">
-                        <i class="fas fa-bullseye me-2"></i>Details
-                    </a>
-                </li>
-                <li class="nav-item d-none">
-                    <a class="nav-link" id="billing-tab" data-bs-toggle="tab" href="#billing" role="tab">
-                        <i class="far fa-credit-card me-2"></i>Billing
+                <li class="nav-item">
+                    <a class="nav-link" id="promotions-tab" data-bs-toggle="tab" href="#promotions" role="tab" aria-controls="promotions" aria-selected="false">
+                        <i class="fas fa-award me-2"></i>Promotions
                     </a>
                 </li>
                 <li class="nav-item">
@@ -64,7 +59,6 @@
                                         </div>
                                     {% endif %}
                                 </div>
-
                                 <div class="col-md-9">
                                     <div class="d-flex justify-content-between align-items-start">
                                         <div>
@@ -155,6 +149,40 @@
                             <div class="col-md-12">
                                 <strong>Notes:</strong>
                                 <p class="text-secondary">{{ member.membership_notes|default:"None" }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tab-pane fade" id="promotions" role="tabpanel" aria-labelledby="promotions-tab">
+                    <div class="card shadow-sm rounded-3">
+                        <div class="card-body">
+                            <h4 class="fw-bold mb-4">Promotion History</h4>
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Belt Rank</th>
+                                            <th>Stripes</th>
+                                            <th>Instructor</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for promotion in member.promotions.all %}
+                                        <tr>
+                                            <td>{{ promotion.date|date:"M d, Y" }}</td>
+                                            <td><span class="badge bg-dark text-white">{{ promotion.get_belt_rank_display }}</span></td>
+                                            <td>{{ promotion.stripes }}</td>
+                                            <td>{{ promotion.instructor|default:"—" }}</td>
+                                        </tr>
+                                        {% empty %}
+                                        <tr>
+                                            <td colspan="4" class="text-center text-muted">No promotion history recorded.</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
                     </div>
@@ -261,3 +289,4 @@
     });
 </script>
 {% endblock %}
+

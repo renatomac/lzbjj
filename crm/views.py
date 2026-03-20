@@ -389,6 +389,10 @@ def viewMember(request, member_id):
     responsible = instance.contacts.filter(contact_type="responsible").values()
     emergency = instance.contacts.filter(contact_type="emergency").values()
 
+    # --- Promotions History ---
+    # Fetch all promotions for this member, ordered by date (newest first)
+    promotions = BeltPromotion.objects.filter(member=instance).order_by('-promotion_date')
+    
     # --- Attendance Calculations ---
     today = timezone.localdate()
     current_year = today.year
@@ -449,13 +453,15 @@ def viewMember(request, member_id):
     print(f"DEBUG: Last Month Count: {last_month_count}")
     print(f"DEBUG: YTD Count: {ytd_count}")
     print(f"DEBUG: Graph Labels: {graph_labels}") 
+    print(f"DEBUG: Promotions: {list(promotions.values()) }") 
+    print(f"DEBUG: Graph Data: {graph_data}")
 
     return render(request, "members/view.html", {
         "member": instance,
         "age": calculateAge(instance.date_of_birth),
         "responsible": responsible,
         "emergency": emergency,
-        # New Context Variables
+        "promotions": promotions,
         "current_month_count": current_month_count,
         "last_month_count": last_month_count,
         "ytd_count": ytd_count,
