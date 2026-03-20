@@ -48,6 +48,16 @@
                         <i class="fas fa-chalkboard-teacher me-2"></i>Classes
                     </a>
                 </li>
+                <li class="nav-item">
+                    <a class="nav-link" id="attendance-tab" data-bs-toggle="tab" href="#attendance" role="tab" aria-controls="attendance" aria-selected="false">
+                        <i class="fas fa-calendar-check me-2"></i>Attendance
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" id="attendance-graph-tab" data-bs-toggle="tab" href="#attendance-graph" role="tab" aria-controls="attendance-graph" aria-selected="false">
+                        <i class="fas fa-chart-bar me-2"></i>Attendance Graph
+                    </a>
+                </li>
             </ul>
         </div>
         <div class="card-body">
@@ -211,6 +221,44 @@
                         </div>
                     </div>
                 </div>
+                <div class="tab-pane fade" id="attendance" role="tabpanel" aria-labelledby="attendance-tab">
+                    <div class="card shadow-sm rounded-3">
+                        <div class="card-body">
+                            <h4 class="fw-bold mb-4">Attendance Statistics</h4>
+                            <div class="row text-center g-4">
+                                <div class="col-md-4">
+                                    <div class="p-4 border rounded bg-light">
+                                        <h6 class="text-muted text-uppercase mb-2">Current Month</h6>
+                                        <h2 class="display-4 text-primary fw-bold mb-0">{{ current_month_count }}</h2>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="p-4 border rounded bg-light">
+                                        <h6 class="text-muted text-uppercase mb-2">Last Month</h6>
+                                        <h2 class="display-4 text-info fw-bold mb-0">{{ last_month_count }}</h2>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="p-4 border rounded bg-light">
+                                        <h6 class="text-muted text-uppercase mb-2">YTD (Since Jan 1st)</h6>
+                                        <h2 class="display-4 text-success fw-bold mb-0">{{ ytd_count }}</h2>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tab-pane fade" id="attendance-graph" role="tabpanel" aria-labelledby="attendance-graph-tab">
+                    <div class="card shadow-sm rounded-3">
+                        <div class="card-body">
+                            <h4 class="fw-bold mb-4">Year-To-Date Activity</h4>
+                            <div style="position: relative; height: 400px; width: 100%;">
+                                <canvas id="attendanceChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 </div>
             </div>
         </div>
@@ -236,4 +284,45 @@
     </div>
 </div>
 {% endblock %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const ctx = document.getElementById('attendanceChart').getContext('2d');
+        
+        // Parse the JSON data passed from Django views
+        const labels = {{ graph_labels|safe }};
+        const data = {{ graph_data|safe }};
 
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Classes Attended',
+                    data: data,
+                    backgroundColor: 'rgba(220, 53, 69, 0.7)', // Adapting to your red accent color
+                    borderColor: 'rgba(220, 53, 69, 1)',
+                    borderWidth: 1,
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            stepSize: 1 // Force whole numbers for attendance counts
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false // Hide legend since there's only one dataset
+                    }
+                }
+            }
+        });
+    });
+</script>

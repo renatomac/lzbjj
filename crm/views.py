@@ -21,6 +21,7 @@ from crm.utils import *
 from datetime import date
 from django.db.models.functions import ExtractYear, ExtractMonth
 import logging
+import calendar
 
 logger = logging.getLogger(__name__)
 
@@ -385,14 +386,81 @@ def exportMembers(request):
 
 def viewMember(request, member_id):
     instance = get_object_or_404(Member, pk=member_id)
-    responsible = instance.contacts.filter(contact_type = "responsible").values()
-    emergency = instance.contacts.filter(contact_type = "emergency").values()
-    data = instance
+    responsible = instance.contacts.filter(contact_type="responsible").values()
+    emergency = instance.contacts.filter(contact_type="emergency").values()
+
+    # --- Attendance Calculations ---
+    today = timezone.localdate()
+    current_year = today.year
+    current_month = today.month
+
+    # Calculate date boundaries
+    start_of_year = date(current_year, 1, 1)
+    start_of_current_month = date(current_year, current_month, 1)
+
+    if current_month == 1:
+        start_of_last_month = date(current_year - 1, 12, 1)
+        end_of_last_month = date(current_year - 1, 12, 31)
+    else:
+        start_of_last_month = date(current_year, current_month - 1, 1)
+        last_day = calendar.monthrange(current_year, current_month - 1)[1]
+        end_of_last_month = date(current_year, current_month - 1, last_day)
+
+    # Base query for attendances where the member was present and the session wasn't canceled
+    attendances = SessionAttendance.objects.filter(
+        member=instance, 
+        present=True, 
+        session__is_canceled=False
+    )
+
+    # Count stats
+    current_month_count = attendances.filter(
+        session__date__gte=start_of_current_month, 
+        session__date__lte=today
+    ).count()
+    
+    last_month_count = attendances.filter(
+        session__date__gte=start_of_last_month, 
+        session__date__lte=end_of_last_month
+    ).count()
+    
+    ytd_count = attendances.filter(
+        session__date__gte=start_of_year, 
+        session__date__lte=today
+    ).count()
+
+    # Graph Data Preparation (Group by month for the current year)
+    ytd_attendances = attendances.filter(session__date__gte=start_of_year, session__date__lte=today)
+    monthly_counts = ytd_attendances.annotate(
+        month=ExtractMonth('session__date')
+    ).values('month').annotate(count=Count('id')).order_by('month')
+
+    months_names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    graph_labels = months_names[:current_month]  # Show months up to the current month
+    graph_data = [0] * current_month
+
+    for item in monthly_counts:
+        month_idx = item['month'] - 1  # List is 0-indexed
+        if month_idx < current_month:
+            graph_data[month_idx] = item['count']
+            
+        # views.py inside viewMember function
+    print(f"DEBUG: Current Month Count: {current_month_count}")
+    print(f"DEBUG: Last Month Count: {last_month_count}")
+    print(f"DEBUG: YTD Count: {ytd_count}")
+    print(f"DEBUG: Graph Labels: {graph_labels}") 
+
     return render(request, "members/view.html", {
-        "member": data,
+        "member": instance,
         "age": calculateAge(instance.date_of_birth),
         "responsible": responsible,
-        "emergency": emergency
+        "emergency": emergency,
+        # New Context Variables
+        "current_month_count": current_month_count,
+        "last_month_count": last_month_count,
+        "ytd_count": ytd_count,
+        "graph_labels": json.dumps(graph_labels),
+        "graph_data": json.dumps(graph_data)
     })
 
 def getContacts(request, member_id):
