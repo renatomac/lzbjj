@@ -7,6 +7,16 @@ from .models import Notification
 from asgiref.sync import async_to_sync   
 import json
 
+try:
+    from notifications.utils import create_notification
+    NOTIFICATIONS_AVAILABLE = True
+except ImportError:
+    NOTIFICATIONS_AVAILABLE = False
+    # Fallback function if notifications aren't available
+    def create_notification(user, notification_type, message, data=None):
+        print(f"NOTIFICATION ({notification_type}): {message}")  # For debugging
+        return None
+
 
 @login_required
 def notification_list(request):

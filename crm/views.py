@@ -20,12 +20,6 @@ from datetime import datetime, date, timedelta
 from crm.utils import *
 from datetime import date
 from django.db.models.functions import ExtractYear, ExtractMonth
-
-
-
-
-
-
 import logging
 
 logger = logging.getLogger(__name__)
@@ -253,7 +247,7 @@ def view_session(request):
 
 def members(request):
     query = request.GET.get("query", "")
-    status = request.GET.get("status", "")
+    status = request.GET.get("status", "active")
 
     # Base queryset
     all_members = Member.objects.all()

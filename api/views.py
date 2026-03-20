@@ -135,11 +135,47 @@ class PiAttendanceCompat(APIView):
                 att.notes = notes
             att.save()
 
-        # Optional: notify staff
+        # Optional: notify staff - Updated to use your existing notification structure
         try:
-            from notifications.utils import create_notification
-            create_notification(user, "Attendance", f"Check-in: {member} on {day.isoformat()}")
-        except Exception:
+            # Import the publish function directly from realtime
+            from notifications.realtime import publish_user_notification
+            
+            # Create a notification in the database
+            from notifications.models import Notification
+            
+            # Create the notification in the database
+            notification = Notification.objects.create(
+                user=user,
+                message=f"Check-in: {member} on {day.isoformat()}",
+                data={
+                    'member_id': member.id,
+                    'member_name': str(member),
+                    'date': day.isoformat(),
+                    'method': method,
+                    'attendance_id': att.id
+                },
+                is_read=False,
+                created_at=timezone.now()
+            )
+            
+            # Publish real-time notification via Ably
+            try:
+                publish_user_notification(
+                    user_id=user.id,
+                    payload={
+                        'id': notification.id,
+                        'type': 'attendance',
+                        'message': notification.message,
+                        'data': notification.data,
+                        'created_at': notification.created_at.isoformat()
+                    }
+                )
+            except Exception:
+                pass  # Real-time notification failed, but DB notification still exists
+                
+        except Exception as e:
+            # Log the error but don't fail the request
+            print(f"Notification creation failed: {e}")
             pass  # notifications are optional
 
         return Response({'id': att.id, 'status': 'created' if created else 'updated'}, status=201)
