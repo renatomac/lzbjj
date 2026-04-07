@@ -169,12 +169,12 @@
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {% for promotion in member.promotions.all %}
+                                        {% for promotion in promotions %}
                                         <tr>
-                                            <td>{{ promotion.date|date:"M d, Y" }}</td>
-                                            <td><span class="badge bg-dark text-white">{{ promotion.get_belt_rank_display }}</span></td>
-                                            <td>{{ promotion.stripes }}</td>
-                                            <td>{{ promotion.instructor|default:"—" }}</td>
+                                            <td>{{ promotion.promotion_date|date:"M d, Y" }}</td>
+                                            <td><span class="badge bg-dark text-white">{{ promotion.new_rank }}</span></td>
+                                            <td>{{ promotion.new_stripes }}</td>
+                                            <td>{{ promotion.promoted_by.first_name }} {{ promotion.promoted_by.last_name|default:"—" }}</td>
                                         </tr>
                                         {% empty %}
                                         <tr>

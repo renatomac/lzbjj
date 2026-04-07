@@ -71,7 +71,7 @@ Members <span class="badge bg-primary ms-2">{{ members.paginator.count }}</span>
                     <thead class="bg-light">
                         <tr>
                             <th>Name</th>
-                            <th>Phone</th>
+                            <th>Last Promotion</th>
                             <th>Age</th>
                             <th>Rank</th>
                             <th>Status</th>
@@ -97,7 +97,13 @@ Members <span class="badge bg-primary ms-2">{{ members.paginator.count }}</span>
                                 </div>
                             </td>
 
-                            <td>{{ member.phone }}</td>
+                            <td>
+                                {% if member.last_promotion_date %}
+                                    {{ member.last_promotion_date|date:"M d, Y" }}
+                                {% else %}
+                                    <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
                             <td>{{ member.age }}</td>
                             <td>
                                 <span class="badge belt {{ member.belt_color }}-belt ">{{ member.belt_rank|capfirst }}</span>

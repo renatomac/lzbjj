@@ -277,20 +277,22 @@ def members(request):
         total=Count('id')
     )
 
-    # Add age to each member
-    members_with_age = [
-        {
+    # Add age and last promotion date to each member
+    members_with_age = []
+    for m in all_members:
+        # Get the most recent promotion date
+        last_promotion = BeltPromotion.objects.filter(member=m).order_by('-promotion_date').first()
+        
+        members_with_age.append({
             'id': m.id,
             'first_name': m.first_name,
             'last_name': m.last_name,
-            'phone': m.phone,
+            'last_promotion_date': last_promotion.promotion_date if last_promotion else None,
             'age': m.age,  # use the property directly
             'is_active': m.is_active,
-            'belt_rank': makeRank(m.belt_rank,m.stripes),
+            'belt_rank': makeRank(m.belt_rank, m.stripes),
             'belt_color': m.belt_rank,
-        }
-        for m in all_members
-    ]
+        })
 
     return render(request, "members/index.html", {
         'all_members': members_with_age,
@@ -392,7 +394,7 @@ def viewMember(request, member_id):
 
     # --- Promotions History ---
     # Fetch all promotions for this member, ordered by date (newest first)
-    promotions = BeltPromotion.objects.filter(member=instance).order_by('-promotion_date')
+    promotions = BeltPromotion.objects.filter(member=instance).select_related('promoted_by').order_by('-promotion_date')
     
     # --- Attendance Calculations ---
     today = timezone.localdate()
