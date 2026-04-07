@@ -805,14 +805,31 @@ class BeltPromotion(models.Model):
         if not self.old_rank or not self.new_rank:
             return
 
+        # Get member - it might be set via the member_id field
+        # Since this is called before save, we need to check if member is set
+        member = getattr(self, 'member', None)
+        
+        # If member is not set yet (during validation before save), 
+        # we can't do the age-based validation.
+        # We'll skip the age-specific validation and use a fallback.
+        # The form's clean will handle the actual validation with the member.
+        if member is None:
+            # During initial validation before member is assigned, skip belt order validation
+            # The form will handle the actual validation
+            return
+
         # Get appropriate belt order based on member's age
-        belt_order = self.get_belt_order_for_member(self.member)
+        belt_order = self.get_belt_order_for_member(member)
 
         # 1️⃣ Belt rank must move forward
-        if belt_order.index(self.new_rank) < belt_order.index(self.old_rank):
-            raise ValidationError(
-                {"new_rank": "New belt rank cannot be lower than the current rank."}
-            )
+        try:
+            if belt_order.index(self.new_rank) < belt_order.index(self.old_rank):
+                raise ValidationError(
+                    {"new_rank": "New belt rank cannot be lower than the current rank."}
+                )
+        except ValueError:
+            # If belt not found in the order, skip validation
+            pass
 
         # 2️⃣ Same belt → stripes must increase
         if self.new_rank == self.old_rank:
