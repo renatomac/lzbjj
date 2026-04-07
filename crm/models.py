@@ -335,6 +335,14 @@ class Member(models.Model):
 
         return None
     
+    @property
+    def is_child_for_belt_promotion(self):
+        """
+        Determines if a member should use the kid belt promotion hierarchy.
+        Returns True for members under 16 years old.
+        """
+        return self.age is not None and self.age < 16
+    
     def sync_future_sessions(self):
         """
         Ensure this member is enrolled ONLY in the future sessions
@@ -754,21 +762,39 @@ class BeltPromotion(models.Model):
     # ----------------------------
     
     @staticmethod
-    def belt_index(belt):
+    def get_belt_order_for_member(member):
+        """
+        Return the appropriate belt order for a member based on their age.
+        Returns KID_BELT_ORDER for members under 16, ADULT_BELT_ORDER otherwise.
+        """
+        if member and member.date_of_birth:
+            today = timezone.localdate()
+            age = today.year - member.date_of_birth.year - ((today.month, today.day) < (member.date_of_birth.month, member.date_of_birth.day))
+            if age < 16:
+                return KID_BELT_ORDER
+        return ADULT_BELT_ORDER
+    
+    @staticmethod
+    def belt_index(belt, member=None):
         """
         Return the index of a belt in the correct belt hierarchy.
-        Works for both adult belts and kid belts.
+        Works for both adult belts and kid belts based on member's age.
         """
+        if member:
+            belt_order = BeltPromotion.get_belt_order_for_member(member)
+            if belt in belt_order:
+                return belt_order.index(belt)
+        
+        # Fallback: check both orders
         if belt in ADULT_BELT_ORDER:
             return ADULT_BELT_ORDER.index(belt)
         if belt in KID_BELT_ORDER:
             return KID_BELT_ORDER.index(belt)
         return -1  # unknown belt
 
-
     @staticmethod
-    def is_higher_belt(old, new):
-        return BeltPromotion.belt_index(new) > BeltPromotion.belt_index(old)
+    def is_higher_belt(old, new, member=None):
+        return BeltPromotion.belt_index(new, member) > BeltPromotion.belt_index(old, member)
 
     # ----------------------------
     # Validation
@@ -779,8 +805,11 @@ class BeltPromotion(models.Model):
         if not self.old_rank or not self.new_rank:
             return
 
+        # Get appropriate belt order based on member's age
+        belt_order = self.get_belt_order_for_member(self.member)
+
         # 1️⃣ Belt rank must move forward
-        if self.belt_index(self.new_rank) < self.belt_index(self.old_rank):
+        if belt_order.index(self.new_rank) < belt_order.index(self.old_rank):
             raise ValidationError(
                 {"new_rank": "New belt rank cannot be lower than the current rank."}
             )

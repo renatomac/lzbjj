@@ -240,6 +240,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                 </li>
 
                 <li class="nav-item">
+                    <a href="{% url 'attendance' %}"
+                       class="nav-link text-white d-flex align-items-center gap-3 rounded-3
+                       {% if request.resolver_match.app_name == 'attendance' %}active{% endif %}">
+                        <i class="fas fa-clipboard-check"></i> Attendance Report
+                    </a>
+                </li>
+
+                <li class="nav-item">
                     <a href="{% url 'sessions' %}"
                        class="nav-link text-white d-flex align-items-center gap-3 rounded-3
                        {% if request.resolver_match.app_name == 'sessions' %}active{% endif %}">

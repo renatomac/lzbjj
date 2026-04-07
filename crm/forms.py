@@ -322,6 +322,8 @@ class BeltPromotionForm(forms.ModelForm):
         # ----------------------------
         self.fields["old_rank"].initial = member.belt_rank
         self.fields["old_stripes"].initial = member.stripes
+        self.fields["new_rank"].initial = member.belt_rank
+        self.fields["new_stripes"].initial = member.stripes
 
         # ----------------------------
         # Prefill promotion date
@@ -335,9 +337,17 @@ class BeltPromotionForm(forms.ModelForm):
             self.fields[field].disabled = True
 
         # ----------------------------
-        # Restrict new_rank choices
+        # Restrict new_rank choices based on age (under 16 = kid belt order)
         # ----------------------------
-        belt_order = KID_BELT_ORDER if member.member_type == "child" else ADULT_BELT_ORDER
+        # Calculate age from date_of_birth
+        today = timezone.localdate()
+        age = None
+        if member.date_of_birth:
+            age = today.year - member.date_of_birth.year - ((today.month, today.day) < (member.date_of_birth.month, member.date_of_birth.day))
+        
+        # Use KID_BELT_ORDER for members under 16, ADULT_BELT_ORDER for 16 and older
+        belt_order = KID_BELT_ORDER if age is not None and age < 16 else ADULT_BELT_ORDER
+        
         try:
             current_index = belt_order.index(member.belt_rank)
         except ValueError:
@@ -369,7 +379,14 @@ class BeltPromotionForm(forms.ModelForm):
         if not member or not old_rank or not new_rank:
             return cleaned
 
-        belt_order = KID_BELT_ORDER if member.member_type == "child" else ADULT_BELT_ORDER
+        # Calculate age for belt order determination
+        today = timezone.localdate()
+        age = None
+        if member.date_of_birth:
+            age = today.year - member.date_of_birth.year - ((today.month, today.day) < (member.date_of_birth.month, member.date_of_birth.day))
+        
+        # Use appropriate belt order based on age (under 16 = kid belt order)
+        belt_order = KID_BELT_ORDER if age is not None and age < 16 else ADULT_BELT_ORDER
 
         # ----------------------------
         # Prevent demotion

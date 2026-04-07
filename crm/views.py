@@ -22,6 +22,7 @@ from datetime import date
 from django.db.models.functions import ExtractYear, ExtractMonth
 import logging
 import calendar
+from django.db.models import Prefetch
 
 logger = logging.getLogger(__name__)
 
@@ -1332,3 +1333,55 @@ def mark_notification_read(request, pk):
     n.is_read = True
     n.save()
     return redirect(n.url or "/")
+
+
+def attendance_report(request):
+    start_date_str = request.GET.get('start_date')
+    end_date_str = request.GET.get('end_date')
+    member_type = request.GET.get('member_type', 'adult') # 'adult' or 'child'
+
+    report_data = []
+    
+    if start_date_str and end_date_str:
+        start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+        end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+
+        # 1. Get all sessions in range for the selected type
+        # Maps 'child' member type to 'kids' class type
+        class_filter_type = 'kids' if member_type == 'child' else 'adult'
+        
+        sessions = ClassSession.objects.filter(
+            date__range=[start_date, end_date],
+            class_template__type=class_filter_type,
+            is_canceled=False
+        ).order_by('date', 'start_time')
+
+        # 2. Get all active members of that type
+        members = Member.objects.filter(member_type=member_type, is_active=True).order_by('first_name')
+
+        # 3. Group sessions by day and build attendance map
+        # We prefetch SessionAttendance to avoid N+1 queries
+        days_map = {}
+        for session in sessions:
+            day_str = session.date.strftime('%A, %b %d, %Y')
+            if day_str not in days_map:
+                days_map[day_str] = {'date': session.date, 'sessions': []}
+            
+            # Fetch attendance for this session
+            attendance_list = SessionAttendance.objects.filter(session=session, present=True).values_list('member_id', flat=True)
+            
+            days_map[day_str]['sessions'].append({
+                'info': session,
+                'present_ids': set(attendance_list)
+            })
+
+        # Convert map to sorted list for the template
+        report_data = sorted(days_map.items(), key=lambda x: x[1]['date'])
+
+    return render(request, "reports/attendance_report.html", {
+        "report_data": report_data,
+        "start_date": start_date_str,
+        "end_date": end_date_str,
+        "member_type": member_type,
+        "members": members if 'members' in locals() else [],
+    })
