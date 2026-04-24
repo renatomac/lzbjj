@@ -33,41 +33,10 @@
 {# If you use Bootstrap Icons, ensure the icon CSS is loaded in your base layout: #}
 {# <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"> #}
 
-<div class="dropdown">
-  <a class="bell-wrapper" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-    <i class="bi bi-bell" style="font-size: 1.3rem;"></i>
-    {% if notifications_unread_count and notifications_unread_count > 0 %}
-      <span class="bell-badge">{{ notifications_unread_count }}</span>
-    {% endif %}
-  </a>
-  <ul class="dropdown-menu dropdown-menu-end dropdown-menu-notifs">
-    {% if notifications_recent %}
-      {% for n in notifications_recent %}
-        <li class="dropdown-item notif-item d-flex justify-content-between align-items-start {% if not n.is_read %}fw-semibold{% endif %}">
-          <div class="me-2">
-            {{ n.message }}
-            {% if n.created_at %}
-              <div class="small text-muted">{{ n.created_at|date:"M d, Y H:i" }}</div>
-            {% endif %}
-          </div>
-          {% if not n.is_read %}
-            <span class="badge text-bg-primary">New</span>
-          {% endif %}
-        </li>
-        {% if not forloop.last %}<li><hr class="dropdown-divider"></li>{% endif %}
-      {% endfor %}
-      <li><hr class="dropdown-divider"></li>
-      <li>
-        <a class="dropdown-item text-center" href="{% url 'notifications:list' %}">View all notifications</a>
-      </li>
-    {% else %}
-      <li class="dropdown-item text-muted">No notifications</li>
-    {% endif %}
-  </ul>
-</div>
+
 <div class="dropdown">
   <a class="nav-link dropdown-toggle bell-wrapper" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false" id="notifBell">
-    <i class="bi bi-bell" style="font-size: 1.3rem;"></i>
+    <i class="fas fa-bell" style="font-size: 1.3rem;"></i>
     {% if notifications_unread_count and notifications_unread_count > 0 %}
       <span class="bell-badge" id="notifBadge">{{ notifications_unread_count }}</span>
     {% else %}

@@ -24,9 +24,7 @@ def create_notification(user, notification_type: str, message: str, data: dict =
     notification = Notification.objects.create(
         user=user,
         message=message,
-        data=data or {},
         is_read=False,
-        created_at=timezone.now()
     )
     
     # Publish real-time notification via Ably
@@ -68,7 +66,6 @@ def create_bulk_notifications(users, notification_type: str, message: str, data:
         notification = Notification(
             user=user,
             message=message,
-            data=data or {},
             is_read=False,
             created_at=now
         )
