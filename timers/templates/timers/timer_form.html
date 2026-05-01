@@ -1,0 +1,20 @@
+{% extends 'layout.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}{% if object %}Edit Timer{% else %}Create Timer{% endif %}{% endblock %}
+{% block header_title %}{% if object %}Edit Timer{% else %}Create Timer{% endif %}{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm">
+    <div class="card-body">
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            {{ form|crispy }}
+            <div class="mt-4">
+                <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save</button>
+                <a href="{% url 'timers:list' %}" class="btn btn-outline-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

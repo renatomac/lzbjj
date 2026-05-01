@@ -1,0 +1,20 @@
+{% extends 'layout.html' %}
+
+{% block title %}Delete Timer{% endblock %}
+{% block header_title %}Delete Timer{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm border-danger">
+    <div class="card-body text-center py-5">
+        <i class="fas fa-exclamation-triangle text-danger fa-3x mb-3"></i>
+        <h4 class="card-title">Are you sure?</h4>
+        <p class="card-text">Do you really want to delete the timer <strong>"{{ timer.name }}"</strong>? This action cannot be undone.</p>
+        
+        <form method="post" class="mt-4">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-danger"><i class="fas fa-trash"></i> Yes, Delete</button>
+            <a href="{% url 'timers:list' %}" class="btn btn-outline-secondary">Cancel</a>
+        </form>
+    </div>
+</div>
+{% endblock %}
