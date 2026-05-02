@@ -43,6 +43,7 @@
                     <button id="btnStart" class="btn btn-success btn-lg px-4"><i class="fas fa-play"></i> Start</button>
                     <button id="btnPause" class="btn btn-warning btn-lg px-4 d-none"><i class="fas fa-pause"></i> Pause</button>
                     <button id="btnReset" class="btn btn-danger btn-lg px-4"><i class="fas fa-stop"></i> Reset</button>
+                    <button id="castButton" style="display: none;">Cast Timer to TV</button>
                 </div>
             </div>
             <div class="card-footer bg-transparent border-0 mt-3">
@@ -54,6 +55,79 @@
 {% endblock %}
 
 {% block extra_scripts %}
+<script>
+    // Replace with your actual Application ID from Step 3
+    const CUSTOM_APP_ID = '074DF02E';
+    const CUSTOM_NAMESPACE = 'urn:x-cast:com.yourdomain.timer';
+    
+    let castSession = null;
+    
+    // Initialize Cast system
+    window.__onGCastApiAvailable = function(isAvailable) {
+        if (isAvailable) {
+            initializeCastApi();
+        }
+    };
+    
+    function initializeCastApi() {
+        const context = cast.framework.CastContext.getInstance();
+        context.setOptions({
+            receiverApplicationId: CUSTOM_APP_ID,  // Your registered receiver
+            autoJoinPolicy: chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED
+        });
+        
+        // Show the Cast button once ready
+        const castButton = document.getElementById('castButton');
+        castButton.style.display = 'inline-block';
+        castButton.addEventListener('click', initiateCast);
+        
+        // Track session for sending updates
+        context.addEventListener(
+            cast.framework.CastContextEventType.SESSION_STATE_CHANGED,
+            (event) => {
+                if (event.sessionState === cast.framework.SessionState.SESSION_STARTED) {
+                    castSession = context.getCurrentSession();
+                    sendTimerUpdate();  // Send initial data
+                }
+            }
+        );
+    }
+    
+    function initiateCast() {
+        const context = cast.framework.CastContext.getInstance();
+        context.requestSession().then(() => {
+            console.log('Cast session started');
+        }).catch(err => {
+            console.error('Failed to start cast:', err);
+        });
+    }
+    
+    // Send timer data to the TV
+    function sendTimerUpdate() {
+        if (!castSession) return;
+        
+        // Get current timer values from your app
+        const timerValue = document.getElementById('timerDisplay').innerText;
+        const isWarning = timerValue.includes('00:') && parseInt(timerValue.slice(-2)) < 10;
+        
+        const messageData = {
+            time: timerValue,
+            label: 'Round ' + currentRound,  // Your round variable
+            warning: isWarning
+        };
+        
+        castSession.sendMessage(CUSTOM_NAMESPACE, messageData)
+            .then(() => console.log('Timer updated on TV'))
+            .catch(err => console.error('Send failed:', err));
+    }
+    
+    // Call this whenever your timer updates
+    function onTimerTick(currentTime) {
+        // ... your existing timer update logic ...
+        updateYourDisplay(currentTime);
+        sendTimerUpdate();  // Also update the TV
+    }
+</script>
 <script>
     document.addEventListener('DOMContentLoaded', () => {
         // Timer configuration
