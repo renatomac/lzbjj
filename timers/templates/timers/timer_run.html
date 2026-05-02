@@ -4,12 +4,9 @@
 {% block header_title %}{{ timer.name }}{% endblock %}
 
 {% block extra_head %}
-<!-- Load Google Cast Sender Framework - Updated URL -->
-<script type="text/javascript" src="https://www.gstatic.com/cast/sdk/libs/sender/1.0/cast_framework.js"></script>
-
 <style>
     .timer-display {
-        font-size: 8rem;
+        font-size: clamp(4rem, 20vw, 15rem);
         font-family: monospace;
         font-weight: bold;
         line-height: 1;
@@ -75,8 +72,8 @@
 {% endblock %}
 
 {% block extra_scripts %}
-<!-- Load Google Cast SDK -->
-<script type="text/javascript" src="https://www.gstatic.com/cvjs/sender/v1/cast_sender.js"></script>
+<!-- Load Google Cast SDK Correctly -->
+<script type="text/javascript" src="https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1"></script>
 
 <!-- Google Cast Initialization -->
 <script>
@@ -116,6 +113,13 @@
     }
     
     function initiateCast() {
+        // Automatically make the local display full screen for a better 'cast tab' experience
+        const elem = document.documentElement;
+        if (elem.requestFullscreen) {
+            elem.requestFullscreen().catch(err => console.log("Fullscreen error:", err));
+        }
+        
+        // Attempt Cast API session
         const context = cast.framework.CastContext.getInstance();
         context.requestSession().then(() => {
             console.log('Cast session started');
