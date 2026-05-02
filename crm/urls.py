@@ -1,4 +1,5 @@
 from django.urls import path
+from django.views.generic import TemplateView
 from . import views
 
 urlpatterns = [
@@ -61,5 +62,6 @@ urlpatterns = [
     path("waivers/<int:pk>/delete/", views.waiver_delete, name="waiver_delete"),
     path("ajax/members/", views.member_autocomplete, name="member_autocomplete"),
     path("read/<int:pk>/", views.mark_notification_read, name="mark_read"),
+    path('cast-receiver/', TemplateView.as_view(template_name='timers/cast_receiver.html'), name='cast_receiver'),
     # API Routes
 ]

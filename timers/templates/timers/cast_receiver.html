@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Fighting Timer - Cast Receiver</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Courier New', monospace;
+        }
+
+        .timer-container {
+            text-align: center;
+            padding: 2rem;
+        }
+
+        .timer-display {
+            font-size: 25vw;
+            font-weight: bold;
+            color: #e94560;
+            text-shadow: 5px 5px 15px rgba(0,0,0,0.5);
+            letter-spacing: 5px;
+        }
+
+        .timer-label {
+            font-size: 3vw;
+            color: #fff;
+            margin-top: 2rem;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+        }
+
+        .status-overlay {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            color: rgba(255,255,255,0.5);
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="timer-container">
+        <div class="timer-display" id="timerDisplay">00:00</div>
+        <div class="timer-label" id="timerLabel">Ready</div>
+    </div>
+    <div class="status-overlay" id="statusOverlay">Waiting for connection...</div>
+
+    <script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
+    <script>
+        const CUSTOM_NAMESPACE = 'urn:x-cast:com.yourdomain.timer';
+        
+        // Initialize Cast Receiver
+        const context = cast.framework.CastReceiverContext.getInstance();
+        const options = new cast.framework.CastReceiverOptions();
+        
+        // Critical: Keep the receiver alive even when not playing media
+        options.disableIdleTimeout = true;
+        options.maxInactivity = 3600; // 1 hour
+        
+        // Listen for custom messages from your Django app
+        context.addCustomMessageListener(CUSTOM_NAMESPACE, function(customEvent) {
+            const data = customEvent.data;
+            console.log('Received timer update:', data);
+            
+            // Update the timer display
+            if (data.time) {
+                document.getElementById('timerDisplay').innerText = data.time;
+            }
+            
+            // Update the label
+            if (data.label) {
+                document.getElementById('timerLabel').innerText = data.label;
+            }
+            
+            // Change color for warning (last 10 seconds)
+            if (data.warning) {
+                document.getElementById('timerDisplay').style.color = '#ff0000';
+            } else {
+                document.getElementById('timerDisplay').style.color = '#e94560';
+            }
+            
+            // Update status overlay
+            document.getElementById('statusOverlay').innerHTML = 'Connected • Receiving updates';
+            setTimeout(() => {
+                document.getElementById('statusOverlay').style.opacity = '0.5';
+            }, 2000);
+        });
+        
+        // Handle connection events
+        context.addEventListener(cast.framework.system.EventType.READY, () => {
+            console.log('Cast receiver ready');
+            document.getElementById('statusOverlay').innerHTML = 'Ready • Waiting for timer';
+        });
+        
+        context.addEventListener(cast.framework.system.EventType.SENDER_CONNECTED, () => {
+            console.log('Sender connected');
+            document.getElementById('statusOverlay').innerHTML = 'Connected to timer';
+        });
+        
+        context.start(options);
+        console.log('Custom receiver started - waiting for timer data...');
+    </script>
+</body>
+</html>
