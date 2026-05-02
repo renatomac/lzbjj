@@ -4,6 +4,9 @@
 {% block header_title %}{{ timer.name }}{% endblock %}
 
 {% block extra_head %}
+<!-- Load Google Cast Sender Framework - Updated URL -->
+<script type="text/javascript" src="https://www.gstatic.com/cast/sdk/libs/sender/1.0/cast_framework.js"></script>
+
 <style>
     .timer-display {
         font-size: 8rem;
@@ -12,15 +15,30 @@
         line-height: 1;
         transition: color 0.3s ease;
     }
-    .state-work { color: #198754; } /* bootstrap success */
-    .state-rest { color: #dc3545; } /* bootstrap danger */
-    .state-paused { color: #6c757d; } /* bootstrap secondary */
+    .state-work { color: #198754; }
+    .state-rest { color: #dc3545; }
+    .state-paused { color: #6c757d; }
     
     .status-text {
         font-size: 2rem;
         font-weight: 600;
         text-transform: uppercase;
         letter-spacing: 2px;
+    }
+    
+    /* Style the Cast button to match your design */
+    #castButton {
+        background-color: #4285F4;
+        color: white;
+        border: none;
+        padding: 12px 24px;
+        font-size: 1.25rem;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+    }
+    #castButton:hover {
+        background-color: #3367D6;
     }
 </style>
 {% endblock %}
@@ -43,7 +61,9 @@
                     <button id="btnStart" class="btn btn-success btn-lg px-4"><i class="fas fa-play"></i> Start</button>
                     <button id="btnPause" class="btn btn-warning btn-lg px-4 d-none"><i class="fas fa-pause"></i> Pause</button>
                     <button id="btnReset" class="btn btn-danger btn-lg px-4"><i class="fas fa-stop"></i> Reset</button>
-                    <button id="castButton" style="display: none;">Cast Timer to TV</button>
+                    <button id="castButton" class="btn btn-info btn-lg px-4" style="display: none;">
+    <i class="fas fa-tv"></i> Cast to TV
+</button>
                 </div>
             </div>
             <div class="card-footer bg-transparent border-0 mt-3">
@@ -55,14 +75,16 @@
 {% endblock %}
 
 {% block extra_scripts %}
+<!-- Load Google Cast SDK -->
+<script type="text/javascript" src="https://www.gstatic.com/cvjs/sender/v1/cast_sender.js"></script>
+
+<!-- Google Cast Initialization -->
 <script>
-    // Replace with your actual Application ID from Step 3
     const CUSTOM_APP_ID = '074DF02E';
     const CUSTOM_NAMESPACE = 'urn:x-cast:com.yourdomain.timer';
     
     let castSession = null;
     
-    // Initialize Cast system
     window.__onGCastApiAvailable = function(isAvailable) {
         if (isAvailable) {
             initializeCastApi();
@@ -72,22 +94,22 @@
     function initializeCastApi() {
         const context = cast.framework.CastContext.getInstance();
         context.setOptions({
-            receiverApplicationId: CUSTOM_APP_ID,  // Your registered receiver
+            receiverApplicationId: CUSTOM_APP_ID,
             autoJoinPolicy: chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED
         });
         
-        // Show the Cast button once ready
         const castButton = document.getElementById('castButton');
-        castButton.style.display = 'inline-block';
-        castButton.addEventListener('click', initiateCast);
+        if (castButton) {
+            castButton.style.display = 'inline-flex';
+            castButton.addEventListener('click', initiateCast);
+        }
         
-        // Track session for sending updates
         context.addEventListener(
             cast.framework.CastContextEventType.SESSION_STATE_CHANGED,
             (event) => {
                 if (event.sessionState === cast.framework.SessionState.SESSION_STARTED) {
                     castSession = context.getCurrentSession();
-                    sendTimerUpdate();  // Send initial data
+                    sendTimerUpdate();
                 }
             }
         );
@@ -102,17 +124,16 @@
         });
     }
     
-    // Send timer data to the TV
     function sendTimerUpdate() {
         if (!castSession) return;
         
-        // Get current timer values from your app
         const timerValue = document.getElementById('timerDisplay').innerText;
         const isWarning = timerValue.includes('00:') && parseInt(timerValue.slice(-2)) < 10;
         
+        // Use window.currentRound (global) instead of local variable
         const messageData = {
             time: timerValue,
-            label: 'Round ' + currentRound,  // Your round variable
+            label: window.currentRound ? 'Round ' + window.currentRound : 'Timer',
             warning: isWarning
         };
         
@@ -120,14 +141,9 @@
             .then(() => console.log('Timer updated on TV'))
             .catch(err => console.error('Send failed:', err));
     }
-    
-    // Call this whenever your timer updates
-    function onTimerTick(currentTime) {
-        // ... your existing timer update logic ...
-        updateYourDisplay(currentTime);
-        sendTimerUpdate();  // Also update the TV
-    }
 </script>
+
+<!-- Main Timer Script -->
 <script>
     document.addEventListener('DOMContentLoaded', () => {
         // Timer configuration
@@ -135,15 +151,17 @@
             rounds: parseInt("{{ timer.rounds }}"),
             duration: parseInt("{{ timer.duration }}"),
             interval: parseInt("{{ timer.interval }}"),
-            direction: "{{ timer.direction }}", // 'UP' or 'DOWN'
+            direction: "{{ timer.direction }}",
             soundFileUrl: "{% if timer.sound_file %}{{ timer.sound_file.url }}{% endif %}"
         };
 
-        // State variables
+        // State variables - make currentRound global for Cast access
         let currentRound = 1;
-        let currentState = 'ready'; // ready, work, rest, done
-        let timeRemaining = config.duration; // If DOWN, start at duration. If UP, start at 0
-        let elapsedTime = 0; // For counting up
+        window.currentRound = currentRound;  // Expose globally
+        
+        let currentState = 'ready';
+        let timeRemaining = config.duration;
+        let elapsedTime = 0;
         let timerInterval = null;
 
         // Elements
@@ -154,7 +172,7 @@
         const btnPause = document.getElementById('btnPause');
         const btnReset = document.getElementById('btnReset');
 
-        // Audio Context setup (needs to be initialized on user interaction)
+        // Audio Context setup
         let audioCtx = null;
         
         function initAudio() {
@@ -177,20 +195,19 @@
             const oscillator = audioCtx.createOscillator();
             const gainNode = audioCtx.createGain();
             
-            // Configuration for beep types
-            let freq = 440; // Default A4
+            let freq = 440;
             let duration = 0.5;
             
             if (type === 'work') {
-                freq = 880; // High pitch for work
+                freq = 880;
                 duration = 0.8;
                 oscillator.type = 'square';
             } else if (type === 'rest') {
-                freq = 330; // Low pitch for rest
+                freq = 330;
                 duration = 0.8;
                 oscillator.type = 'sawtooth';
             } else if (type === 'end') {
-                freq = 1046; // High C for done
+                freq = 1046;
                 duration = 1.5;
                 oscillator.type = 'sine';
             } else if (type === 'tick') {
@@ -219,15 +236,15 @@
         function updateDisplay() {
             let displayTime = config.direction === 'DOWN' ? timeRemaining : elapsedTime;
             
-            // In Rest state, we might always want to count down the rest period, or up
-            // Let's keep it consistent: Rest counts down by default, or follows direction
-            // Better UX: Work follows config direction, Rest always counts down
             if (currentState === 'rest') {
-                 displayTime = timeRemaining; // ALWAYS count down rest
+                 displayTime = timeRemaining;
             }
 
             display.innerText = formatTime(displayTime);
             roundText.innerText = `Round ${currentRound} / ${config.rounds}`;
+            
+            // Update global variable for Cast
+            window.currentRound = currentRound;
 
             // Update colors
             display.className = 'timer-display';
@@ -239,11 +256,16 @@
         function setInitialState() {
             currentState = 'ready';
             currentRound = 1;
+            window.currentRound = currentRound;
             timeRemaining = config.duration;
             elapsedTime = 0;
             statusText.innerText = 'READY';
             statusText.className = 'status-text text-muted';
             updateDisplay();
+            // Send initial update to TV if casting
+            if (typeof sendTimerUpdate === 'function') {
+                sendTimerUpdate();
+            }
         }
 
         function tick() {
@@ -258,7 +280,6 @@
 
                 if ((config.direction === 'DOWN' && timeRemaining <= 0) || 
                     (config.direction === 'UP' && elapsedTime >= config.duration)) {
-                    // End of round
                     if (currentRound < config.rounds) {
                         transitionTo('rest');
                     } else {
@@ -271,10 +292,15 @@
 
                 if (timeRemaining <= 0) {
                     currentRound++;
+                    window.currentRound = currentRound;
                     transitionTo('work');
                 }
             }
             updateDisplay();
+            // Send update to TV every tick
+            if (typeof sendTimerUpdate === 'function') {
+                sendTimerUpdate();
+            }
         }
 
         function transitionTo(newState) {
@@ -299,14 +325,18 @@
                 timerInterval = null;
                 btnPause.classList.add('d-none');
                 btnStart.classList.remove('d-none');
-                btnStart.disabled = true; // disable until reset
+                btnStart.disabled = true;
             }
             updateDisplay();
+            // Send update to TV on state change
+            if (typeof sendTimerUpdate === 'function') {
+                sendTimerUpdate();
+            }
         }
 
         // Event Listeners
         btnStart.addEventListener('click', () => {
-            initAudio(); // Required for browsers to allow sound
+            initAudio();
             if (currentState === 'ready') {
                 transitionTo('work');
             } else if (currentState === 'done') {
@@ -326,8 +356,6 @@
             timerInterval = null;
             btnPause.classList.add('d-none');
             btnStart.classList.remove('d-none');
-            
-            // Ensure status shows paused color but keeps text
             display.className = 'timer-display state-paused';
         });
 
