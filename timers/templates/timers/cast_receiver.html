@@ -2,114 +2,557 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Fighting Timer - Cast Receiver</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>LZBJJ Fight Timer - Cast Display</title>
     <style>
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
+            user-select: none; /* Prevent accidental selection on TV */
         }
 
         body {
-            background: linear-gradient(135deg, #1a1a2e, #16213e);
             min-height: 100vh;
+            background: radial-gradient(circle at 20% 30%, #0a0f1e, #03060c);
+            font-family: 'Segoe UI', 'Roboto', 'Courier New', monospace;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Animated background gradient effect (subtle fight intensity) */
+        body::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(ellipse at 70% 40%, rgba(233,69,96,0.08), transparent 70%);
+            pointer-events: none;
+            animation: breatheGlow 6s infinite alternate;
+        }
+
+        @keyframes breatheGlow {
+            0% { opacity: 0.3; }
+            100% { opacity: 0.8; }
+        }
+
+        /* Main container with glassmorphism card effect */
+        .timer-glass {
+            background: rgba(10, 20, 30, 0.65);
+            backdrop-filter: blur(12px);
+            border-radius: 64px;
+            border: 1px solid rgba(233, 69, 96, 0.25);
+            box-shadow: 0 25px 45px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.08);
+            padding: 2rem 3rem;
+            margin: 1.5rem;
+            text-align: center;
+            transition: all 0.2s ease;
+            width: 90%;
+            max-width: 1300px;
+        }
+
+        /* Logo area – flexible, respects the provided logo */
+        .logo-area {
+            margin-bottom: 1.5rem;
             display: flex;
             justify-content: center;
             align-items: center;
-            font-family: 'Courier New', monospace;
         }
 
-        .timer-container {
-            text-align: center;
-            padding: 2rem;
+        .logo-img {
+            max-width: 240px;
+            width: auto;
+            height: auto;
+            filter: drop-shadow(0 8px 12px rgba(0,0,0,0.5));
+            transition: transform 0.2s;
         }
 
-        .timer-display {
-            font-size: 25vw;
-            font-weight: bold;
-            color: #e94560;
-            text-shadow: 5px 5px 15px rgba(0,0,0,0.5);
-            letter-spacing: 5px;
-        }
-
-        .timer-label {
-            font-size: 3vw;
-            color: #fff;
-            margin-top: 2rem;
-            text-transform: uppercase;
+        /* Brand text fallback if image not loaded (just in case) */
+        .logo-fallback {
+            font-family: 'Impact', 'Arial Black', sans-serif;
+            font-size: 1.8rem;
             letter-spacing: 3px;
+            color: #e94560;
+            text-shadow: 0 2px 5px black;
+            background: rgba(0,0,0,0.5);
+            padding: 0.6rem 1.8rem;
+            border-radius: 60px;
+            display: inline-block;
         }
 
+        /* Main timer digit style – aggressive, bold, modern */
+        .timer-display {
+            font-size: 18vw;
+            font-weight: 800;
+            font-family: 'Monoton', 'Courier New', 'Impact', monospace;
+            letter-spacing: 8px;
+            background: linear-gradient(135deg, #fff 20%, #e94560 80%);
+            background-clip: text;
+            -webkit-background-clip: text;
+            color: transparent;
+            text-shadow: 0 0 28px rgba(233,69,96,0.4);
+            line-height: 1.1;
+            transition: all 0.2s cubic-bezier(0.2, 0.9, 0.4, 1.1);
+            word-break: break-word;
+        }
+
+        /* Warning state – RED alert */
+        .timer-display.warning-mode {
+            background: linear-gradient(135deg, #ff3a3a, #ff0000);
+            background-clip: text;
+            -webkit-background-clip: text;
+            text-shadow: 0 0 20px rgba(255,0,0,0.8);
+            animation: pulseWarning 0.7s infinite alternate;
+        }
+
+        @keyframes pulseWarning {
+            0% { opacity: 0.85; text-shadow: 0 0 5px red; }
+            100% { opacity: 1; text-shadow: 0 0 28px #ff4d4d; }
+        }
+
+        /* rest / work label segment */
+        .timer-label {
+            font-size: 3.5rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            margin-top: 1rem;
+            letter-spacing: 6px;
+            background: rgba(0,0,0,0.6);
+            display: inline-block;
+            padding: 0.4rem 2rem;
+            border-radius: 60px;
+            backdrop-filter: blur(4px);
+            font-family: 'Segoe UI', 'Poppins', sans-serif;
+            transition: all 0.2s;
+        }
+
+        /* dynamic label colors */
+        .label-work {
+            background: rgba(25, 135, 84, 0.85);
+            color: #ecffe6;
+            box-shadow: 0 0 12px #198754;
+            border-left: 4px solid #a3ffbe;
+            border-right: 4px solid #a3ffbe;
+        }
+        .label-rest {
+            background: rgba(220, 53, 69, 0.85);
+            color: #fff0f0;
+            box-shadow: 0 0 12px #dc3545;
+        }
+        .label-ready {
+            background: rgba(108, 117, 125, 0.85);
+            color: #f8f9fa;
+        }
+        .label-done {
+            background: rgba(13, 110, 253, 0.9);
+            color: white;
+            text-shadow: 0 0 3px black;
+            box-shadow: 0 0 15px #0d6efd;
+        }
+
+        /* round info */
+        .round-info {
+            margin-top: 1.8rem;
+            font-size: 1.8rem;
+            font-weight: 500;
+            font-family: monospace;
+            background: rgba(0,0,0,0.5);
+            display: inline-block;
+            padding: 0.3rem 1.8rem;
+            border-radius: 40px;
+            color: #ccc;
+            letter-spacing: 2px;
+            backdrop-filter: blur(5px);
+        }
+
+        /* status overlay (connection indicator) */
         .status-overlay {
             position: fixed;
-            bottom: 20px;
-            right: 20px;
-            color: rgba(255,255,255,0.5);
-            font-size: 12px;
+            bottom: 24px;
+            right: 24px;
+            background: rgba(0, 0, 0, 0.65);
+            backdrop-filter: blur(8px);
+            padding: 8px 18px;
+            border-radius: 40px;
+            font-family: monospace;
+            font-size: 13px;
+            font-weight: 500;
+            color: #b0e0ff;
+            border-left: 3px solid #e94560;
+            pointer-events: none;
+            z-index: 200;
+            transition: opacity 0.4s;
+            letter-spacing: 1px;
+        }
+
+        /* decorative rings / fighting rope style */
+        .decor-ring {
+            position: absolute;
+            bottom: 15px;
+            left: 15px;
+            width: 110px;
+            height: 110px;
+            border: 1px solid rgba(233,69,96,0.2);
+            border-radius: 50%;
+            pointer-events: none;
+        }
+        .decor-ring::after {
+            content: "⚡";
+            position: absolute;
+            bottom: -8px;
+            right: 15px;
+            font-size: 26px;
+            opacity: 0.4;
+            color: #e94560;
+        }
+
+        @media (max-width: 700px) {
+            .timer-glass {
+                padding: 1rem 1.5rem;
+                border-radius: 48px;
+            }
+            .timer-label {
+                font-size: 2rem;
+                padding: 0.3rem 1rem;
+            }
+            .round-info {
+                font-size: 1.2rem;
+            }
+            .status-overlay {
+                bottom: 12px;
+                right: 12px;
+                font-size: 10px;
+            }
+            .logo-img {
+                max-width: 160px;
+            }
+        }
+
+        /* extra smooth */
+        .glow-transition {
+            transition: color 0.2s, text-shadow 0.2s;
         }
     </style>
+    <!-- Load Google Fonts for Impact & Monoton style -->
+    <link href="https://fonts.googleapis.com/css2?family=Monoton&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
-    <div class="timer-container">
-        <div class="timer-display" id="timerDisplay">00:00</div>
-        <div class="timer-label" id="timerLabel">Ready</div>
-    </div>
-    <div class="status-overlay" id="statusOverlay">Waiting for connection...</div>
 
+    <div class="timer-glass">
+        <!-- Logo Section: Display the provided LZBJJ Logo White.png (integrated) -->
+        <div class="logo-area" id="logoArea">
+            <!-- We'll embed the logo as an image, using the provided asset name -->
+            <img class="logo-img" id="mainLogo" src="LZBJJ Logo 1 White.png" alt="LZBJJ Logo" onerror="this.onerror=null; this.style.display='none'; document.getElementById('fallbackLogo').style.display='block';">
+            <div id="fallbackLogo" class="logo-fallback" style="display: none;">⚡ LZBJJ ⚡<br>FIGHT TIMER</div>
+        </div>
+
+        <!-- Dynamic Timer Display -->
+        <div class="timer-display" id="timerDisplay">00:00</div>
+
+        <!-- Label / phase indicator -->
+        <div class="timer-label" id="timerLabel">READY</div>
+
+        <!-- Round indicator (dynamic) -->
+        <div class="round-info" id="roundInfo">Round – / –</div>
+    </div>
+
+    <div class="status-overlay" id="statusOverlay">
+        ⚡ CONNECTING TO CAST...
+    </div>
+    <div class="decor-ring"></div>
+
+    <!-- Google Cast Receiver Framework (CAF v3) -->
     <script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
+
     <script>
-        const CUSTOM_NAMESPACE = 'urn:x-cast:com.yourdomain.timer';
-        
-        // Initialize Cast Receiver
-        const context = cast.framework.CastReceiverContext.getInstance();
-        const options = new cast.framework.CastReceiverOptions();
-        
-        // Critical: Keep the receiver alive even when not playing media
-        options.disableIdleTimeout = true;
-        options.maxInactivity = 3600; // 1 hour
-        
-        // Listen for custom messages from your Django app
-        context.addCustomMessageListener(CUSTOM_NAMESPACE, function(customEvent) {
-            const data = customEvent.data;
-            console.log('Received timer update:', data);
+        (function() {
+            // ----- 1. Namespace and configuration -----
+            const CUSTOM_NAMESPACE = 'urn:x-cast:com.yourdomain.timer';
+            let warningActive = false;
             
-            // Update the timer display
-            if (data.time) {
-                document.getElementById('timerDisplay').innerText = data.time;
+            // DOM elements
+            const timerDisplayEl = document.getElementById('timerDisplay');
+            const timerLabelEl = document.getElementById('timerLabel');
+            const roundInfoSpan = document.getElementById('roundInfo');
+            const statusOverlay = document.getElementById('statusOverlay');
+            
+            // Helper: update class for label styling
+            function setLabelStyle(stateType) {
+                // Remove existing style classes
+                timerLabelEl.classList.remove('label-work', 'label-rest', 'label-ready', 'label-done');
+                switch(stateType) {
+                    case 'work':
+                        timerLabelEl.classList.add('label-work');
+                        break;
+                    case 'rest':
+                        timerLabelEl.classList.add('label-rest');
+                        break;
+                    case 'done':
+                        timerLabelEl.classList.add('label-done');
+                        break;
+                    default: // ready / paused / waiting
+                        timerLabelEl.classList.add('label-ready');
+                        break;
+                }
             }
             
-            // Update the label
-            if (data.label) {
-                document.getElementById('timerLabel').innerText = data.label;
+            // sets warning mode on timer digits
+            function setWarningMode(enable) {
+                if (enable && !warningActive) {
+                    timerDisplayEl.classList.add('warning-mode');
+                    warningActive = true;
+                } else if (!enable && warningActive) {
+                    timerDisplayEl.classList.remove('warning-mode');
+                    warningActive = false;
+                }
             }
             
-            // Change color for warning (last 10 seconds)
-            if (data.warning) {
-                document.getElementById('timerDisplay').style.color = '#ff0000';
-            } else {
-                document.getElementById('timerDisplay').style.color = '#e94560';
+            // Update entire UI from received data
+            function updateReceiverUI(data) {
+                // 1. Time update
+                if (data.time && typeof data.time === 'string') {
+                    timerDisplayEl.innerText = data.time;
+                }
+                
+                // 2. Label update: display work/rest/ready/done etc
+                if (data.label) {
+                    let labelText = data.label.toUpperCase();
+                    timerLabelEl.innerText = labelText;
+                    
+                    // Infer state for style based on label content or custom state field
+                    let lowerLabel = labelText.toLowerCase();
+                    if (lowerLabel.includes('work') || lowerLabel === 'work') {
+                        setLabelStyle('work');
+                    } else if (lowerLabel.includes('rest') || lowerLabel === 'rest') {
+                        setLabelStyle('rest');
+                    } else if (lowerLabel.includes('done') || lowerLabel === 'done') {
+                        setLabelStyle('done');
+                    } else if (lowerLabel.includes('ready')) {
+                        setLabelStyle('ready');
+                    } else {
+                        // fallback - neutral
+                        setLabelStyle('ready');
+                    }
+                    
+                    // Extra: show round info if present in label or via separate field
+                    if (data.roundInfo) {
+                        roundInfoSpan.innerText = data.roundInfo;
+                    } else if (labelText.match(/round \d+/i)) {
+                        // extract round from label if available (smart)
+                        let match = labelText.match(/round (\d+)\/(\d+)/i);
+                        if (match) {
+                            roundInfoSpan.innerText = `⚔️ ROUND ${match[1]} / ${match[2]} ⚔️`;
+                        } else {
+                            let simpleRound = labelText.match(/round (\d+)/i);
+                            if (simpleRound) {
+                                roundInfoSpan.innerText = `🥋 ROUND ${simpleRound[1]} 🥋`;
+                            } else {
+                                // keep existing but not override
+                            }
+                        }
+                    }
+                }
+                
+                // 3. Custom round details if provided separately (sender may send round)
+                if (data.roundText && typeof data.roundText === 'string') {
+                    roundInfoSpan.innerText = data.roundText;
+                }
+                
+                // If no round info was updated but only time, we keep previous round display - better than clearing
+                // 4. Warning status
+                const warningFlag = data.warning === true;
+                setWarningMode(warningFlag);
+                
+                // 5. Additional style for timer color: background gradient depends on warning already handled.
+                // For special pause effect: if data shows a paused state, can adjust opacity (optional)
+                if (data.isPaused === true) {
+                    timerDisplayEl.style.opacity = '0.85';
+                } else {
+                    timerDisplayEl.style.opacity = '1';
+                }
+                
+                // update connection status flash effect
+                if (statusOverlay) {
+                    statusOverlay.innerHTML = '📺 CAST ACTIVE • LAST UPDATE';
+                    statusOverlay.style.opacity = '1';
+                    setTimeout(() => {
+                        if (statusOverlay) statusOverlay.style.opacity = '0.7';
+                    }, 1800);
+                }
             }
             
-            // Update status overlay
-            document.getElementById('statusOverlay').innerHTML = 'Connected • Receiving updates';
-            setTimeout(() => {
-                document.getElementById('statusOverlay').style.opacity = '0.5';
-            }, 2000);
-        });
-        
-        // Handle connection events
-        context.addEventListener(cast.framework.system.EventType.READY, () => {
-            console.log('Cast receiver ready');
-            document.getElementById('statusOverlay').innerHTML = 'Ready • Waiting for timer';
-        });
-        
-        context.addEventListener(cast.framework.system.EventType.SENDER_CONNECTED, () => {
-            console.log('Sender connected');
-            document.getElementById('statusOverlay').innerHTML = 'Connected to timer';
-        });
-        
-        context.start(options);
-        console.log('Custom receiver started - waiting for timer data...');
+            // Helper to set initial UI ready style
+            function setReadyUI() {
+                timerDisplayEl.innerText = "00:00";
+                timerLabelEl.innerText = "READY";
+                setLabelStyle('ready');
+                roundInfoSpan.innerText = "🏆 READY TO FIGHT 🏆";
+                setWarningMode(false);
+                if (statusOverlay) statusOverlay.innerHTML = '✅ RECEIVER READY • WAITING FOR TIMER';
+            }
+            
+            // ----- 2. Cast Receiver Setup -----
+            const context = cast.framework.CastReceiverContext.getInstance();
+            const options = new cast.framework.CastReceiverOptions();
+            
+            // Keep alive: disable idle timeout for long timer sessions
+            options.disableIdleTimeout = true;
+            options.maxInactivity = 3600;   // 1 hour inactivity max, but custom messages keep alive
+            
+            // Custom message listener
+            context.addCustomMessageListener(CUSTOM_NAMESPACE, function(customEvent) {
+                const data = customEvent.data;
+                console.log('[CAF] Timer data received:', data);
+                if (!data) return;
+                
+                // May contain full state: time, label, warning, roundText, etc.
+                // For compatibility: Both timer_run.html sends { time, label, warning } + optionally extra.
+                // We'll also accept optional `roundText`, `state`, `phase`.
+                let updatePayload = {};
+                if (data.time) updatePayload.time = data.time;
+                if (data.label) updatePayload.label = data.label;
+                if (typeof data.warning !== 'undefined') updatePayload.warning = data.warning;
+                if (data.roundText) updatePayload.roundText = data.roundText;
+                if (data.roundInfo) updatePayload.roundInfo = data.roundInfo;
+                // Additional: detect work/rest from label or separate phase field
+                if (data.phase) {
+                    updatePayload.label = data.phase.toUpperCase();
+                }
+                // Enhanced round display: Construct round info if we get round numbers from timer_run extended data?
+                // timer_run doesn't send round number directly via message, but we can parse from label like "Round 3 / 5" 
+                if (data.label && (data.label.includes('Round') || data.label.match(/\d+\/\d+/))) {
+                    updatePayload.roundText = data.label; // use label as round info sometimes
+                }
+                
+                updateReceiverUI(updatePayload);
+                // Also small status ping
+                if (statusOverlay) {
+                    const prevHTML = statusOverlay.innerHTML;
+                    statusOverlay.innerHTML = '⏱️ LIVE • CONNECTED';
+                    setTimeout(() => {
+                        if (statusOverlay && document.getElementById('statusOverlay') === statusOverlay) {
+                            if (!statusOverlay.innerHTML.includes('LIVE')) return;
+                            statusOverlay.innerHTML = '🎯 CAST RECEIVING • READY';
+                        }
+                    }, 2000);
+                }
+            });
+            
+            // System event listeners for better UX
+            context.addEventListener(cast.framework.system.EventType.READY, () => {
+                console.log('Cast Receiver Framework ready');
+                setReadyUI();
+                if (statusOverlay) {
+                    statusOverlay.innerHTML = '🟢 READY • Awaiting Timer Stream';
+                    statusOverlay.style.opacity = '0.85';
+                }
+                // Optional small animation to indicate readiness
+                const glassCard = document.querySelector('.timer-glass');
+                if (glassCard) {
+                    glassCard.style.transition = 'box-shadow 0.3s';
+                    glassCard.style.boxShadow = '0 0 15px rgba(233,69,96,0.4)';
+                }
+            });
+            
+            context.addEventListener(cast.framework.system.EventType.SENDER_CONNECTED, (event) => {
+                console.log('Sender connected:', event);
+                if (statusOverlay) {
+                    statusOverlay.innerHTML = '🔗 SENDER CONNECTED • Receiving timer data';
+                    statusOverlay.style.opacity = '1';
+                    setTimeout(() => {
+                        if (statusOverlay) statusOverlay.style.opacity = '0.8';
+                    }, 3000);
+                }
+            });
+            
+            context.addEventListener(cast.framework.system.EventType.SENDER_DISCONNECTED, () => {
+                console.log('Sender disconnected');
+                if (statusOverlay) {
+                    statusOverlay.innerHTML = '⚠️ Sender left - waiting for reconnection';
+                    statusOverlay.style.opacity = '0.9';
+                }
+                // Do not reset timer display entirely, but show standby
+                // Could keep last values to not disturb the audience.
+            });
+            
+            // Start the receiver with options
+            context.start(options);
+            console.log('🏆 LZBJJ Custom Timer Receiver started – waiting for messages');
+            
+            // Extra: logo graceful error fallback, but ensure logo background is shown
+            const logoImg = document.getElementById('mainLogo');
+            if (logoImg) {
+                logoImg.addEventListener('error', function() {
+                    this.style.display = 'none';
+                    const fallback = document.getElementById('fallbackLogo');
+                    if (fallback) fallback.style.display = 'block';
+                });
+                // Also if image loads, ensure fallback hidden
+                logoImg.addEventListener('load', function() {
+                    const fallback = document.getElementById('fallbackLogo');
+                    if (fallback) fallback.style.display = 'none';
+                });
+            }
+            
+            // Additional style: add subtle round corner highlight based on warning (if warning active via later data)
+            // watching class change for extra depth
+            const observer = new MutationObserver((mutations) => {
+                mutations.forEach((mut) => {
+                    if (mut.attributeName === 'class' && mut.target === timerDisplayEl) {
+                        const hasWarning = timerDisplayEl.classList.contains('warning-mode');
+                        const container = document.querySelector('.timer-glass');
+                        if (container) {
+                            if (hasWarning) {
+                                container.style.borderColor = '#ff4d4d';
+                                container.style.boxShadow = '0 0 25px rgba(255, 50, 50, 0.6)';
+                            } else {
+                                container.style.borderColor = 'rgba(233, 69, 96, 0.35)';
+                                container.style.boxShadow = '0 25px 45px rgba(0,0,0,0.4)';
+                            }
+                        }
+                    }
+                });
+            });
+            if (timerDisplayEl) {
+                observer.observe(timerDisplayEl, { attributes: true });
+            }
+            
+            // Also for label changes dynamic
+            function enhanceConnectionStatus() {
+                // initial ready message styled
+                setReadyUI();
+            }
+            enhanceConnectionStatus();
+            
+            // Optional: Heartbeat / ping to Sender? not needed but ensures receiver stays alive.
+            // keep alive: we already used disableIdleTimeout. Perfect.
+            
+            // Additional support for custom messages that might include round and phase 
+            // In case timer_run doesn't provide separate roundInfo, you can extract from label.
+            // The HTML implementation for timer_run sends label: 'Round X' or 'WORK'/'REST' etc.
+            // receive update in updateReceiverUI will parse round from label if needed.
+            // For extra robustness: listen to window load to ensure no overlapping errors
+            window.addEventListener('load', () => {
+                // make sure that the logo environment loads
+                if (logoImg && logoImg.complete && (logoImg.naturalWidth === 0 || logoImg.naturalHeight === 0)) {
+                    logoImg.style.display = 'none';
+                    const fb = document.getElementById('fallbackLogo');
+                    if (fb) fb.style.display = 'block';
+                }
+                // set custom background for additional flair
+                console.log('Receiver fully loaded – LZBJJ Timer ready for battle');
+            });
+            
+            // Expose manual update for debugging (optional)
+            window.debugCastUpdate = function(testTime, testLabel) {
+                updateReceiverUI({ time: testTime, label: testLabel, warning: false });
+            };
+        })();
     </script>
 </body>
 </html>
