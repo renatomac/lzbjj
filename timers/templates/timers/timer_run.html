@@ -45,6 +45,11 @@
     <div class="col-md-8 col-lg-6">
         <div class="card shadow text-center py-5">
             <div class="card-body">
+                <div class="bg-logo">
+                    <img src={% static 'crm/img/LZBJJ_White.png' %}
+                        alt=""
+                        onerror="this.style.display='none'">
+                </div>
                 <div class="mb-4">
                     <div id="statusText" class="status-text text-muted">READY</div>
                     <div id="roundText" class="text-muted fs-4">Round 1 / {{ timer.rounds }}</div>
