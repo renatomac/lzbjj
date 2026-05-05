@@ -1,0 +1,478 @@
+{% extends 'layout.html' %}
+
+{% block title %}Running {{ timer.name }}{% endblock %}
+{% block header_title %}{{ timer.name }}{% endblock %}
+
+{% block extra_head %}
+<style>
+    .timer-display {
+        font-size: clamp(4rem, 20vw, 15rem);
+        font-family: monospace;
+        font-weight: bold;
+        line-height: 1;
+        transition: color 0.3s ease;
+    }
+    .state-work { color: #198754; }
+    .state-rest { color: #dc3545; }
+    .state-paused { color: #6c757d; }
+
+    .status-text {
+        font-size: 2rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+    }
+
+    /* Chromecast launcher web component */
+    google-cast-launcher {
+        display: none; /* shown only on PC/Android once Cast SDK is ready */
+        --connected-color: #1a6fd4;
+        --disconnected-color: #4285F4;
+        width: 40px;
+        height: 40px;
+        cursor: pointer;
+        align-self: center;
+    }
+
+    /* AirPlay button */
+    #airplayButton {
+        display: none;
+        background-color: #000;
+        color: white;
+        border: none;
+        padding: 12px 24px;
+        font-size: 1.25rem;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+        align-items: center;
+        gap: 8px;
+    }
+    #airplayButton:hover { background-color: #333; }
+    #airplayButton.connected { background-color: #0071e3; }
+    #airplayButton.unavailable { background-color: #888; }
+
+    /*
+      The <video> must NOT be display:none — AirPlay won't stream a hidden element.
+      We push it off-screen instead so it doesn't affect layout.
+    */
+    #airplayVideo {
+        position: fixed;
+        top: -9999px;
+        left: -9999px;
+        width: 1px;
+        height: 1px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+        <div class="card shadow text-center py-5">
+            <div class="card-body">
+                <div class="mb-4">
+                    <div id="statusText" class="status-text text-muted">READY</div>
+                    <div id="roundText" class="text-muted fs-4">Round 1 / {{ timer.rounds }}</div>
+                </div>
+
+                <div id="timerDisplay" class="timer-display state-paused my-4">
+                    00:00
+                </div>
+
+                <div class="mt-5 d-flex justify-content-center gap-3 flex-wrap">
+                    <button id="btnStart" class="btn btn-success btn-lg px-4"><i class="fas fa-play"></i> Start</button>
+                    <button id="btnPause" class="btn btn-warning btn-lg px-4 d-none"><i class="fas fa-pause"></i> Pause</button>
+                    <button id="btnReset" class="btn btn-danger btn-lg px-4"><i class="fas fa-stop"></i> Reset</button>
+
+                    <!-- Chromecast: shown on PC/Android by Cast SDK -->
+                    <google-cast-launcher id="castbutton"></google-cast-launcher>
+
+                    <!-- AirPlay: shown on iOS only -->
+                    <button id="airplayButton" onclick="triggerAirPlay()">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="white">
+                            <path d="M6 22h12l-6-6-6 6zM21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h4v-2H3V5h18v12h-4v2h4c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/>
+                        </svg>
+                        AirPlay
+                    </button>
+                </div>
+
+                <!-- Tip shown only on iOS -->
+                <p id="airplayTip" class="text-muted small mt-3" style="display:none;">
+                    📺 Tap <strong>AirPlay</strong> to stream the timer to your TV.<br>
+                    Or use <strong>Screen Mirroring</strong> in iOS Control Center for full-screen.
+                </p>
+            </div>
+            <div class="card-footer bg-transparent border-0 mt-3">
+                <a href="{% url 'timers:list' %}" class="btn btn-link text-muted text-decoration-none">
+                    <i class="fas fa-arrow-left"></i> Back to Timers
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Canvas draws the timer frame; video streams it via AirPlay -->
+<canvas id="airplayCanvas" style="display:none;"></canvas>
+<video id="airplayVideo" playsinline webkit-playsinline x-webkit-airplay="allow" muted autoplay></video>
+{% endblock %}
+
+{% block extra_scripts %}
+<!-- Google Cast SDK (silently ignored on iOS) -->
+<script src="https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1"></script>
+
+<!-- ─── Device Detection ──────────────────────────────────────────── -->
+<script>
+    function isIOS() {
+        return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    }
+    if (isIOS()) {
+        document.getElementById('airplayButton').style.display = 'inline-flex';
+        document.getElementById('airplayTip').style.display    = 'block';
+    }
+</script>
+
+<!-- ─── AirPlay: Canvas → Video Stream ──────────────────────────── -->
+<script>
+    const airplayVideo  = document.getElementById('airplayVideo');
+    const airplayCanvas = document.getElementById('airplayCanvas');
+    const airplayCtx    = airplayCanvas.getContext('2d');
+
+    airplayCanvas.width  = 1920;
+    airplayCanvas.height = 1080;
+
+    const STATE_COLORS = {
+        work:   '#198754',
+        rest:   '#dc3545',
+        paused: '#6c757d',
+        ready:  '#6c757d',
+        done:   '#0d6efd'
+    };
+
+    // Shared state object — timer logic writes here, RAF loop reads it
+    window.airplayState = {
+        timeStr:     '00:00',
+        statusLabel: 'READY',
+        roundLabel:  'Round 1',
+        state:       'ready'
+    };
+
+    // Timer logic calls this every tick to update the shared state
+    window.updateAirPlayCanvas = function(timeStr, statusLabel, roundLabel, state) {
+        window.airplayState = { timeStr, statusLabel, roundLabel, state };
+    };
+
+    // Renders one frame onto the canvas from the current shared state
+    function renderCanvasFrame() {
+        const { timeStr, statusLabel, roundLabel, state } = window.airplayState;
+        const W     = airplayCanvas.width;
+        const H     = airplayCanvas.height;
+        const color = STATE_COLORS[state] || '#6c757d';
+
+        airplayCtx.fillStyle = '#ffffff';
+        airplayCtx.fillRect(0, 0, W, H);
+
+        airplayCtx.textAlign    = 'center';
+        airplayCtx.textBaseline = 'middle';
+
+        // Status label
+        airplayCtx.fillStyle = color;
+        airplayCtx.font      = 'bold 110px monospace';
+        airplayCtx.fillText(statusLabel, W / 2, H * 0.22);
+
+        // Big timer digits
+        airplayCtx.font = 'bold 380px monospace';
+        airplayCtx.fillText(timeStr, W / 2, H * 0.54);
+
+        // Round label
+        airplayCtx.fillStyle = '#555555';
+        airplayCtx.font      = '80px monospace';
+        airplayCtx.fillText(roundLabel, W / 2, H * 0.82);
+    }
+
+    // Continuous RAF loop — keeps the video stream alive with fresh frames
+    // even when the timer is paused or between ticks
+    let rafRunning = false;
+    function startRenderLoop() {
+        if (rafRunning) return;
+        rafRunning = true;
+        function loop() {
+            renderCanvasFrame();
+            requestAnimationFrame(loop);
+        }
+        requestAnimationFrame(loop);
+    }
+
+    // Draw an initial frame before the stream starts
+    renderCanvasFrame();
+
+    // Attach the canvas stream to the <video> element and kick off the loop
+    function startCanvasStream() {
+        startRenderLoop(); // RAF must be running before captureStream
+        if (!airplayVideo.srcObject) {
+            try {
+                // 0 = let the browser pick the frame rate (honours RAF)
+                airplayVideo.srcObject = airplayCanvas.captureStream(0);
+                airplayVideo.play().catch(() => {});
+            } catch (e) {
+                console.warn('captureStream not supported:', e);
+            }
+        }
+    }
+
+    function triggerAirPlay() {
+        startCanvasStream();
+        if (typeof airplayVideo.webkitShowPlaybackTargetPicker === 'function') {
+            airplayVideo.webkitShowPlaybackTargetPicker();
+        } else {
+            alert('AirPlay is unavailable in this browser.\nPlease use Screen Mirroring from iOS Control Center instead.');
+        }
+    }
+
+    // Visual feedback on the button
+    airplayVideo.addEventListener('webkitplaybacktargetavailabilitychanged', function(e) {
+        const btn = document.getElementById('airplayButton');
+        btn.classList.toggle('unavailable', e.availability !== 'available');
+    });
+
+    airplayVideo.addEventListener('webkitcurrentplaybacktargetiswirelesschanged', function() {
+        const btn  = document.getElementById('airplayButton');
+        const connected = airplayVideo.webkitCurrentPlaybackTargetIsWireless;
+        btn.classList.toggle('connected', connected);
+        if (connected) startCanvasStream();
+    });
+</script>
+
+<!-- ─── Google Cast (PC / Android Chrome only) ───────────────────── -->
+<script>
+    const CUSTOM_APP_ID    = '074DF02E';
+    const CUSTOM_NAMESPACE = 'urn:x-cast:com.yourdomain.timer';
+    let castSession = null;
+
+    window.__onGCastApiAvailable = function(isAvailable) {
+        if (isAvailable && !isIOS()) initializeCastApi();
+    };
+
+    function initializeCastApi() {
+        const context = cast.framework.CastContext.getInstance();
+        context.setOptions({
+            receiverApplicationId: CUSTOM_APP_ID,
+            autoJoinPolicy: chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED
+        });
+
+        // Show the native Cast launcher now that SDK is ready
+        const launcher = document.getElementById('castbutton');
+        if (launcher) launcher.style.display = 'inline-block';
+
+        context.addEventListener(
+            cast.framework.CastContextEventType.SESSION_STATE_CHANGED,
+            (event) => {
+                if (event.sessionState === cast.framework.SessionState.SESSION_STARTED) {
+                    castSession = context.getCurrentSession();
+                    sendTimerUpdate();
+                } else if (
+                    event.sessionState === cast.framework.SessionState.SESSION_ENDED ||
+                    event.sessionState === cast.framework.SessionState.NO_SESSION
+                ) {
+                    castSession = null;
+                }
+            }
+        );
+    }
+
+    function initiateCast() {
+        const elem = document.documentElement;
+        if (elem.requestFullscreen) elem.requestFullscreen().catch(() => {});
+        cast.framework.CastContext.getInstance().requestSession()
+            .catch(err => console.error('Cast failed:', err));
+    }
+
+    function sendTimerUpdate() {
+        if (!castSession) return;
+        const timerValue = document.getElementById('timerDisplay').innerText;
+        const isWarning  = timerValue.startsWith('00:') && parseInt(timerValue.slice(-2)) < 10;
+        castSession.sendMessage(CUSTOM_NAMESPACE, {
+            time:    timerValue,
+            label:   window.currentRound ? 'Round ' + window.currentRound : 'Timer',
+            warning: isWarning
+        }).catch(err => console.error('Cast send failed:', err));
+    }
+</script>
+
+<!-- ─── Main Timer Logic ─────────────────────────────────────────── -->
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const config = {
+            rounds:       parseInt("{{ timer.rounds }}"),
+            duration:     parseInt("{{ timer.duration }}"),
+            interval:     parseInt("{{ timer.interval }}"),
+            direction:    "{{ timer.direction }}",
+            soundFileUrl: "{% if timer.sound_file %}{{ timer.sound_file.url }}{% endif %}"
+        };
+
+        let currentRound  = 1;
+        window.currentRound = currentRound;
+        let currentState  = 'ready';
+        let timeRemaining = config.duration;
+        let elapsedTime   = 0;
+        let timerInterval = null;
+
+        const display    = document.getElementById('timerDisplay');
+        const statusText = document.getElementById('statusText');
+        const roundText  = document.getElementById('roundText');
+        const btnStart   = document.getElementById('btnStart');
+        const btnPause   = document.getElementById('btnPause');
+        const btnReset   = document.getElementById('btnReset');
+
+        let audioCtx = null;
+
+        function initAudio() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+        }
+
+        function playBeep(type) {
+            if (type === 'end' && config.soundFileUrl) {
+                new Audio(config.soundFileUrl).play().catch(() => {});
+                return;
+            }
+            if (!audioCtx) return;
+            const osc  = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            const map  = {
+                work: [880,  0.8, 'square'],
+                rest: [330,  0.8, 'sawtooth'],
+                end:  [1046, 1.5, 'sine'],
+                tick: [440,  0.1, 'sine']
+            };
+            const [freq, dur, shape] = map[type] || [440, 0.5, 'sine'];
+            osc.type = shape;
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + dur);
+        }
+
+        function formatTime(s) {
+            return `${Math.floor(s / 60).toString().padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}`;
+        }
+
+        function updateDisplay() {
+            let displayTime = config.direction === 'DOWN' ? timeRemaining : elapsedTime;
+            if (currentState === 'rest') displayTime = timeRemaining;
+
+            const timeStr    = formatTime(displayTime);
+            const roundLabel = `Round ${currentRound} / ${config.rounds}`;
+
+            display.innerText   = timeStr;
+            roundText.innerText = roundLabel;
+            window.currentRound = currentRound;
+
+            display.className = 'timer-display';
+            if      (currentState === 'work') display.classList.add('state-work');
+            else if (currentState === 'rest') display.classList.add('state-rest');
+            else                              display.classList.add('state-paused');
+
+            // Push to AirPlay canvas and Chromecast
+            if (typeof window.updateAirPlayCanvas === 'function') {
+                window.updateAirPlayCanvas(timeStr, statusText.innerText || 'READY', roundLabel, currentState);
+            }
+            if (typeof sendTimerUpdate === 'function') sendTimerUpdate();
+        }
+
+        function setInitialState() {
+            currentState  = 'ready';
+            currentRound  = 1;
+            window.currentRound = currentRound;
+            timeRemaining = config.duration;
+            elapsedTime   = 0;
+            statusText.innerText = 'READY';
+            statusText.className = 'status-text text-muted';
+            updateDisplay();
+        }
+
+        function tick() {
+            if (currentState === 'work') {
+                if (config.direction === 'DOWN') {
+                    timeRemaining--;
+                    if (timeRemaining <= 3 && timeRemaining > 0) playBeep('tick');
+                } else {
+                    elapsedTime++;
+                    if (elapsedTime >= config.duration - 3 && elapsedTime < config.duration) playBeep('tick');
+                }
+                if ((config.direction === 'DOWN' && timeRemaining <= 0) ||
+                    (config.direction === 'UP'   && elapsedTime >= config.duration)) {
+                    transitionTo(currentRound < config.rounds ? 'rest' : 'done');
+                }
+            } else if (currentState === 'rest') {
+                timeRemaining--;
+                if (timeRemaining <= 3 && timeRemaining > 0) playBeep('tick');
+                if (timeRemaining <= 0) {
+                    currentRound++;
+                    window.currentRound = currentRound;
+                    transitionTo('work');
+                }
+            }
+            updateDisplay();
+        }
+
+        function transitionTo(newState) {
+            currentState = newState;
+            if (newState === 'work') {
+                playBeep('work');
+                statusText.innerText = 'WORK';
+                statusText.className = 'status-text text-success';
+                timeRemaining = config.duration;
+                elapsedTime   = 0;
+            } else if (newState === 'rest') {
+                playBeep('rest');
+                statusText.innerText = 'REST';
+                statusText.className = 'status-text text-danger';
+                timeRemaining = config.interval;
+                elapsedTime   = 0;
+            } else if (newState === 'done') {
+                playBeep('end');
+                statusText.innerText = 'DONE';
+                statusText.className = 'status-text text-primary';
+                clearInterval(timerInterval);
+                timerInterval = null;
+                btnPause.classList.add('d-none');
+                btnStart.classList.remove('d-none');
+                btnStart.disabled = true;
+            }
+            updateDisplay();
+        }
+
+        btnStart.addEventListener('click', () => {
+            initAudio();
+            if (currentState === 'ready') transitionTo('work');
+            else if (currentState === 'done') return;
+            btnStart.classList.add('d-none');
+            btnPause.classList.remove('d-none');
+            if (!timerInterval) timerInterval = setInterval(tick, 1000);
+        });
+
+        btnPause.addEventListener('click', () => {
+            clearInterval(timerInterval);
+            timerInterval = null;
+            btnPause.classList.add('d-none');
+            btnStart.classList.remove('d-none');
+            display.className = 'timer-display state-paused';
+        });
+
+        btnReset.addEventListener('click', () => {
+            clearInterval(timerInterval);
+            timerInterval = null;
+            btnPause.classList.add('d-none');
+            btnStart.classList.remove('d-none');
+            btnStart.disabled = false;
+            setInitialState();
+        });
+
+        setInitialState();
+    });
+</script>
+{% endblock %}
