@@ -22,10 +22,9 @@
         text-transform: uppercase;
         letter-spacing: 2px;
     }
-
-    /* Chromecast button (PC/Android) */
+    
+    /* Style the Cast button to match your design */
     #castButton {
-        display: none; /* hidden until Cast SDK confirms availability */
         background-color: #4285F4;
         color: white;
         border: none;
@@ -34,34 +33,9 @@
         border-radius: 8px;
         cursor: pointer;
         transition: background-color 0.3s;
-        align-items: center;
-        gap: 8px;
     }
     #castButton:hover {
         background-color: #3367D6;
-    }
-
-    /* AirPlay button (iOS) */
-    #airplayButton {
-        display: none; /* shown only on iOS via JS */
-        background-color: #000000;
-        color: white;
-        border: none;
-        padding: 12px 24px;
-        font-size: 1.25rem;
-        border-radius: 8px;
-        cursor: pointer;
-        transition: background-color 0.3s;
-        align-items: center;
-        gap: 8px;
-    }
-    #airplayButton:hover {
-        background-color: #333333;
-    }
-
-    /* Hidden video element used to trigger AirPlay picker */
-    #airplayVideo {
-        display: none;
     }
 </style>
 {% endblock %}
@@ -80,31 +54,11 @@
                     00:00
                 </div>
 
-                <div class="mt-5 d-flex justify-content-center gap-3 flex-wrap">
+                <div class="mt-5 d-flex justify-content-center gap-3">
                     <button id="btnStart" class="btn btn-success btn-lg px-4"><i class="fas fa-play"></i> Start</button>
                     <button id="btnPause" class="btn btn-warning btn-lg px-4 d-none"><i class="fas fa-pause"></i> Pause</button>
                     <button id="btnReset" class="btn btn-danger btn-lg px-4"><i class="fas fa-stop"></i> Reset</button>
-
-                    <!-- Chromecast button: shown on PC/Android by Cast SDK -->
-                    <button id="castButton">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="white">
-                            <path d="M1 18v3h3c0-1.66-1.34-3-3-3zm0-4v2c2.76 0 5 2.24 5 5h2c0-3.87-3.13-7-7-7zm18-7H5v1.63c3.96 1.28 7.09 4.41 8.37 8.37H19V7zM1 10v2c4.97 0 9 4.03 9 9h2c0-6.08-4.93-11-11-11zm20-7H3C1.9 3 1 3.9 1 5v3c5.52 0 10 4.48 10 10h3c0-3.61-1.38-6.9-3.62-9.38C11.55 7.4 13.64 7 16 7h5V5c0-1.1-.9-2-2-2z"/>
-                        </svg>
-                        Cast
-                    </button>
-
-                    <!-- AirPlay button: shown on iOS only -->
-                    <button id="airplayButton" onclick="triggerAirPlay()">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="white">
-                            <path d="M6 22h12l-6-6-6 6zM21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h4v-2H3V5h18v12h-4v2h4c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/>
-                        </svg>
-                        AirPlay
-                    </button>
-
-                    <!-- Hidden video element required to trigger the native iOS AirPlay picker -->
-                    <video id="airplayVideo" playsinline webkit-playsinline x-webkit-airplay="allow">
-                        <source src="" type="video/mp4">
-                    </video>
+                    <google-cast-launcher id="castbutton"></google-cast-launcher>
                 </div>
             </div>
             <div class="card-footer bg-transparent border-0 mt-3">
@@ -116,110 +70,54 @@
 {% endblock %}
 
 {% block extra_scripts %}
-<!-- Load Google Cast SDK (ignored on iOS since WebKit blocks it) -->
+<!-- Load Google Cast SDK Correctly -->
 <script type="text/javascript" src="https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1"></script>
 
-<!-- Device detection helper -->
-<script>
-    function isIOS() {
-        return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-    }
-
-    // Show AirPlay button on iOS immediately, before any SDK loads
-    if (isIOS()) {
-        document.getElementById('airplayButton').style.display = 'inline-flex';
-    }
-</script>
-
-<!-- AirPlay Logic (iOS only) -->
-<script>
-    function triggerAirPlay() {
-        const video = document.getElementById('airplayVideo');
-
-        // Check for native WebKit AirPlay support
-        if (typeof video.webkitShowPlaybackTargetPicker === 'function') {
-            video.webkitShowPlaybackTargetPicker();
-        } else {
-            alert('AirPlay is not available on this device or browser. Please use Screen Mirroring from your iOS Control Center instead.');
-        }
-    }
-
-    // Optional: update AirPlay button style when connected/disconnected
-    const airplayVideo = document.getElementById('airplayVideo');
-    if (airplayVideo) {
-        airplayVideo.addEventListener('webkitplaybacktargetavailabilitychanged', function(event) {
-            const btn = document.getElementById('airplayButton');
-            if (event.availability === 'available') {
-                btn.style.backgroundColor = '#000000';
-            } else {
-                // No AirPlay targets nearby — dim the button
-                btn.style.backgroundColor = '#888888';
-            }
-        });
-
-        airplayVideo.addEventListener('webkitcurrentplaybacktargetiswirelesschanged', function() {
-            const btn = document.getElementById('airplayButton');
-            // Highlight button when actively casting via AirPlay
-            btn.style.backgroundColor = airplayVideo.webkitCurrentPlaybackTargetIsWireless
-                ? '#0071e3'   // Apple blue = connected
-                : '#000000';  // Black = disconnected
-        });
-    }
-</script>
-
-<!-- Google Cast Initialization (PC / Android Chrome only) -->
+<!-- Google Cast Initialization -->
 <script>
     const CUSTOM_APP_ID = '074DF02E';
     const CUSTOM_NAMESPACE = 'urn:x-cast:com.yourdomain.timer';
-
+    
     let castSession = null;
-
-    // Only run Cast setup on non-iOS devices
+    
     window.__onGCastApiAvailable = function(isAvailable) {
-        if (isAvailable && !isIOS()) {
+        if (isAvailable) {
             initializeCastApi();
         }
     };
-
+    
     function initializeCastApi() {
         const context = cast.framework.CastContext.getInstance();
         context.setOptions({
             receiverApplicationId: CUSTOM_APP_ID,
             autoJoinPolicy: chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED
         });
-
-        // Show the Cast button now that SDK is ready
+        
         const castButton = document.getElementById('castButton');
         if (castButton) {
             castButton.style.display = 'inline-flex';
             castButton.addEventListener('click', initiateCast);
         }
-
+        
         context.addEventListener(
             cast.framework.CastContextEventType.SESSION_STATE_CHANGED,
             (event) => {
-                const castButton = document.getElementById('castButton');
                 if (event.sessionState === cast.framework.SessionState.SESSION_STARTED) {
                     castSession = context.getCurrentSession();
-                    if (castButton) castButton.style.backgroundColor = '#1a6fd4'; // darker = active
                     sendTimerUpdate();
-                } else if (
-                    event.sessionState === cast.framework.SessionState.SESSION_ENDED ||
-                    event.sessionState === cast.framework.SessionState.NO_SESSION
-                ) {
-                    castSession = null;
-                    if (castButton) castButton.style.backgroundColor = '#4285F4'; // reset
                 }
             }
         );
     }
-
+    
     function initiateCast() {
+        // Automatically make the local display full screen for a better 'cast tab' experience
         const elem = document.documentElement;
         if (elem.requestFullscreen) {
             elem.requestFullscreen().catch(err => console.log("Fullscreen error:", err));
         }
-
+        
+        // Attempt Cast API session
         const context = cast.framework.CastContext.getInstance();
         context.requestSession().then(() => {
             console.log('Cast session started');
@@ -227,19 +125,20 @@
             console.error('Failed to start cast:', err);
         });
     }
-
+    
     function sendTimerUpdate() {
         if (!castSession) return;
-
+        
         const timerValue = document.getElementById('timerDisplay').innerText;
         const isWarning = timerValue.includes('00:') && parseInt(timerValue.slice(-2)) < 10;
-
+        
+        // Use window.currentRound (global) instead of local variable
         const messageData = {
             time: timerValue,
             label: window.currentRound ? 'Round ' + window.currentRound : 'Timer',
             warning: isWarning
         };
-
+        
         castSession.sendMessage(CUSTOM_NAMESPACE, messageData)
             .then(() => console.log('Timer updated on TV'))
             .catch(err => console.error('Send failed:', err));
@@ -249,6 +148,7 @@
 <!-- Main Timer Script -->
 <script>
     document.addEventListener('DOMContentLoaded', () => {
+        // Timer configuration
         const config = {
             rounds: parseInt("{{ timer.rounds }}"),
             duration: parseInt("{{ timer.duration }}"),
@@ -257,14 +157,16 @@
             soundFileUrl: "{% if timer.sound_file %}{{ timer.sound_file.url }}{% endif %}"
         };
 
+        // State variables - make currentRound global for Cast access
         let currentRound = 1;
-        window.currentRound = currentRound;
-
+        window.currentRound = currentRound;  // Expose globally
+        
         let currentState = 'ready';
         let timeRemaining = config.duration;
         let elapsedTime = 0;
         let timerInterval = null;
 
+        // Elements
         const display = document.getElementById('timerDisplay');
         const statusText = document.getElementById('statusText');
         const roundText = document.getElementById('roundText');
@@ -272,8 +174,9 @@
         const btnPause = document.getElementById('btnPause');
         const btnReset = document.getElementById('btnReset');
 
+        // Audio Context setup
         let audioCtx = null;
-
+        
         function initAudio() {
             if (!audioCtx) {
                 audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -293,26 +196,35 @@
             if (!audioCtx) return;
             const oscillator = audioCtx.createOscillator();
             const gainNode = audioCtx.createGain();
-
+            
             let freq = 440;
             let duration = 0.5;
-
+            
             if (type === 'work') {
-                freq = 880; duration = 0.8; oscillator.type = 'square';
+                freq = 880;
+                duration = 0.8;
+                oscillator.type = 'square';
             } else if (type === 'rest') {
-                freq = 330; duration = 0.8; oscillator.type = 'sawtooth';
+                freq = 330;
+                duration = 0.8;
+                oscillator.type = 'sawtooth';
             } else if (type === 'end') {
-                freq = 1046; duration = 1.5; oscillator.type = 'sine';
+                freq = 1046;
+                duration = 1.5;
+                oscillator.type = 'sine';
             } else if (type === 'tick') {
-                freq = 440; duration = 0.1; oscillator.type = 'sine';
+                freq = 440;
+                duration = 0.1;
+                oscillator.type = 'sine';
             }
 
             oscillator.frequency.setValueAtTime(freq, audioCtx.currentTime);
             gainNode.gain.setValueAtTime(0.5, audioCtx.currentTime);
             gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
-
+            
             oscillator.connect(gainNode);
             gainNode.connect(audioCtx.destination);
+            
             oscillator.start();
             oscillator.stop(audioCtx.currentTime + duration);
         }
@@ -325,12 +237,18 @@
 
         function updateDisplay() {
             let displayTime = config.direction === 'DOWN' ? timeRemaining : elapsedTime;
-            if (currentState === 'rest') displayTime = timeRemaining;
+            
+            if (currentState === 'rest') {
+                 displayTime = timeRemaining;
+            }
 
             display.innerText = formatTime(displayTime);
             roundText.innerText = `Round ${currentRound} / ${config.rounds}`;
+            
+            // Update global variable for Cast
             window.currentRound = currentRound;
 
+            // Update colors
             display.className = 'timer-display';
             if (currentState === 'work') display.classList.add('state-work');
             else if (currentState === 'rest') display.classList.add('state-rest');
@@ -346,7 +264,10 @@
             statusText.innerText = 'READY';
             statusText.className = 'status-text text-muted';
             updateDisplay();
-            if (typeof sendTimerUpdate === 'function') sendTimerUpdate();
+            // Send initial update to TV if casting
+            if (typeof sendTimerUpdate === 'function') {
+                sendTimerUpdate();
+            }
         }
 
         function tick() {
@@ -359,13 +280,18 @@
                     if (elapsedTime >= config.duration - 3 && elapsedTime < config.duration) playBeep('tick');
                 }
 
-                if ((config.direction === 'DOWN' && timeRemaining <= 0) ||
+                if ((config.direction === 'DOWN' && timeRemaining <= 0) || 
                     (config.direction === 'UP' && elapsedTime >= config.duration)) {
-                    transitionTo(currentRound < config.rounds ? 'rest' : 'done');
+                    if (currentRound < config.rounds) {
+                        transitionTo('rest');
+                    } else {
+                        transitionTo('done');
+                    }
                 }
             } else if (currentState === 'rest') {
                 timeRemaining--;
                 if (timeRemaining <= 3 && timeRemaining > 0) playBeep('tick');
+
                 if (timeRemaining <= 0) {
                     currentRound++;
                     window.currentRound = currentRound;
@@ -373,7 +299,10 @@
                 }
             }
             updateDisplay();
-            if (typeof sendTimerUpdate === 'function') sendTimerUpdate();
+            // Send update to TV every tick
+            if (typeof sendTimerUpdate === 'function') {
+                sendTimerUpdate();
+            }
         }
 
         function transitionTo(newState) {
@@ -401,9 +330,13 @@
                 btnStart.disabled = true;
             }
             updateDisplay();
-            if (typeof sendTimerUpdate === 'function') sendTimerUpdate();
+            // Send update to TV on state change
+            if (typeof sendTimerUpdate === 'function') {
+                sendTimerUpdate();
+            }
         }
 
+        // Event Listeners
         btnStart.addEventListener('click', () => {
             initAudio();
             if (currentState === 'ready') {
@@ -411,8 +344,10 @@
             } else if (currentState === 'done') {
                 return;
             }
+            
             btnStart.classList.add('d-none');
             btnPause.classList.remove('d-none');
+            
             if (!timerInterval) {
                 timerInterval = setInterval(tick, 1000);
             }
@@ -435,6 +370,7 @@
             setInitialState();
         });
 
+        // Initialize
         setInitialState();
     });
 </script>
