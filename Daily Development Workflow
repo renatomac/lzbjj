@@ -37,3 +37,6 @@ python manage.py collectstatic
 Reload the web app via PythonAnywhere Web tab.
 command:
     touch /var/www/renatomac_pythonanywhere_com_wsgi.py
+    \
+
+    <--img src="{% static 'crm/img/LZBJJ_White.png' %}"
