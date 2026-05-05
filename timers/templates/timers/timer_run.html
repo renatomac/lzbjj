@@ -138,7 +138,6 @@
     const airplayCanvas = document.getElementById('airplayCanvas');
     const airplayCtx    = airplayCanvas.getContext('2d');
 
-    // 1080p canvas — looks great on any TV
     airplayCanvas.width  = 1920;
     airplayCanvas.height = 1080;
 
@@ -150,20 +149,33 @@
         done:   '#0d6efd'
     };
 
-    // Called by timer logic every tick to repaint the canvas
+    // Shared state object — timer logic writes here, RAF loop reads it
+    window.airplayState = {
+        timeStr:     '00:00',
+        statusLabel: 'READY',
+        roundLabel:  'Round 1',
+        state:       'ready'
+    };
+
+    // Timer logic calls this every tick to update the shared state
     window.updateAirPlayCanvas = function(timeStr, statusLabel, roundLabel, state) {
-        const W = airplayCanvas.width;
-        const H = airplayCanvas.height;
+        window.airplayState = { timeStr, statusLabel, roundLabel, state };
+    };
+
+    // Renders one frame onto the canvas from the current shared state
+    function renderCanvasFrame() {
+        const { timeStr, statusLabel, roundLabel, state } = window.airplayState;
+        const W     = airplayCanvas.width;
+        const H     = airplayCanvas.height;
         const color = STATE_COLORS[state] || '#6c757d';
 
-        // White background
         airplayCtx.fillStyle = '#ffffff';
         airplayCtx.fillRect(0, 0, W, H);
 
         airplayCtx.textAlign    = 'center';
         airplayCtx.textBaseline = 'middle';
 
-        // Status label (WORK / REST / READY / DONE)
+        // Status label
         airplayCtx.fillStyle = color;
         airplayCtx.font      = 'bold 110px monospace';
         airplayCtx.fillText(statusLabel, W / 2, H * 0.22);
@@ -176,26 +188,40 @@
         airplayCtx.fillStyle = '#555555';
         airplayCtx.font      = '80px monospace';
         airplayCtx.fillText(roundLabel, W / 2, H * 0.82);
-    };
+    }
 
-    // Draw an initial frame so the stream has content before AirPlay connects
-    window.updateAirPlayCanvas('00:00', 'READY', 'Round 1', 'ready');
+    // Continuous RAF loop — keeps the video stream alive with fresh frames
+    // even when the timer is paused or between ticks
+    let rafRunning = false;
+    function startRenderLoop() {
+        if (rafRunning) return;
+        rafRunning = true;
+        function loop() {
+            renderCanvasFrame();
+            requestAnimationFrame(loop);
+        }
+        requestAnimationFrame(loop);
+    }
 
-    // Attach the canvas stream to the <video> element
+    // Draw an initial frame before the stream starts
+    renderCanvasFrame();
+
+    // Attach the canvas stream to the <video> element and kick off the loop
     function startCanvasStream() {
+        startRenderLoop(); // RAF must be running before captureStream
         if (!airplayVideo.srcObject) {
             try {
-                airplayVideo.srcObject = airplayCanvas.captureStream(10); // 10 fps is enough for a timer
+                // 0 = let the browser pick the frame rate (honours RAF)
+                airplayVideo.srcObject = airplayCanvas.captureStream(0);
                 airplayVideo.play().catch(() => {});
             } catch (e) {
-                console.warn('captureStream not supported on this browser:', e);
+                console.warn('captureStream not supported:', e);
             }
         }
     }
 
     function triggerAirPlay() {
-        startCanvasStream(); // must be live before picker opens
-
+        startCanvasStream();
         if (typeof airplayVideo.webkitShowPlaybackTargetPicker === 'function') {
             airplayVideo.webkitShowPlaybackTargetPicker();
         } else {
@@ -210,7 +236,7 @@
     });
 
     airplayVideo.addEventListener('webkitcurrentplaybacktargetiswirelesschanged', function() {
-        const btn = document.getElementById('airplayButton');
+        const btn  = document.getElementById('airplayButton');
         const connected = airplayVideo.webkitCurrentPlaybackTargetIsWireless;
         btn.classList.toggle('connected', connected);
         if (connected) startCanvasStream();
