@@ -51,8 +51,8 @@
                         <div class="card-body">
                             <div class="row g-4 align-items-center">
                                 <div class="col-md-3 text-center">
-                                    {% if member.photo %}
-                                        <img src="{{ member.photo }}" alt="member Photo" class="img-fluid rounded-circle mb-2" style="max-width: 150px;">
+                                    {% if member.get_photo_url %}
+                                        <img src="{{ member.get_photo_url }}" alt="member Photo" class="img-fluid rounded-circle mb-2" style="max-width: 150px;">
                                     {% else %}
                                         <div class="rounded-circle bg-secondary text-white d-flex align-items-center justify-content-center" style="width: 150px; height: 150px; margin: auto;">
                                             <i class="fa-solid fa-user fa-3x"></i>

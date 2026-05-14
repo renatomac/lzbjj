@@ -1,3 +1,5 @@
+import base64
+import io
 import json
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
@@ -657,6 +659,18 @@ def attendance_enroll(request, member_id):
     member = get_object_or_404(Member, pk=member_id)
     if request.method == "POST":
         image_file = request.FILES.get("face_image")
+        if not image_file:
+            image_data = request.POST.get("face_image_data")
+            if image_data:
+                try:
+                    _, encoded = image_data.split(",", 1) if "," in image_data else (None, image_data)
+                    image_bytes = base64.b64decode(encoded)
+                    image_file = io.BytesIO(image_bytes)
+                    image_file.name = f"face_capture_{member.id}.jpg"
+                    image_file.content_type = "image/jpeg"
+                except (TypeError, ValueError):
+                    image_file = None
+
         if not image_file:
             messages.error(request, "Please select a face image to enroll.")
         else:

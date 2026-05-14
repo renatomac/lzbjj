@@ -18,8 +18,8 @@
         </div>
 
         <div class="text-center mb-4">
-          {% if member.photo %}
-            <img src="{{ member.photo }}" alt="Member Photo" class="rounded-circle" style="width: 160px; height: 160px; object-fit: cover;" />
+          {% if member.get_photo_url %}
+            <img src="{{ member.get_photo_url }}" alt="Member Photo" class="rounded-circle" style="width: 160px; height: 160px; object-fit: cover;" />
           {% else %}
             <div class="rounded-circle bg-secondary text-white d-inline-flex align-items-center justify-content-center" style="width: 160px; height: 160px;">
               <i class="fa-solid fa-face-smile fa-3x"></i>
@@ -31,8 +31,28 @@
           {% csrf_token %}
           <div class="mb-3">
             <label for="face_image" class="form-label fw-semibold">Face Photo</label>
-            <input class="form-control" type="file" id="face_image" name="face_image" accept="image/*" capture="user" required>
+            <input class="form-control" type="file" id="face_image" name="face_image" accept="image/*" capture="user">
             <div class="form-text">Use a front-facing photo with the member's face clearly visible.</div>
+          </div>
+          <div class="mb-3">
+            <button type="button" id="open_camera_btn" class="btn btn-outline-secondary me-2">Take Photo with Camera</button>
+            <span class="text-muted">Or choose an existing photo above.</span>
+          </div>
+          <input type="hidden" id="face_image_data" name="face_image_data" value="">
+          <div id="camera_container" class="mb-3 d-none">
+            <div class="ratio ratio-16x9 mb-3">
+              <video id="camera_video" class="w-100 rounded" autoplay playsinline muted></video>
+            </div>
+            <button type="button" id="capture_photo_btn" class="btn btn-primary me-2">Capture Photo</button>
+            <button type="button" id="cancel_camera_btn" class="btn btn-secondary">Cancel</button>
+            <div id="camera_error" class="form-text text-danger mt-2 d-none"></div>
+          </div>
+          <div id="captured_preview" class="mb-3 d-none">
+            <label class="form-label fw-semibold">Captured Photo Preview</label>
+            <div class="border rounded p-2">
+              <img id="photo_preview" src="" alt="Captured face preview" class="img-fluid rounded" />
+            </div>
+            <div class="form-text">This image will be used to register the member's face.</div>
           </div>
           <button type="submit" class="btn btn-primary">Register Face</button>
         </form>
@@ -40,4 +60,71 @@
     </div>
   </div>
 </div>
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  const openCameraBtn = document.getElementById("open_camera_btn");
+  const cameraContainer = document.getElementById("camera_container");
+  const cameraVideo = document.getElementById("camera_video");
+  const capturePhotoBtn = document.getElementById("capture_photo_btn");
+  const cancelCameraBtn = document.getElementById("cancel_camera_btn");
+  const cameraError = document.getElementById("camera_error");
+  const capturedPreview = document.getElementById("captured_preview");
+  const photoPreview = document.getElementById("photo_preview");
+  const faceImageDataInput = document.getElementById("face_image_data");
+  const faceImageInput = document.getElementById("face_image");
+  let stream = null;
+
+  function stopCamera() {
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+      stream = null;
+    }
+    cameraVideo.pause();
+    cameraVideo.srcObject = null;
+    cameraContainer.classList.add("d-none");
+    cameraError.classList.add("d-none");
+  }
+
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    openCameraBtn?.classList.add("d-none");
+  }
+
+  openCameraBtn?.addEventListener("click", async function() {
+    cameraError.classList.add("d-none");
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
+      cameraVideo.srcObject = stream;
+      cameraContainer.classList.remove("d-none");
+      cameraVideo.play();
+    } catch (err) {
+      cameraError.textContent = "Unable to access the camera. Please ensure the page is served securely and camera permissions are allowed.";
+      cameraError.classList.remove("d-none");
+    }
+  });
+
+  capturePhotoBtn?.addEventListener("click", function() {
+    if (!stream) {
+      return;
+    }
+    const videoTrack = stream.getVideoTracks()[0];
+    const settings = videoTrack.getSettings ? videoTrack.getSettings() : null;
+    const width = settings?.width || cameraVideo.videoWidth || 640;
+    const height = settings?.height || cameraVideo.videoHeight || 480;
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    canvas.getContext("2d").drawImage(cameraVideo, 0, 0, width, height);
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.9);
+    faceImageDataInput.value = dataUrl;
+    photoPreview.src = dataUrl;
+    capturedPreview.classList.remove("d-none");
+    stopCamera();
+    if (faceImageInput) {
+      faceImageInput.value = "";
+    }
+  });
+
+  cancelCameraBtn?.addEventListener("click", stopCamera);
+});
+</script>
 {% endblock %}

@@ -59,11 +59,29 @@ def get_bucket_name():
 
 
 def build_s3_url(key):
-    bucket = get_bucket_name()
-    region = settings.AWS_REGION
-    if region == "us-east-1":
-        return f"https://{bucket}.s3.amazonaws.com/{key}"
-    return f"https://{bucket}.s3.{region}.amazonaws.com/{key}"
+    """Generate a signed URL for S3 object that's valid for 7 days."""
+    s3 = get_s3_client()
+    try:
+        url = s3.generate_presigned_url(
+            'get_object',
+            Params={'Bucket': get_bucket_name(), 'Key': key},
+            ExpiresIn=604800  # 7 days
+        )
+        return url
+    except Exception:
+        # Fallback to public URL if signing fails
+        bucket = get_bucket_name()
+        region = settings.AWS_REGION
+        if region == "us-east-1":
+            return f"https://{bucket}.s3.amazonaws.com/{key}"
+        return f"https://{bucket}.s3.{region}.amazonaws.com/{key}"
+
+
+def get_signed_s3_url(s3_key):
+    """Generate a fresh signed URL for an S3 key (useful for templates to refresh expired URLs)."""
+    if not s3_key:
+        return None
+    return build_s3_url(s3_key)
 
 
 def ensure_collection():

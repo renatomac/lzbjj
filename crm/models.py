@@ -189,6 +189,20 @@ class Member(models.Model):
     def __str__(self):
         return f"{self.first_name} {self.last_name} ({self.belt_rank})"
     
+    def get_photo_url(self):
+        """
+        Returns a fresh signed S3 URL if S3 key exists, otherwise returns stored photo URL.
+        This ensures the photo always remains accessible even after signed URLs expire.
+        """
+        if self.face_image_s3_key:
+            try:
+                from .aws_utils import get_signed_s3_url
+                return get_signed_s3_url(self.face_image_s3_key)
+            except Exception:
+                # Fallback to stored photo URL if signing fails
+                pass
+        return self.photo
+    
     def required_waiver_type(self):
         """
         Returns the waiver type this member must sign
