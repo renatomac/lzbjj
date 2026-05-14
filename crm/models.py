@@ -173,7 +173,7 @@ class Member(models.Model):
 
     belt_rank = models.CharField(max_length=50, choices=BeltRank.choices, default=BeltRank.WHITE)
     stripes = models.SmallIntegerField(validators=[MinValueValidator(0), MaxValueValidator(12)], default=0)
-    photo = models.URLField(max_length=200, null=True, blank=True)
+    photo = models.URLField(max_length=1000, null=True, blank=True)
     face_image_s3_key = models.CharField(max_length=255, null=True, blank=True)
     rekognition_face_id = models.CharField(max_length=128, null=True, blank=True)
 
