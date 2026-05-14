@@ -18,6 +18,12 @@
                                 <i class="fa-solid fa-arrow-left me-2"></i> Back to Dashboard
                             </a>
                         </div>
+                        <div class="d-flex flex-wrap gap-2 mb-4">
+                            {% if request.user.is_staff %}
+                                <a href="{% url 'attendance_bulk' %}" class="btn btn-sm btn-primary">Bulk attendance</a>
+                            {% endif %}
+                            <a href="{% url 'attendance_member_checkin' %}" class="btn btn-sm btn-secondary">Member self check-in</a>
+                        </div>
                         <div class="d-flex">
                             <h3 class="h5 fw-bold text-gray-900 mb-3 d-flex align-items-center gap-2">
                                 <i class="fas fa-calendar-day text-primary"></i> Scheduled Sessions

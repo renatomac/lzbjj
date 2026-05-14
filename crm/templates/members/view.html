@@ -93,6 +93,9 @@
                                             <a href="{% url 'editMember' member_id=member.id %}" class="btn btn-primary">
                                                 <i class="fas fa-edit me-2"></i>Edit Profile
                                             </a>
+                                            <a href="{% url 'attendance_enroll' member.id %}" class="btn btn-outline-primary">
+                                                <i class="fas fa-face-smile me-2"></i>Enroll Face
+                                            </a>
                                             <button type="button" data-id="{{member.id}}" class="toggle-status btn {% if member.is_active %}btn-danger{% else %}btn-success{% endif %}">
                                                 <i class="fas {% if member.is_active %}fa-user-slash{% else %}fa-user-check{% endif %} me-2"></i>
                                                 {% if member.is_active %} Deactivate {% else %} Activate {% endif %}

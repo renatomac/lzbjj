@@ -16,6 +16,7 @@ from .models import User, Plan, Member, Membership, BeltPromotion, Staff, Contac
 from notifications.models import Notification
 from .forms import PlanForm, StaffForm , MemberForm, MembershipForm, ClassForm, ContactFormSet, ContactForm,BeltPromotionForm, AttendanceForm, MinorWaiverForm, AdultWaiverForm, ClassSessionForm, WaiverEditForm
 from .formsets import SessionAttendanceFormSet
+from .aws_utils import index_member_face, search_faces_by_image
 from datetime import datetime, date, timedelta
 from crm.utils import *
 from datetime import date
@@ -648,6 +649,193 @@ def attendanceRecord(request, session_id):
     "attending_list":attending_list,
     "todaySessions":todaySessions,
     "filter": filter,
+    })
+
+
+@login_required
+def attendance_enroll(request, member_id):
+    member = get_object_or_404(Member, pk=member_id)
+    if request.method == "POST":
+        image_file = request.FILES.get("face_image")
+        if not image_file:
+            messages.error(request, "Please select a face image to enroll.")
+        else:
+            try:
+                face_id, image_url, image_key = index_member_face(member, image_file)
+                member.photo = image_url
+                member.face_image_s3_key = image_key
+                member.rekognition_face_id = face_id
+                member.save(update_fields=["photo", "face_image_s3_key", "rekognition_face_id"])
+                messages.success(request, "Face enrolled successfully.")
+            except Exception as exc:
+                logger.exception("Face enrollment failed")
+                messages.error(request, str(exc))
+
+    return render(request, "attendance/enroll.html", {
+        "member": member,
+    })
+
+
+@login_required
+def attendance_bulk(request):
+    if not request.user.is_staff:
+        return HttpResponse("Staff access only", status=403)
+
+    sessions = (
+        ClassSession.objects
+        .filter(date__gte=timezone.localdate())
+        .annotate(
+            effective_start_time_db=Coalesce(
+                "start_time",
+                F("class_template__start_time")
+            )
+        )
+        .order_by("date", "effective_start_time_db")
+    )
+
+    recognized_members = []
+    face_matches = None
+
+    if request.method == "POST":
+        session_id = request.POST.get("session_id")
+        image_file = request.FILES.get("attendance_image")
+
+        if not session_id:
+            messages.error(request, "Please select a class session.")
+        elif not image_file:
+            messages.error(request, "Please upload a class photo.")
+        else:
+            session = get_object_or_404(ClassSession, pk=session_id)
+            try:
+                matches, _ = search_faces_by_image(image_file)
+                face_matches = matches
+                member_ids = set()
+                for match in matches:
+                    external_id = match["Face"].get("ExternalImageId")
+                    if external_id:
+                        member_ids.add(int(external_id))
+
+                for member_id in member_ids:
+                    member = Member.objects.filter(pk=member_id).first()
+                    if member:
+                        attendance, created = SessionAttendance.objects.get_or_create(
+                            session=session,
+                            member=member,
+                            defaults={"present": True},
+                        )
+                        if not created and not attendance.present:
+                            attendance.present = True
+                            attendance.save(update_fields=["present"])
+                        face_confidence = next(
+                            (match["Similarity"] for match in matches
+                             if match["Face"].get("ExternalImageId") == str(member_id)),
+                            0,
+                        )
+                        recognized_members.append({
+                            "member": member,
+                            "confidence": face_confidence,
+                        })
+                if not recognized_members:
+                    messages.warning(request, "No enrolled members were recognized in the photo.")
+                else:
+                    messages.success(request, "Attendance updated for recognized members.")
+            except Exception as exc:
+                logger.exception("Bulk attendance failed")
+                messages.error(request, str(exc))
+
+    return render(request, "attendance/bulk.html", {
+        "sessions": sessions,
+        "recognized_members": recognized_members,
+        "face_matches": face_matches,
+    })
+
+
+@login_required
+def attendance_member_checkin(request):
+    member = getattr(request.user, "member", None)
+    selected_session = None
+    attendance_status = None
+    face_matches = None
+    sessions = (
+        ClassSession.objects
+        .filter(date__gte=timezone.localdate())
+        .annotate(
+            effective_start_time_db=Coalesce(
+                "start_time",
+                F("class_template__start_time")
+            )
+        )
+        .order_by("date", "effective_start_time_db")
+    )
+
+    if request.method == "POST":
+        session_id = request.POST.get("session_id")
+        if session_id:
+            selected_session = get_object_or_404(ClassSession, pk=session_id)
+
+        if not member:
+            messages.error(request, "You must be logged in with a member account to check in.")
+        elif not selected_session:
+            messages.error(request, "Please select a class session.")
+        elif selected_session.is_canceled:
+            messages.error(request, "This session has been canceled.")
+        elif request.POST.get("checkin_manual"):
+            attendance, created = SessionAttendance.objects.get_or_create(
+                session=selected_session,
+                member=member,
+                defaults={"present": True},
+            )
+            if not created and not attendance.present:
+                attendance.present = True
+                attendance.save(update_fields=["present"])
+            attendance_status = f"Manual check-in recorded for {selected_session.class_template.name} on {selected_session.date}."
+        elif request.POST.get("checkin_face"):
+            image_file = request.FILES.get("face_image")
+            if not image_file:
+                messages.error(request, "Please upload a photo for face check-in.")
+            else:
+                try:
+                    matches, _ = search_faces_by_image(image_file)
+                    face_matches = []
+                    recognized_member = False
+                    for match in matches:
+                        external_id = match["Face"].get("ExternalImageId")
+                        member_name = None
+                        if external_id:
+                            matched_member = Member.objects.filter(pk=int(external_id)).first()
+                            if matched_member:
+                                member_name = f"{matched_member.first_name} {matched_member.last_name}"
+                        face_matches.append({
+                            "member_name": member_name or "Unknown",
+                            "confidence": match.get("Similarity", 0),
+                        })
+                        if external_id == str(member.id):
+                            recognized_member = True
+
+                    if recognized_member:
+                        attendance, created = SessionAttendance.objects.get_or_create(
+                            session=selected_session,
+                            member=member,
+                            defaults={"present": True},
+                        )
+                        if not created and not attendance.present:
+                            attendance.present = True
+                            attendance.save(update_fields=["present"])
+                        attendance_status = "Face check-in successful. Your attendance was recorded."
+                    else:
+                        messages.error(request, "Face did not match your profile. Please try again or use manual check-in.")
+                except Exception as exc:
+                    logger.exception("Member face check-in failed")
+                    messages.error(request, str(exc))
+        else:
+            messages.error(request, "Please choose manual check-in or upload a face photo.")
+
+    return render(request, "attendance/member_checkin.html", {
+        "member": member,
+        "sessions": sessions,
+        "selected_session": selected_session,
+        "attendance_status": attendance_status,
+        "face_matches": face_matches,
     })
 
 
