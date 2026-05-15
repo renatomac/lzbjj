@@ -85,9 +85,9 @@ Members <span class="badge bg-primary ms-2">{{ members.paginator.count }}</span>
                             <td>
                                 <div class="d-flex align-items-center">
                                     {% if member.get_photo_url %}
-                                        <img src="{{ member.get_photo_url }}" alt="member Photo" class="img-fluid rounded-circle mb-2" style="max-width: 150px;">
+                                        <img src="{{ member.get_photo_url }}" alt="member Photo" class="img-fluid rounded-circle mb-2" style="max-width: 30px;">
                                     {% else %}
-                                        <div class="rounded-circle bg-secondary text-white d-flex align-items-center justify-content-center" style="width: 150px; height: 150px; margin: auto;">
+                                        <div class="rounded-circle bg-secondary text-white d-flex align-items-center justify-content-center" style="width: 30px; height: 30px; margin: auto;">
                                             <i class="fa-solid fa-user fa-3x"></i>
                                         </div>
                                     {% endif %}
