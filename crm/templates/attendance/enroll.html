@@ -108,13 +108,17 @@ document.addEventListener("DOMContentLoaded", function() {
     }
     const videoTrack = stream.getVideoTracks()[0];
     const settings = videoTrack.getSettings ? videoTrack.getSettings() : null;
-    const width = settings?.width || cameraVideo.videoWidth || 640;
-    const height = settings?.height || cameraVideo.videoHeight || 480;
+    let width = settings?.width || cameraVideo.videoWidth || 640;
+    let height = settings?.height || cameraVideo.videoHeight || 480;
+    const maxDimension = 1024;
+    const scale = Math.min(1, maxDimension / Math.max(width, height));
+    width = Math.round(width * scale);
+    height = Math.round(height * scale);
     const canvas = document.createElement("canvas");
     canvas.width = width;
     canvas.height = height;
     canvas.getContext("2d").drawImage(cameraVideo, 0, 0, width, height);
-    const dataUrl = canvas.toDataURL("image/jpeg", 0.9);
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
     faceImageDataInput.value = dataUrl;
     photoPreview.src = dataUrl;
     capturedPreview.classList.remove("d-none");

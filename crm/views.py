@@ -675,11 +675,10 @@ def attendance_enroll(request, member_id):
             messages.error(request, "Please select a face image to enroll.")
         else:
             try:
-                face_id, image_url, image_key = index_member_face(member, image_file)
-                member.photo = image_url
+                face_id, _, image_key = index_member_face(member, image_file)
                 member.face_image_s3_key = image_key
                 member.rekognition_face_id = face_id
-                member.save(update_fields=["photo", "face_image_s3_key", "rekognition_face_id"])
+                member.save(update_fields=["face_image_s3_key", "rekognition_face_id"])
                 messages.success(request, "Face enrolled successfully.")
             except Exception as exc:
                 logger.exception("Face enrollment failed")
