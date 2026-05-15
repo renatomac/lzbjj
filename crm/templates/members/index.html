@@ -83,13 +83,13 @@ Members <span class="badge bg-primary ms-2">{{ members.paginator.count }}</span>
                             <tr>
                                 <td class="ps-3 ps-lg-4">
                                     <div class="d-flex align-items-center gap-2 gap-lg-3">
-                                        {% if member.get_photo_url %}
-                                            <img src="{{ member.get_photo_url }}" alt="{{ member.first_name }}" 
-                                                 class="rounded-circle object-fit-cover"
-                                                 style="width: 38px; height: 38px; min-width: 38px;">
+                                        {% if member.photo %}
+                                            <img src="{{ member.photo.url }}" alt="{{ member.first_name }}" 
+                                                class="rounded-circle object-fit-cover"
+                                                style="width: 38px; height: 38px; min-width: 38px;">
                                         {% else %}
                                             <div class="rounded-circle bg-gradient bg-secondary d-flex align-items-center justify-content-center flex-shrink-0"
-                                                 style="width: 38px; height: 38px; min-width: 38px;">
+                                                style="width: 38px; height: 38px; min-width: 38px;">
                                                 <i class="fa-solid fa-user text-white" style="font-size: 16px;"></i>
                                             </div>
                                         {% endif %}
