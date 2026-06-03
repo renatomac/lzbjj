@@ -1,0 +1,113 @@
+[33m4abc794[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m timer
+[33mfefb8c3[m timer
+[33m471465e[m[33m ([m[1;32mcopilot/worktree-2026-05-31T17-17-07[m[33m, [m[1;32mcopilot/worktree-2026-05-31T17-16-12[m[33m)[m timer
+[33mfd294e9[m face
+[33mc2099bb[m face
+[33mc7c3e0f[m face
+[33m7267f9d[m face
+[33mc414dad[m face
+[33m8b2b93e[m face
+[33mb64e0e0[m face
+[33mf913f18[m face
+[33mbfa68ae[m face
+[33m1905b8b[m face rec
+[33m1d2fdee[m cast
+[33m7222883[m cast
+[33m859bc2a[m cast
+[33me145f9d[m cast
+[33md4956f1[m cast
+[33m43c8f90[m cast
+[33m5379ef3[m cast
+[33m1d7e550[m cast
+[33m4ef5ae2[m cast
+[33m394eace[m cast
+[33m7af1177[m cast
+[33m4021beb[m cast
+[33m6295d95[m cast
+[33m33f68d3[m cast
+[33m45e0eb8[m cast
+[33m98bb1b0[m cast
+[33m5699175[m cast
+[33m99d569c[m cast
+[33mf7f29ef[m cast
+[33meda1b94[m Cast
+[33m4312522[m timer
+[33m4c0625c[m notificarion
+[33m7a83729[m logo
+[33m025570d[m member view update
+[33m7a9cf32[m fix belt save func
+[33m3a10383[m belt adjust
+[33mfa482d0[m new
+[33m6465f7e[m new
+[33m179d419[m attendance
+[33mf994436[m filter
+[33m9c4135c[m APi adjust
+[33mb4cb368[m Stop tracking collected static (staticfiles/) and ignore going forward
+[33m16ff3ea[m bnotification adjustments.
+[33me86b398[m WIP: update urls, login layout, utils; add logo.svg and README
+[33m8edf738[m api
+[33m3ece1a0[m classes
+[33m434c00f[m classes
+[33m09b5090[m classes
+[33mc6e4eb8[m classes adjust
+[33m6fcdfce[m waiver adjustments
+[33mc084059[m stripes
+[33ma977c30[m belt distribution adjustment
+[33m859e310[m waiver update
+[33mf1b7495[m update
+[33mbde2aac[m attencence adjustments
+[33m9dae289[m fix member issue
+[33m46cd769[m memberform issue
+[33m888bedb[m no_waiver page
+[33mf1edcdb[m waiver update
+[33mca26b41[m waiver
+[33me9fc5cf[m icons
+[33m35ba099[m fix
+[33mc725471[m fix
+[33m380d2b9[m fix
+[33m79077d2[m new update
+[33mc84b07c[m update Regenerate Future Sessions
+[33ma230b47[m user obligation temporary disabled.
+[33m95ecd29[m session filter
+[33mcfcf1a7[m Sessions improvement
+[33mbeed310[m fix attendance edition
+[33mabc16c3[m fix class edit
+[33mdbb41c6[m gitignore
+[33mfa40ad0[m fix member phone and order
+[33m967856a[m Merge branch 'main' of https://github.com/renatomac/lzbjj
+[33mc387dcf[m digital waiver
+[33m7eb2aee[m Layout adjustments
+[33meb55713[m WIP: local changes before rebase
+[33m26b7ec0[m Update gitignore
+[33m9dce252[m sync
+[33m0c1bc00[m dashboard corerection
+[33m418b85d[m birthdays
+[33mfac7984[m sessions adjustments
+[33m882aa3a[m Merge branch 'main' of https://github.com/renatomac/lzbjj
+[33me205e28[m static
+[33mc443401[m static
+[33m9aa89a7[m Delete .virtualenvs directory
+[33md340eae[m Delete .ssh directory
+[33m434070b[m Delete .local directory
+[33m6b97a06[m Delete .ipython/profile_default/startup directory
+[33m08444db[m sessions
+[33m78e6a13[m Remove pyc files and respect .gitignore
+[33m9d12c96[m create sessions
+[33m03634f8[m Merge branch 'main' of github.com:renatomac/lzbjj
+[33m14899d7[m gitignore
+[33mcd80936[m Add Python cache and bytecode files to .gitignore
+[33m898aef7[m session techniques and comments
+[33m5f2546d[m before changing the class schedule
+[33ma1fa971[m before creation of class session
+[33m62eac8e[m form size adjustments
+[33m6b1911b[m phone size
+[33m0752337[m test
+[33m614090c[m Merge branch 'main' of github.com:renatomac/lzbjj
+[33m9c1057f[m daily routine
+[33mee4f898[m Merged remote main into local, keeping remote versions
+[33mff3a222[m Update .gitignore to ignore virtualenv and SSH keys
+[33m972a62e[m Initial Django project
+[33m939ab27[m gitignore
+[33m9852192[m Merge branch 'main' of github.com:renatomac/lzbjj
+[33m0d0f097[m Initial Commit
+[33ma9155cb[m Initial commit
