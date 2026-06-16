@@ -19,6 +19,20 @@
     <link rel="stylesheet" href="{% static 'crm/css/styles.css' %}">
 
     {% block extra_head %}{% endblock %}
+    <style>
+    @keyframes pulse {
+      0% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.12); opacity: 0.85; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    .timer-pulse {
+      animation: pulse 1s infinite ease-in-out;
+      display: inline-block;
+    }
+    .bg-work { background-color: #198754 !important; }
+    .bg-rest { background-color: #dc3545 !important; }
+    .bg-paused { background-color: #6c757d !important; }
+    </style>
 </head>
 
 
@@ -102,6 +116,194 @@ document.addEventListener('click', (e) => {
   }
 });
 
+// --- Global Timer Javascript Helpers ---
+let activeTimerState = null;
+let globalTimerInterval = null;
+
+async function checkActiveTimer() {
+  try {
+    const res = await fetch("/timers/active-state/");
+    const data = await res.json();
+    if (data.active) {
+      updateGlobalTimerState(data);
+    } else {
+      hideGlobalTimer();
+    }
+  } catch (e) {
+    console.error("Error checking active timer", e);
+  }
+}
+
+function updateGlobalTimerState(timer) {
+  activeTimerState = timer;
+  if (globalTimerInterval) {
+    clearInterval(globalTimerInterval);
+    globalTimerInterval = null;
+  }
+  
+  if (timer.status === 'RUNNING') {
+    globalTimerInterval = setInterval(tickGlobalTimer, 1000);
+    renderGlobalTimer();
+  } else if (timer.status === 'PAUSED') {
+    renderGlobalTimer();
+  } else {
+    hideGlobalTimer();
+  }
+}
+
+function hideGlobalTimer() {
+  activeTimerState = null;
+  if (globalTimerInterval) {
+    clearInterval(globalTimerInterval);
+    globalTimerInterval = null;
+  }
+  const widget = document.getElementById('globalTimerWidget');
+  if (widget) {
+    widget.classList.remove('d-flex');
+    widget.classList.add('d-none');
+  }
+}
+
+function formatGlobalTime(seconds) {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+}
+
+function parseGlobalDate(dateStr) {
+  if (!dateStr) return null;
+  const normalized = dateStr.replace(/\.(\d{1,3})\d*/, '.$1');
+  const d = new Date(normalized);
+  if (isNaN(d.getTime())) {
+    return new Date(dateStr.split('.')[0]);
+  }
+  return d;
+}
+
+function getGlobalTimerStateAt(state, targetTime) {
+  if (state.status !== 'RUNNING' || !state.last_started_at) {
+    return {
+      status: state.status,
+      current_state: state.current_state,
+      current_round: state.current_round,
+      time_remaining: state.time_remaining
+    };
+  }
+  
+  const lastStarted = parseGlobalDate(state.last_started_at);
+  if (!lastStarted || isNaN(lastStarted.getTime())) {
+    return {
+      status: state.status,
+      current_state: state.current_state,
+      current_round: state.current_round,
+      time_remaining: state.time_remaining
+    };
+  }
+  
+  let elapsed = Math.floor((targetTime - lastStarted) / 1000);
+  if (elapsed <= 0) {
+    return {
+      status: state.status,
+      current_state: state.current_state,
+      current_round: state.current_round,
+      time_remaining: state.time_remaining
+    };
+  }
+  
+  let status = state.status;
+  let current_state = state.current_state;
+  let current_round = state.current_round;
+  let time_remaining = state.time_remaining;
+  
+  while (elapsed > 0) {
+    if (elapsed < time_remaining) {
+      time_remaining -= elapsed;
+      elapsed = 0;
+    } else {
+      elapsed -= time_remaining;
+      if (current_state === 'WORK') {
+        if (current_round < state.rounds) {
+          current_state = 'REST';
+          time_remaining = state.interval;
+        } else {
+          status = 'DONE';
+          current_state = 'WORK';
+          time_remaining = 0;
+          elapsed = 0;
+        }
+      } else { // REST
+        current_state = 'WORK';
+        current_round += 1;
+        time_remaining = state.duration;
+      }
+    }
+  }
+  
+  return {
+    status,
+    current_state,
+    current_round,
+    time_remaining
+  };
+}
+
+function tickGlobalTimer() {
+  if (!activeTimerState) return;
+  const current = getGlobalTimerStateAt(activeTimerState, new Date());
+  
+  if (current.status === 'DONE') {
+    hideGlobalTimer();
+    if (activeTimerState.sound_file_url) {
+      const audio = new Audio(activeTimerState.sound_file_url);
+      audio.play().catch(e => console.error("Sound play failed", e));
+    }
+    return;
+  }
+  
+  renderGlobalTimerWithValues(current);
+}
+
+function renderGlobalTimer() {
+  if (!activeTimerState) return;
+  const current = getGlobalTimerStateAt(activeTimerState, new Date());
+  renderGlobalTimerWithValues(current);
+}
+
+function renderGlobalTimerWithValues(current) {
+  const widget = document.getElementById('globalTimerWidget');
+  const text = document.getElementById('globalTimerText');
+  const round = document.getElementById('globalTimerRound');
+  const label = document.getElementById('globalTimerLabel');
+  const link = document.getElementById('globalTimerLink');
+  const icon = document.getElementById('globalTimerIcon');
+  
+  if (!widget) return;
+  
+  widget.classList.remove('d-none');
+  widget.classList.add('d-flex');
+  
+  let displayTime = current.time_remaining;
+  if (activeTimerState.direction === 'UP' && current.current_state === 'WORK') {
+    displayTime = activeTimerState.duration - current.time_remaining;
+  }
+  
+  text.innerText = formatGlobalTime(displayTime);
+  round.innerText = `R${current.current_round}/${activeTimerState.rounds}`;
+  
+  label.innerText = current.current_state;
+  label.className = `badge ms-1 ${current.current_state === 'WORK' ? 'bg-work bg-success' : 'bg-rest bg-danger'}`;
+  
+  link.href = `/timers/${activeTimerState.id}/run/`;
+  
+  if (activeTimerState.status === 'RUNNING') {
+    icon.className = 'fas fa-stopwatch text-success timer-pulse';
+  } else {
+    icon.className = 'fas fa-stopwatch text-secondary';
+    label.innerText = 'PAUSED';
+    label.className = 'badge ms-1 bg-paused bg-secondary';
+  }
+}
+
 // --- Ably realtime subscription (single instance & single subscription) ---
 document.addEventListener('DOMContentLoaded', async () => {
   {% if user.is_authenticated %}
@@ -172,6 +374,23 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
         setBadge(0);
       });
+
+      // --- Ably active timer subscription ---
+      const timerChannelName = "user-{{ request.user.id }}-timer";
+      const timerChannel = ably.channels.get(timerChannelName);
+      
+      timerChannel.subscribe('update', (msg) => {
+        console.log('Ably timer update received:', msg.data);
+        const timer = msg.data;
+        if (timer.status === 'READY' || timer.status === 'DONE') {
+          hideGlobalTimer();
+        } else {
+          updateGlobalTimerState(timer);
+        }
+      });
+      
+      // Check initial active timer
+      checkActiveTimer();
 
       window.__notifSubscribed = true;
     }
@@ -336,6 +555,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                 </div>  
                 
                 <div class="d-flex align-items-center">
+                <!-- Global Active Timer Widget -->
+                <div id="globalTimerWidget" class="d-none me-3 align-items-center gap-2 px-3 py-1 bg-light border rounded-pill shadow-sm">
+                    <i class="fas fa-stopwatch text-success" id="globalTimerIcon" style="font-size: 1.1rem;"></i>
+                    <span id="globalTimerText" class="font-monospace fw-bold fs-6">00:00</span>
+                    <span id="globalTimerRound" class="small text-muted" style="font-size: 0.8rem;">R1/3</span>
+                    <span id="globalTimerLabel" class="badge ms-1" style="font-size: 0.75rem;">WORK</span>
+                    <a id="globalTimerLink" class="btn btn-sm btn-link p-0 ms-1 text-decoration-none" title="Open Timer"><i class="fas fa-external-link-alt"></i></a>
+                </div>
+                
                 <span class="me-3 text-muted small d-none d-sm-inline">
                     Hi!, {{ user.username }}
                 </span>

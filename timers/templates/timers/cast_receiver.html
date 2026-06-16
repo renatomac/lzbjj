@@ -401,6 +401,150 @@
             roundEl.innerHTML   = 'ROUND &nbsp;<span>—</span>&nbsp;/&nbsp;<span>—</span>';
         }
 
+        let localTimerState = null;
+        let receiverInterval = null;
+
+        function parseDate(dateStr) {
+            if (!dateStr) return null;
+            const normalized = dateStr.replace(/\.(\d{1,3})\d*/, '.$1');
+            const d = new Date(normalized);
+            if (isNaN(d.getTime())) {
+                return new Date(dateStr.split('.')[0]);
+            }
+            return d;
+        }
+
+        function getTimerStateAt(state, targetTime) {
+            if (state.status !== 'RUNNING' || !state.last_started_at) {
+                return {
+                    status: state.status,
+                    current_state: state.current_state,
+                    current_round: state.current_round,
+                    time_remaining: state.time_remaining
+                };
+            }
+            
+            const lastStarted = parseDate(state.last_started_at);
+            if (!lastStarted || isNaN(lastStarted.getTime())) {
+                return {
+                    status: state.status,
+                    current_state: state.current_state,
+                    current_round: state.current_round,
+                    time_remaining: state.time_remaining
+                };
+            }
+            
+            let elapsed = Math.floor((targetTime - lastStarted) / 1000);
+            if (elapsed <= 0) {
+                return {
+                    status: state.status,
+                    current_state: state.current_state,
+                    current_round: state.current_round,
+                    time_remaining: state.time_remaining
+                };
+            }
+            
+            let status = state.status;
+            let current_state = state.current_state;
+            let current_round = state.current_round;
+            let time_remaining = state.time_remaining;
+            
+            while (elapsed > 0) {
+                if (elapsed < time_remaining) {
+                    time_remaining -= elapsed;
+                    elapsed = 0;
+                } else {
+                    elapsed -= time_remaining;
+                    if (current_state === 'WORK') {
+                        if (current_round < state.rounds) {
+                            current_state = 'REST';
+                            time_remaining = state.interval;
+                        } else {
+                            status = 'DONE';
+                            current_state = 'WORK';
+                            time_remaining = 0;
+                            elapsed = 0;
+                        }
+                    } else { // REST
+                        current_state = 'WORK';
+                        current_round += 1;
+                        time_remaining = state.duration;
+                    }
+                }
+            }
+            
+            return {
+                status,
+                current_state,
+                current_round,
+                time_remaining
+            };
+        }
+
+        function updateReceiverTimer(timer) {
+            localTimerState = timer;
+            if (receiverInterval) {
+                clearInterval(receiverInterval);
+                receiverInterval = null;
+            }
+            if (timer.status === 'RUNNING') {
+                receiverInterval = setInterval(tickReceiver, 1000);
+            }
+            renderReceiver();
+        }
+
+        function tickReceiver() {
+            if (!localTimerState || localTimerState.status !== 'RUNNING') return;
+            const current = getTimerStateAt(localTimerState, new Date());
+            
+            if (current.status === 'DONE') {
+                clearInterval(receiverInterval);
+                receiverInterval = null;
+                localTimerState.status = 'DONE';
+                localTimerState.time_remaining = 0;
+            }
+            renderReceiverWithValues(current);
+        }
+
+        function renderReceiver() {
+            if (!localTimerState) return;
+            const current = getTimerStateAt(localTimerState, new Date());
+            renderReceiverWithValues(current);
+        }
+
+        function formatTime(seconds) {
+            const m = Math.floor(seconds / 60);
+            const s = seconds % 60;
+            return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        }
+
+        function renderReceiverWithValues(current) {
+            let displayTime = current.time_remaining;
+            if (localTimerState.direction === 'UP' && current.current_state === 'WORK') {
+                displayTime = localTimerState.duration - current.time_remaining;
+            }
+            
+            const timeStr = formatTime(displayTime);
+            const isWarning = current.current_state === 'WORK' && displayTime < 10;
+            
+            let labelText = '';
+            if (current.status === 'READY') {
+                labelText = 'READY';
+            } else if (current.status === 'DONE') {
+                labelText = 'DONE';
+            } else {
+                labelText = `${current.current_state} - Round ${current.current_round}/${localTimerState.rounds}`;
+            }
+            
+            const renderData = {
+                time: timeStr,
+                label: labelText,
+                warning: isWarning
+            };
+            
+            applyState(renderData);
+        }
+
         // ── CAST RECEIVER SETUP ───────────────────────────────────
         const context = cast.framework.CastReceiverContext.getInstance();
         const options = new cast.framework.CastReceiverOptions();
@@ -408,10 +552,24 @@
         options.maxInactivity = 3600;
 
         context.addCustomMessageListener(CUSTOM_NAMESPACE, function (event) {
-            const d = event.data;
+            let d = event.data;
             if (!d) return;
-            applyState(d);
-            setStatus('LIVE · RECEIVING', true);
+            
+            if (typeof d === 'string') {
+                try {
+                    d = JSON.parse(d);
+                } catch (e) {
+                    console.error("Error parsing custom message JSON", e);
+                }
+            }
+            
+            if (d && d.status !== undefined && d.duration !== undefined) {
+                updateReceiverTimer(d);
+                setStatus('LIVE · SYNCED', true);
+            } else {
+                applyState(d);
+                setStatus('LIVE · RECEIVING', true);
+            }
         });
 
         context.addEventListener(cast.framework.system.EventType.READY, () => {
@@ -431,6 +589,7 @@
 
         // Debug hook
         window.debugCastUpdate = (time, label, warning) => applyState({ time, label, warning });
+        window.debugCastState = (state) => updateReceiverTimer(state);
     })();
     </script>
 </body>

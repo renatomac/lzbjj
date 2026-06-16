@@ -80,6 +80,83 @@
     const CUSTOM_NAMESPACE = 'urn:x-cast:com.yourdomain.timer';
     
     let castSession = null;
+
+    function parseDate(dateStr) {
+        if (!dateStr) return null;
+        const normalized = dateStr.replace(/\.(\d{1,3})\d*/, '.$1');
+        const d = new Date(normalized);
+        if (isNaN(d.getTime())) {
+            return new Date(dateStr.split('.')[0]);
+        }
+        return d;
+    }
+
+    function getTimerStateAt(state, targetTime) {
+        if (state.status !== 'RUNNING' || !state.last_started_at) {
+            return {
+                status: state.status,
+                current_state: state.current_state,
+                current_round: state.current_round,
+                time_remaining: state.time_remaining
+            };
+        }
+        
+        const lastStarted = parseDate(state.last_started_at);
+        if (!lastStarted || isNaN(lastStarted.getTime())) {
+            return {
+                status: state.status,
+                current_state: state.current_state,
+                current_round: state.current_round,
+                time_remaining: state.time_remaining
+            };
+        }
+        
+        let elapsed = Math.floor((targetTime - lastStarted) / 1000);
+        if (elapsed <= 0) {
+            return {
+                status: state.status,
+                current_state: state.current_state,
+                current_round: state.current_round,
+                time_remaining: state.time_remaining
+            };
+        }
+        
+        let status = state.status;
+        let current_state = state.current_state;
+        let current_round = state.current_round;
+        let time_remaining = state.time_remaining;
+        
+        while (elapsed > 0) {
+            if (elapsed < time_remaining) {
+                time_remaining -= elapsed;
+                elapsed = 0;
+            } else {
+                elapsed -= time_remaining;
+                if (current_state === 'WORK') {
+                    if (current_round < state.rounds) {
+                        current_state = 'REST';
+                        time_remaining = state.interval;
+                    } else {
+                        status = 'DONE';
+                        current_state = 'WORK';
+                        time_remaining = 0;
+                        elapsed = 0;
+                    }
+                } else { // REST
+                    current_state = 'WORK';
+                    current_round += 1;
+                    time_remaining = state.duration;
+                }
+            }
+        }
+        
+        return {
+            status,
+            current_state,
+            current_round,
+            time_remaining
+        };
+    }
     
     window.__onGCastApiAvailable = function(isAvailable) {
         if (isAvailable) {
@@ -103,12 +180,21 @@
         context.addEventListener(
             cast.framework.CastContextEventType.SESSION_STATE_CHANGED,
             (event) => {
-                if (event.sessionState === cast.framework.SessionState.SESSION_STARTED) {
+                if (event.sessionState === cast.framework.SessionState.SESSION_STARTED ||
+                    event.sessionState === cast.framework.SessionState.SESSION_RESUMED) {
                     castSession = context.getCurrentSession();
                     sendTimerUpdate();
+                } else if (event.sessionState === cast.framework.SessionState.SESSION_ENDED) {
+                    castSession = null;
                 }
             }
         );
+
+        // Check if session is already active on load
+        castSession = context.getCurrentSession();
+        if (castSession) {
+            sendTimerUpdate();
+        }
     }
     
     function initiateCast() {
@@ -128,45 +214,48 @@
     }
     
     function sendTimerUpdate() {
-        if (!castSession) return;
+        if (!castSession || !window.localTimerState) return;
         
-        const timerValue = document.getElementById('timerDisplay').innerText;
-        const isWarning = timerValue.includes('00:') && parseInt(timerValue.slice(-2)) < 10;
+        // 1. Calculate values for the old receiver (backwards compatibility)
+        const current = getTimerStateAt(window.localTimerState, new Date());
         
-        // Use window.currentRound (global) instead of local variable
-        const messageData = {
-            time: timerValue,
-            label: window.currentRound ? 'Round ' + window.currentRound : 'Timer',
+        let displayTime = current.time_remaining;
+        if (window.localTimerState.direction === 'UP' && current.current_state === 'WORK') {
+            displayTime = window.localTimerState.duration - current.time_remaining;
+        }
+        
+        const m = Math.floor(displayTime / 60);
+        const s = displayTime % 60;
+        const timeStr = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        const isWarning = current.current_state === 'WORK' && displayTime < 10;
+        
+        let labelText = '';
+        if (current.status === 'READY') {
+            labelText = 'READY';
+        } else if (current.status === 'DONE') {
+            labelText = 'DONE';
+        } else {
+            labelText = `${current.current_state} - Round ${current.current_round}/${window.localTimerState.rounds}`;
+        }
+        
+        // 2. Create the combined hybrid payload
+        const payload = Object.assign({}, window.localTimerState, {
+            time: timeStr,
+            label: labelText,
             warning: isWarning
-        };
+        });
         
-        castSession.sendMessage(CUSTOM_NAMESPACE, messageData)
-            .then(() => console.log('Timer updated on TV'))
-            .catch(err => console.error('Send failed:', err));
+        castSession.sendMessage(CUSTOM_NAMESPACE, payload)
+            .then(() => console.log('Timer state synced with TV'))
+            .catch(err => console.error('Send state failed:', err));
     }
 </script>
+
+{{ timer.to_dict|json_script:"timer-state-data" }}
 
 <!-- Main Timer Script -->
 <script>
     document.addEventListener('DOMContentLoaded', () => {
-        // Timer configuration
-        const config = {
-            rounds: parseInt("{{ timer.rounds }}"),
-            duration: parseInt("{{ timer.duration }}"),
-            interval: parseInt("{{ timer.interval }}"),
-            direction: "{{ timer.direction }}",
-            soundFileUrl: "{% if timer.sound_file %}{{ timer.sound_file.url }}{% endif %}"
-        };
-
-        // State variables - make currentRound global for Cast access
-        let currentRound = 1;
-        window.currentRound = currentRound;  // Expose globally
-        
-        let currentState = 'ready';
-        let timeRemaining = config.duration;
-        let elapsedTime = 0;
-        let timerInterval = null;
-
         // Elements
         const display = document.getElementById('timerDisplay');
         const statusText = document.getElementById('statusText');
@@ -174,6 +263,12 @@
         const btnStart = document.getElementById('btnStart');
         const btnPause = document.getElementById('btnPause');
         const btnReset = document.getElementById('btnReset');
+
+        // State variables
+        let localTimerState = JSON.parse(document.getElementById('timer-state-data').textContent);
+        window.localTimerState = localTimerState;
+        let timerInterval = null;
+        window.lastRenderedState = null;
 
         // Audio Context setup
         let audioCtx = null;
@@ -188,8 +283,8 @@
         }
 
         function playBeep(type) {
-            if (type === 'end' && config.soundFileUrl) {
-                const audio = new Audio(config.soundFileUrl);
+            if (type === 'end' && localTimerState.sound_file_url) {
+                const audio = new Audio(localTimerState.sound_file_url);
                 audio.play().catch(e => console.error("Error playing custom audio", e));
                 return;
             }
@@ -236,143 +331,152 @@
             return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
         }
 
-        function updateDisplay() {
-            let displayTime = config.direction === 'DOWN' ? timeRemaining : elapsedTime;
-            
-            if (currentState === 'rest') {
-                 displayTime = timeRemaining;
+
+        function updateLocalTimerState(timer) {
+            localTimerState = timer;
+            window.localTimerState = timer;
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
             }
-
-            display.innerText = formatTime(displayTime);
-            roundText.innerText = `Round ${currentRound} / ${config.rounds}`;
             
-            // Update global variable for Cast
-            window.currentRound = currentRound;
-
-            // Update colors
-            display.className = 'timer-display';
-            if (currentState === 'work') display.classList.add('state-work');
-            else if (currentState === 'rest') display.classList.add('state-rest');
-            else display.classList.add('state-paused');
-        }
-
-        function setInitialState() {
-            currentState = 'ready';
-            currentRound = 1;
-            window.currentRound = currentRound;
-            timeRemaining = config.duration;
-            elapsedTime = 0;
-            statusText.innerText = 'READY';
-            statusText.className = 'status-text text-muted';
-            updateDisplay();
-            // Send initial update to TV if casting
-            if (typeof sendTimerUpdate === 'function') {
-                sendTimerUpdate();
+            if (timer.status === 'RUNNING') {
+                timerInterval = setInterval(tick, 1000);
             }
+            renderLocalState();
         }
 
         function tick() {
-            if (currentState === 'work') {
-                if (config.direction === 'DOWN') {
-                    timeRemaining--;
-                    if (timeRemaining <= 3 && timeRemaining > 0) playBeep('tick');
-                } else {
-                    elapsedTime++;
-                    if (elapsedTime >= config.duration - 3 && elapsedTime < config.duration) playBeep('tick');
-                }
-
-                if ((config.direction === 'DOWN' && timeRemaining <= 0) || 
-                    (config.direction === 'UP' && elapsedTime >= config.duration)) {
-                    if (currentRound < config.rounds) {
-                        transitionTo('rest');
-                    } else {
-                        transitionTo('done');
+            if (!localTimerState || localTimerState.status !== 'RUNNING') return;
+            
+            const current = getTimerStateAt(localTimerState, new Date());
+            const prevRendered = window.lastRenderedState;
+            
+            if (prevRendered) {
+                if (prevRendered.status === 'RUNNING' && current.status === 'DONE') {
+                    playBeep('end');
+                } else if (prevRendered.current_state === 'WORK' && current.current_state === 'REST') {
+                    playBeep('rest');
+                } else if (prevRendered.current_state === 'REST' && current.current_state === 'WORK') {
+                    playBeep('work');
+                } else if (current.status === 'RUNNING') {
+                    const tr = current.time_remaining;
+                    if (tr <= 3 && tr > 0 && tr !== prevRendered.time_remaining) {
+                        playBeep('tick');
                     }
                 }
-            } else if (currentState === 'rest') {
-                timeRemaining--;
-                if (timeRemaining <= 3 && timeRemaining > 0) playBeep('tick');
-
-                if (timeRemaining <= 0) {
-                    currentRound++;
-                    window.currentRound = currentRound;
-                    transitionTo('work');
-                }
             }
-            updateDisplay();
-            // Send update to TV every tick
+            
+            if (current.status === 'DONE') {
+                clearInterval(timerInterval);
+                timerInterval = null;
+                localTimerState.status = 'DONE';
+                localTimerState.time_remaining = 0;
+            }
+            
+            renderLocalStateWithValues(current);
+        }
+
+        function renderLocalState() {
+            if (!localTimerState) return;
+            const current = getTimerStateAt(localTimerState, new Date());
+            renderLocalStateWithValues(current);
+        }
+
+        function renderLocalStateWithValues(current) {
+            window.lastRenderedState = {
+                status: current.status,
+                current_state: current.current_state,
+                current_round: current.current_round,
+                time_remaining: current.time_remaining
+            };
+            
+            window.currentRound = current.current_round;
+            
+            let displayTime = current.time_remaining;
+            if (localTimerState.direction === 'UP' && current.current_state === 'WORK') {
+                displayTime = localTimerState.duration - current.time_remaining;
+            }
+            
+            display.innerText = formatTime(displayTime);
+            roundText.innerText = `Round ${current.current_round} / ${localTimerState.rounds}`;
+            
+            display.className = 'timer-display my-4';
+            if (current.status === 'READY') {
+                statusText.innerText = 'READY';
+                statusText.className = 'status-text text-muted';
+                display.classList.add('state-paused');
+                btnStart.classList.remove('d-none');
+                btnStart.disabled = false;
+                btnPause.classList.add('d-none');
+            } else if (current.status === 'RUNNING') {
+                if (current.current_state === 'WORK') {
+                    statusText.innerText = 'WORK';
+                    statusText.className = 'status-text text-success';
+                    display.classList.add('state-work');
+                } else {
+                    statusText.innerText = 'REST';
+                    statusText.className = 'status-text text-danger';
+                    display.classList.add('state-rest');
+                }
+                btnStart.classList.add('d-none');
+                btnPause.classList.remove('d-none');
+            } else if (current.status === 'PAUSED') {
+                statusText.innerText = 'PAUSED';
+                statusText.className = 'status-text text-muted';
+                display.classList.add('state-paused');
+                btnStart.classList.remove('d-none');
+                btnStart.disabled = false;
+                btnPause.classList.add('d-none');
+            } else if (current.status === 'DONE') {
+                statusText.innerText = 'DONE';
+                statusText.className = 'status-text text-primary';
+                display.classList.add('state-paused');
+                btnStart.classList.remove('d-none');
+                btnStart.disabled = true;
+                btnPause.classList.add('d-none');
+            }
+            
             if (typeof sendTimerUpdate === 'function') {
                 sendTimerUpdate();
             }
         }
 
-        function transitionTo(newState) {
-            currentState = newState;
-            if (newState === 'work') {
-                playBeep('work');
-                statusText.innerText = 'WORK';
-                statusText.className = 'status-text text-success';
-                timeRemaining = config.duration;
-                elapsedTime = 0;
-            } else if (newState === 'rest') {
-                playBeep('rest');
-                statusText.innerText = 'REST';
-                statusText.className = 'status-text text-danger';
-                timeRemaining = config.interval;
-                elapsedTime = 0;
-            } else if (newState === 'done') {
-                playBeep('end');
-                statusText.innerText = 'DONE';
-                statusText.className = 'status-text text-primary';
-                clearInterval(timerInterval);
-                timerInterval = null;
-                btnPause.classList.add('d-none');
-                btnStart.classList.remove('d-none');
-                btnStart.disabled = true;
-            }
-            updateDisplay();
-            // Send update to TV on state change
-            if (typeof sendTimerUpdate === 'function') {
-                sendTimerUpdate();
+        async function sendAction(actionName) {
+            initAudio();
+            try {
+                const res = await csrfFetch(`/timers/${localTimerState.id}/action/`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: actionName })
+                });
+                const data = await res.json();
+                updateLocalTimerState(data);
+            } catch (e) {
+                console.error(`Error sending action ${actionName}:`, e);
             }
         }
 
         // Event Listeners
-        btnStart.addEventListener('click', () => {
-            initAudio();
-            if (currentState === 'ready') {
-                transitionTo('work');
-            } else if (currentState === 'done') {
-                return;
-            }
-            
-            btnStart.classList.add('d-none');
-            btnPause.classList.remove('d-none');
-            
-            if (!timerInterval) {
-                timerInterval = setInterval(tick, 1000);
-            }
-        });
+        btnStart.addEventListener('click', () => sendAction('start'));
+        btnPause.addEventListener('click', () => sendAction('pause'));
+        btnReset.addEventListener('click', () => sendAction('reset'));
 
-        btnPause.addEventListener('click', () => {
-            clearInterval(timerInterval);
-            timerInterval = null;
-            btnPause.classList.add('d-none');
-            btnStart.classList.remove('d-none');
-            display.className = 'timer-display state-paused';
-        });
+        // Subscribe to Ably for real-time updates on this timer
+        if (window.__ablyInstance) {
+            const ably = window.__ablyInstance;
+            const channel = ably.channels.get("user-{{ request.user.id }}-timer");
+            channel.subscribe('update', (msg) => {
+                const timer = msg.data;
+                if (timer.id === localTimerState.id) {
+                    console.log("Ably received update for this timer", timer);
+                    updateLocalTimerState(timer);
+                }
+            });
+        }
 
-        btnReset.addEventListener('click', () => {
-            clearInterval(timerInterval);
-            timerInterval = null;
-            btnPause.classList.add('d-none');
-            btnStart.classList.remove('d-none');
-            btnStart.disabled = false;
-            setInitialState();
-        });
-
-        // Initialize
-        setInitialState();
+        // Initialize state
+        updateLocalTimerState(localTimerState);
     });
 </script>
 {% endblock %}
