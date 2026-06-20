@@ -21,22 +21,132 @@
           {% csrf_token %}
           <div class="row g-3 mb-4">
             <div class="col-md-6">
-              <label for="session_id" class="form-label fw-semibold">Class Session</label>
-              <select id="session_id" name="session_id" class="form-select" required>
-                <option value="">Select a session</option>
-                {% for session in sessions %}
-                  <option value="{{ session.id }}">{{ session.date }} • {{ session.class_template.name }} • {{ session.effective_start_time }}</option>
-                {% endfor %}
-              </select>
+              <label class="form-label fw-semibold">Class Session</label>
+              {% if selected_session %}
+                <div class="border rounded p-3 bg-light">
+                  <strong>{{ selected_session.class_template.name }}</strong>
+                  <div class="small text-muted">{{ selected_session.date }} • {{ selected_session.effective_start_time }}</div>
+                </div>
+                <input type="hidden" id="session_id" name="session_id" value="{{ selected_session.id }}">
+              {% else %}
+                <select id="session_id" name="session_id" class="form-select" required>
+                  <option value="">Select a session</option>
+                  {% for session in sessions %}
+                    <option value="{{ session.id }}">{{ session.date }} • {{ session.class_template.name }} • {{ session.effective_start_time }}</option>
+                  {% endfor %}
+                </select>
+              {% endif %}
             </div>
             <div class="col-md-6">
               <label for="attendance_image" class="form-label fw-semibold">Class Photo</label>
-              <input class="form-control" type="file" id="attendance_image" name="attendance_image" accept="image/*" capture="environment" required>
+              <input class="form-control" type="file" id="attendance_image" name="attendance_image" accept="image/*">
+              <div class="form-text">Use the camera or choose an existing photo from your device.</div>
             </div>
+          </div>
+
+          <div class="mb-3">
+            <button type="button" id="open_camera_btn" class="btn btn-outline-secondary me-2">Use live camera</button>
+            <span class="text-muted">Or choose an existing photo above.</span>
+          </div>
+
+          <input type="hidden" id="attendance_image_data" name="attendance_image_data" value="">
+          <div id="camera_container" class="mb-3 d-none">
+            <div class="ratio ratio-16x9 mb-3">
+              <video id="camera_video" class="w-100 rounded" autoplay playsinline muted></video>
+            </div>
+            <button type="button" id="capture_photo_btn" class="btn btn-primary me-2">Capture Photo</button>
+            <button type="button" id="cancel_camera_btn" class="btn btn-secondary">Cancel</button>
+            <div id="camera_error" class="form-text text-danger mt-2 d-none"></div>
+          </div>
+
+          <div id="captured_preview" class="mb-3 d-none">
+            <label class="form-label fw-semibold">Captured Photo Preview</label>
+            <div class="border rounded p-2">
+              <img id="photo_preview" src="" alt="Captured class photo preview" class="img-fluid rounded" />
+            </div>
+            <div class="form-text">This image will be uploaded for bulk attendance.</div>
           </div>
 
           <button type="submit" class="btn btn-primary">Upload and Mark Attendance</button>
         </form>
+
+        <script>
+          document.addEventListener("DOMContentLoaded", function() {
+            const openCameraBtn = document.getElementById("open_camera_btn");
+            const cameraContainer = document.getElementById("camera_container");
+            const cameraVideo = document.getElementById("camera_video");
+            const capturePhotoBtn = document.getElementById("capture_photo_btn");
+            const cancelCameraBtn = document.getElementById("cancel_camera_btn");
+            const cameraError = document.getElementById("camera_error");
+            const capturedPreview = document.getElementById("captured_preview");
+            const photoPreview = document.getElementById("photo_preview");
+            const attendanceImageDataInput = document.getElementById("attendance_image_data");
+            const attendanceImageInput = document.getElementById("attendance_image");
+            let stream = null;
+
+            function stopCamera() {
+              if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+              }
+              cameraVideo.pause();
+              cameraVideo.srcObject = null;
+              cameraContainer.classList.add("d-none");
+              cameraError.classList.add("d-none");
+            }
+
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+              openCameraBtn?.classList.add("d-none");
+            }
+
+            openCameraBtn?.addEventListener("click", async function() {
+              cameraError.classList.add("d-none");
+              try {
+                stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
+                cameraVideo.srcObject = stream;
+                cameraContainer.classList.remove("d-none");
+                cameraVideo.play();
+              } catch (err) {
+                cameraError.textContent = "Unable to access the camera. Please check permissions and try again.";
+                cameraError.classList.remove("d-none");
+              }
+            });
+
+            attendanceImageInput?.addEventListener("change", function() {
+              attendanceImageDataInput.value = "";
+              capturedPreview.classList.add("d-none");
+              photoPreview.src = "";
+            });
+
+            capturePhotoBtn?.addEventListener("click", function() {
+              if (!stream) {
+                return;
+              }
+              const videoTrack = stream.getVideoTracks()[0];
+              const settings = videoTrack.getSettings ? videoTrack.getSettings() : null;
+              let width = settings?.width || cameraVideo.videoWidth || 640;
+              let height = settings?.height || cameraVideo.videoHeight || 480;
+              const maxDimension = 1024;
+              const scale = Math.min(1, maxDimension / Math.max(width, height));
+              width = Math.round(width * scale);
+              height = Math.round(height * scale);
+              const canvas = document.createElement("canvas");
+              canvas.width = width;
+              canvas.height = height;
+              canvas.getContext("2d").drawImage(cameraVideo, 0, 0, width, height);
+              const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
+              attendanceImageDataInput.value = dataUrl;
+              photoPreview.src = dataUrl;
+              capturedPreview.classList.remove("d-none");
+              stopCamera();
+              if (attendanceImageInput) {
+                attendanceImageInput.value = "";
+              }
+            });
+
+            cancelCameraBtn?.addEventListener("click", stopCamera);
+          });
+        </script>
       </div>
 
       {% if recognized_members or face_matches is not None %}

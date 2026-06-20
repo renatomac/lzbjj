@@ -553,6 +553,10 @@ def editClass(request, class_id):
         if form.is_valid():
             form.save()
             regenerate_future_sessions(class_id)
+            template_class = get_object_or_404(Class, pk=class_id)
+            future_sessions = ClassSession.objects.filter(class_template=template_class, date__gte=timezone.localdate())
+            for session in future_sessions:
+                dedupe_session_attendance(session)
             return redirect('classes')
     else:
         form = ClassForm(instance=instance)
@@ -709,17 +713,34 @@ def attendance_bulk(request):
 
     recognized_members = []
     face_matches = None
+    selected_session = None
 
     if request.method == "POST":
-        session_id = request.POST.get("session_id")
+        session_id = request.POST.get("session_id") or request.GET.get("session_id")
         image_file = request.FILES.get("attendance_image")
+
+        if not image_file:
+            image_data = request.POST.get("attendance_image_data")
+            if image_data:
+                try:
+                    _, encoded = image_data.split(",", 1) if "," in image_data else (None, image_data)
+                    image_bytes = base64.b64decode(encoded)
+                    image_file = io.BytesIO(image_bytes)
+                    image_file.name = f"bulk_attendance_{session_id or 'photo'}.jpg"
+                    image_file.content_type = "image/jpeg"
+                except (TypeError, ValueError):
+                    image_file = None
+
+        if session_id:
+            selected_session = ClassSession.objects.filter(pk=session_id).first()
 
         if not session_id:
             messages.error(request, "Please select a class session.")
         elif not image_file:
-            messages.error(request, "Please upload a class photo.")
+            messages.error(request, "Please upload a class photo or use the camera.")
         else:
             session = get_object_or_404(ClassSession, pk=session_id)
+            selected_session = session
             try:
                 matches, _ = search_faces_by_image(image_file)
                 face_matches = matches
@@ -756,11 +777,16 @@ def attendance_bulk(request):
             except Exception as exc:
                 logger.exception("Bulk attendance failed")
                 messages.error(request, str(exc))
+    else:
+        session_id = request.GET.get("session_id")
+        if session_id:
+            selected_session = ClassSession.objects.filter(pk=session_id).first()
 
     return render(request, "attendance/bulk.html", {
         "sessions": sessions,
         "recognized_members": recognized_members,
         "face_matches": face_matches,
+        "selected_session": selected_session,
     })
 
 
@@ -1283,8 +1309,31 @@ def sessions(request):
     })'''
 
 
+def _dedupe_session_attendance(session):
+    duplicates = (
+        SessionAttendance.objects
+        .filter(session=session)
+        .values("member_id")
+        .annotate(count=Count("id"))
+        .filter(count__gt=1)
+    )
+
+    for duplicate in duplicates:
+        member_id = duplicate["member_id"]
+        attendance_qs = (
+            SessionAttendance.objects
+            .filter(session=session, member_id=member_id)
+            .order_by("-present", "id")
+        )
+        keep_id = attendance_qs.values_list("id", flat=True).first()
+        delete_ids = list(attendance_qs.values_list("id", flat=True)[1:])
+        if delete_ids:
+            SessionAttendance.objects.filter(id__in=delete_ids).delete()
+
+
 def session_edit(request, session_id):
     session = get_object_or_404(ClassSession, id=session_id)
+    _dedupe_session_attendance(session)
 
     if request.method == "POST":
         session_form = ClassSessionForm(request.POST, instance=session)
@@ -1293,6 +1342,7 @@ def session_edit(request, session_id):
         if session_form.is_valid() and attendance_formset.is_valid():
             session_form.save()
             attendance_formset.save()
+            _dedupe_session_attendance(session)
             messages.success(request, "Session and attendance saved successfully.")
             return redirect("sessions")
         else:

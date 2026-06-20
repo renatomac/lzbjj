@@ -59,7 +59,33 @@ def create_attendance_for_period(days_ahead=30):
         create_attendance_for_session(session)
     
     
+def dedupe_session_attendance(session):
+    duplicates = (
+        SessionAttendance.objects
+        .filter(session=session)
+        .values("member_id")
+        .annotate(count=Count("id"))
+        .filter(count__gt=1)
+    )
+
+    delete_ids = []
+    for duplicate in duplicates:
+        attendance_qs = (
+            SessionAttendance.objects
+            .filter(session=session, member_id=duplicate["member_id"])
+            .order_by("-present", "id")
+        )
+        delete_ids.extend(list(attendance_qs.values_list("id", flat=True)[1:]))
+
+    if delete_ids:
+        SessionAttendance.objects.filter(id__in=delete_ids).delete()
+
+    return len(delete_ids)
+
+
 def create_attendance_for_session(session):
+    dedupe_session_attendance(session)
+
     if session.class_template.type == 'open':
         active_members = Member.objects.filter(is_active = True).order_by('first_name', 'last_name')
     elif session.class_template.type == 'adult':
@@ -168,6 +194,7 @@ def regenerate_future_sessions(class_id):
             for field in fields_to_copy:
                 setattr(session, field, getattr(template_class, field))
             session.save(update_fields=fields_to_copy)
+            dedupe_session_attendance(session)
 
         # 3) Create missing sessions until end date
         start_date = template_class.start_date or today
