@@ -152,8 +152,17 @@
                     {% for attendee in attending_list %}
                     <tr>
                       <td>
-                        <div class="d-flex align-items-center">
-                          <i class="fas fa-user-circle me-2 text-secondary h4 mb-0"></i>
+                        <div class="d-flex align-items-center gap-2 gap-lg-3">
+                          {% if attendee.member.photo_url %}
+                            <img src="{{ attendee.member.photo_url }}" alt="{{ attendee.member.first_name }}" 
+                                class="rounded-circle object-fit-cover"
+                                style="width: 38px; height: 38px; min-width: 38px;">
+                          {% else %}
+                            <div class="rounded-circle bg-gradient bg-secondary d-flex align-items-center justify-content-center flex-shrink-0"
+                                style="width: 38px; height: 38px; min-width: 38px;">
+                                <i class="fa-solid fa-user text-white" style="font-size: 16px;"></i>
+                            </div>
+                          {% endif %}
                           <div>
                             <a href="{% url 'viewMember' attendee.member.id %}"
                                 class="text-dark fw-bold text-decoration-none">
