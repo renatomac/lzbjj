@@ -632,12 +632,13 @@ def attendanceRecord(request, session_id):
     weekday = today.strftime("%A")
 
     if session.is_canceled == False:
+        base_qs = SessionAttendance.objects.select_related("member").filter(session=sessionSelected)
         if filter == "all":
-            attending_list = SessionAttendance.objects.filter(session=sessionSelected).order_by('member__first_name', 'member__last_name')
+            attending_list = base_qs.order_by('member__first_name', 'member__last_name')
         elif filter == "checked":
-            attending_list = SessionAttendance.objects.filter(session=sessionSelected, present=True).order_by('member__first_name', 'member__last_name')
+            attending_list = base_qs.filter(present=True).order_by('member__first_name', 'member__last_name')
         else:
-            attending_list = SessionAttendance.objects.filter(session=sessionSelected, present=False).order_by('member__first_name', 'member__last_name')
+            attending_list = base_qs.filter(present=False).order_by('member__first_name', 'member__last_name')
     else:
         attending_list = None
 

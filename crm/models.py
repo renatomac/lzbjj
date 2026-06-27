@@ -202,6 +202,11 @@ class Member(models.Model):
                 # Fallback to stored photo URL if signing fails
                 pass
         return self.photo
+
+    @property
+    def photo_url(self):
+        """Template-friendly alias for the member's photo URL."""
+        return self.get_photo_url()
     
     def required_waiver_type(self):
         """
