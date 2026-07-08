@@ -1,0 +1,1379 @@
+{% extends "layout.html" %}
+{% load static %}
+
+{% block title %}LZBJJ Chat{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* Chat Layout Styles */
+    .chat-container {
+        height: calc(100vh - 120px);
+        display: flex;
+        background-color: #ffffff;
+        border-radius: 12px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        overflow: hidden;
+    }
+
+    /* Left Sidebar */
+    .chat-sidebar {
+        width: 350px;
+        min-width: 300px;
+        display: flex;
+        flex-direction: column;
+        border-right: 1px solid #e9ecef;
+        background-color: #ffffff;
+    }
+
+    .sidebar-header {
+        padding: 15px;
+        background-color: #f8f9fa;
+        border-bottom: 1px solid #e9ecef;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .sidebar-header .user-info {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .sidebar-header .user-info h6 {
+        margin: 0;
+        font-weight: 600;
+        color: #212529;
+    }
+
+    .sidebar-actions {
+        display: flex;
+        gap: 8px;
+    }
+
+    .sidebar-actions .btn-icon {
+        background: none;
+        border: none;
+        color: #495057;
+        font-size: 1.1rem;
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background-color 0.2s, color 0.2s;
+    }
+
+    .sidebar-actions .btn-icon:hover {
+        background-color: #e9ecef;
+        color: #0b141a;
+    }
+
+    .sidebar-search {
+        padding: 10px 15px;
+        background-color: #ffffff;
+        border-bottom: 1px solid #f1f3f5;
+    }
+
+    .search-wrapper {
+        position: relative;
+    }
+
+    .search-wrapper i {
+        position: absolute;
+        left: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #adb5bd;
+    }
+
+    .search-wrapper input {
+        width: 100%;
+        padding: 8px 12px 8px 36px;
+        border: 1px solid #dee2e6;
+        border-radius: 20px;
+        background-color: #f8f9fa;
+        font-size: 0.9rem;
+        outline: none;
+        transition: border-color 0.2s, background-color 0.2s;
+    }
+
+    .search-wrapper input:focus {
+        border-color: #25d366;
+        background-color: #ffffff;
+    }
+
+    .room-list {
+        flex-grow: 1;
+        overflow-y: auto;
+    }
+
+    .room-item {
+        display: flex;
+        align-items: center;
+        padding: 12px 15px;
+        border-bottom: 1px solid #f8f9fa;
+        cursor: pointer;
+        transition: background-color 0.2s;
+        position: relative;
+    }
+
+    .room-item:hover {
+        background-color: #f8f9fa;
+    }
+
+    .room-item.active {
+        background-color: #ebebeb;
+    }
+
+    .room-info {
+        flex-grow: 1;
+        min-width: 0; /* Ensures text ellipsis works */
+    }
+
+    .room-meta {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 4px;
+    }
+
+    .room-name {
+        margin: 0;
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: #212529;
+        white-space: nowrap;
+        overflow: hidden;
+        text-ellipsis: ellipsis;
+    }
+
+    .room-time {
+        font-size: 0.75rem;
+        color: #6c757d;
+    }
+
+    .room-preview {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .room-msg-text {
+        font-size: 0.85rem;
+        color: #6c757d;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        margin: 0;
+        flex-grow: 1;
+        padding-right: 10px;
+    }
+
+    .unread-badge {
+        background-color: #25d366;
+        color: #ffffff;
+        font-size: 0.75rem;
+        font-weight: 700;
+        min-width: 20px;
+        height: 20px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0 6px;
+    }
+
+    /* Right Pane - Chat Window */
+    .chat-window {
+        flex-grow: 1;
+        display: flex;
+        flex-direction: column;
+        background-color: #efeae2; /* Classic WhatsApp warm background */
+        position: relative;
+    }
+
+    .chat-empty-state {
+        flex-grow: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background-color: #f8f9fa;
+        color: #6c757d;
+        text-align: center;
+        padding: 40px;
+    }
+
+    .chat-empty-state i {
+        font-size: 4rem;
+        color: #dee2e6;
+        margin-bottom: 20px;
+    }
+
+    .chat-empty-state h4 {
+        color: #495057;
+        margin-bottom: 10px;
+        font-weight: 600;
+    }
+
+    .chat-header {
+        padding: 10px 20px;
+        background-color: #f8f9fa;
+        border-bottom: 1px solid #e9ecef;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        z-index: 10;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+
+    .active-room-details {
+        display: flex;
+        align-items: center;
+        min-width: 0;
+    }
+
+    .active-room-text {
+        min-width: 0;
+    }
+
+    .active-room-name {
+        margin: 0;
+        font-size: 1rem;
+        font-weight: 600;
+        color: #212529;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .active-room-members {
+        font-size: 0.75rem;
+        color: #6c757d;
+        margin: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    /* Message Pane */
+    .message-pane {
+        flex-grow: 1;
+        overflow-y: auto;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .msg-group-date {
+        align-self: center;
+        background-color: rgba(255, 255, 255, 0.85);
+        color: #4a5568;
+        font-size: 0.75rem;
+        font-weight: 600;
+        padding: 4px 12px;
+        border-radius: 8px;
+        box-shadow: 0 1px 1px rgba(0,0,0,0.05);
+        margin: 8px 0;
+    }
+
+    .msg-row {
+        display: flex;
+        width: 100%;
+    }
+
+    .msg-row.sent {
+        justify-content: flex-end;
+    }
+
+    .msg-row.received {
+        justify-content: flex-start;
+    }
+
+    .msg-bubble {
+        max-width: 65%;
+        padding: 8px 12px;
+        border-radius: 8px;
+        position: relative;
+        box-shadow: 0 1px 0.5px rgba(11,20,26,.13);
+        display: flex;
+        flex-direction: column;
+    }
+
+    .msg-row.sent .msg-bubble {
+        background-color: #d9fdd3; /* Light green */
+        border-top-right-radius: 0;
+    }
+
+    .msg-row.received .msg-bubble {
+        background-color: #ffffff; /* White */
+        border-top-left-radius: 0;
+    }
+
+    .msg-sender {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #e53e3e;
+        margin-bottom: 2px;
+    }
+
+    .msg-content {
+        font-size: 0.9rem;
+        color: #111b21;
+        word-break: break-word;
+        white-space: pre-wrap;
+        margin-bottom: 4px;
+    }
+
+    .msg-meta {
+        align-self: flex-end;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .msg-time {
+        font-size: 0.7rem;
+        color: #667781;
+    }
+
+    /* Media Message Formats */
+    .msg-media-image {
+        max-width: 250px;
+        max-height: 250px;
+        border-radius: 6px;
+        overflow: hidden;
+        cursor: pointer;
+        margin-bottom: 4px;
+    }
+
+    .msg-media-image img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .msg-media-doc {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        background-color: rgba(0,0,0,0.04);
+        padding: 10px;
+        border-radius: 6px;
+        margin-bottom: 4px;
+        min-width: 200px;
+        border: 1px solid rgba(0,0,0,0.06);
+    }
+
+    .doc-icon {
+        font-size: 1.8rem;
+        color: #4a5568;
+    }
+
+    .doc-info {
+        flex-grow: 1;
+        min-width: 0;
+    }
+
+    .doc-name {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: #2d3748;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        margin: 0;
+    }
+
+    .doc-size {
+        font-size: 0.75rem;
+        color: #718096;
+        margin: 0;
+    }
+
+    .doc-download-btn {
+        color: #0b141a;
+        font-size: 1.1rem;
+        transition: color 0.2s;
+    }
+
+    .doc-download-btn:hover {
+        color: #25d366;
+    }
+
+    /* Input Area */
+    .chat-input-bar {
+        padding: 12px 20px;
+        background-color: #f0f2f5;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        z-index: 10;
+        border-top: 1px solid #e9ecef;
+    }
+
+    .input-actions {
+        display: flex;
+        gap: 4px;
+    }
+
+    .chat-input-bar .btn-action {
+        background: none;
+        border: none;
+        color: #54656f;
+        font-size: 1.3rem;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background-color 0.2s, color 0.2s;
+        cursor: pointer;
+    }
+
+    .chat-input-bar .btn-action:hover {
+        background-color: #e1e3e6;
+        color: #111b21;
+    }
+
+    .message-input-wrapper {
+        flex-grow: 1;
+    }
+
+    .message-input-wrapper input {
+        width: 100%;
+        padding: 10px 16px;
+        border: none;
+        border-radius: 20px;
+        background-color: #ffffff;
+        font-size: 0.95rem;
+        outline: none;
+        color: #111b21;
+    }
+
+    /* Modal List Items */
+    .user-select-list {
+        max-height: 350px;
+        overflow-y: auto;
+    }
+
+    .user-select-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 15px;
+        border-bottom: 1px solid #f8f9fa;
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
+
+    .user-select-item:hover {
+        background-color: #f8f9fa;
+    }
+
+    .user-checkbox-wrapper {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-grow: 1;
+    }
+
+    .user-meta-info {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .user-meta-name {
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: #212529;
+        margin: 0;
+    }
+
+    .user-meta-role {
+        font-size: 0.75rem;
+        color: #6c757d;
+        margin: 0;
+    }
+
+    /* Uploading Overlay */
+    .uploading-indicator {
+        display: none;
+        background-color: rgba(255, 255, 255, 0.9);
+        position: absolute;
+        bottom: 70px;
+        left: 20px;
+        right: 20px;
+        padding: 12px 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        z-index: 100;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .uploading-file-info {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
+    }
+
+    .uploading-file-name {
+        font-size: 0.85rem;
+        font-weight: 600;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        margin: 0;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+        .chat-sidebar {
+            width: 100%;
+        }
+        .chat-window {
+            display: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 100;
+        }
+        .chat-window.active {
+            display: flex;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="chat-container">
+    <!-- Sidebar -->
+    <div class="chat-sidebar" id="chatSidebar">
+        <div class="sidebar-header">
+            <div class="user-info">
+                <div id="selfAvatar"></div>
+                <h6>{{ current_user_name }}</h6>
+            </div>
+            <div class="sidebar-actions">
+                <button class="btn-icon" title="New Chat" data-bs-toggle="modal" data-bs-target="#newChatModal">
+                    <i class="fas fa-comment-medical"></i>
+                </button>
+                <button class="btn-icon" title="New Group" data-bs-toggle="modal" data-bs-target="#newGroupModal">
+                    <i class="fas fa-users-cog"></i>
+                </button>
+            </div>
+        </div>
+        <div class="sidebar-search">
+            <div class="search-wrapper">
+                <i class="fas fa-search"></i>
+                <input type="text" id="chatSearchInput" placeholder="Search or start a new chat">
+            </div>
+        </div>
+        <div class="room-list" id="roomListContainer">
+            <!-- Dynamically populated room items -->
+        </div>
+    </div>
+
+    <!-- Active Chat Window -->
+    <div class="chat-window" id="chatWindow">
+        <!-- Empty State -->
+        <div class="chat-empty-state" id="emptyState">
+            <i class="fas fa-comments"></i>
+            <h4>LZBJJ Chat System</h4>
+            <p class="mb-0 text-muted">Select a contact or group to begin exchanging information.</p>
+            <p class="small text-muted mt-1">Real-time messaging is active.</p>
+        </div>
+
+        <!-- Chat Board -->
+        <div class="d-none flex-column h-100" id="chatBoard">
+            <!-- Header -->
+            <div class="chat-header">
+                <div class="active-room-details">
+                    <button class="btn btn-icon d-md-none me-2" id="backToSidebarBtn">
+                        <i class="fas fa-arrow-left"></i>
+                    </button>
+                    <div id="activeRoomAvatar"></div>
+                    <div class="active-room-text">
+                        <h6 class="active-room-name" id="activeRoomName">Room Name</h6>
+                        <p class="active-room-members" id="activeRoomMembers">Participants</p>
+                    </div>
+                </div>
+                <div>
+                    <!-- Optional header actions -->
+                </div>
+            </div>
+
+            <!-- Messages List -->
+            <div class="message-pane" id="messagePane">
+                <!-- Dynamically populated message rows -->
+            </div>
+
+            <!-- Uploading Indicator -->
+            <div class="uploading-indicator" id="uploadingIndicator">
+                <div class="uploading-file-info">
+                    <i class="fas fa-spinner fa-spin text-success"></i>
+                    <p class="uploading-file-name" id="uploadingFileName">Uploading file...</p>
+                </div>
+                <button class="btn btn-sm btn-link text-danger p-0 text-decoration-none" id="cancelUploadBtn">Cancel</button>
+            </div>
+
+            <!-- Input Bar -->
+            <div class="chat-input-bar">
+                <div class="input-actions">
+                    <button class="btn-action" title="Attach Document/Photo" id="attachBtn">
+                        <i class="fas fa-paperclip"></i>
+                    </button>
+                    <!-- Hidden file input -->
+                    <input type="file" id="fileInput" class="d-none">
+                </div>
+                <div class="message-input-wrapper">
+                    <input type="text" id="messageTextInput" placeholder="Type a message" autocomplete="off">
+                </div>
+                <button class="btn-action" title="Send" id="sendBtn">
+                    <i class="fas fa-paper-plane text-success"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: New Chat -->
+<div class="modal fade" id="newChatModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">New Direct Message</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-0">
+                <div class="p-3 border-bottom">
+                    <input type="text" class="form-control form-control-sm border-secondary-subtle" id="userSearchInput" placeholder="Search students & staff...">
+                </div>
+                <div class="user-select-list" id="newChatUserList">
+                    <!-- Populated dynamically -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: New Group -->
+<div class="modal fade" id="newGroupModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Create Group Chat</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="newGroupForm" enctype="multipart/form-data">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="groupNameInput" class="form-label fw-bold">Group Name</label>
+                        <input type="text" class="form-control" id="groupNameInput" placeholder="e.g. BJJ Purple Belts Announcements" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="groupPhotoInput" class="form-label fw-bold">Group Photo (Optional)</label>
+                        <input type="file" class="form-control" id="groupPhotoInput" accept="image/*">
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label fw-bold">Select Participants</label>
+                        <input type="text" class="form-control form-control-sm mb-2 border-secondary-subtle" id="groupUserSearchInput" placeholder="Search users...">
+                    </div>
+                    <div class="user-select-list border rounded" id="newGroupUserList">
+                        <!-- Populated dynamically -->
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success" id="createGroupBtn">Create Group</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Scripts -->
+<script>
+    // Embedded initial data
+    const roomsData = JSON.parse('{{ room_list_json|escapejs }}');
+    const usersData = JSON.parse('{{ user_list_json|escapejs }}');
+    const currentUserId = Number('{{ current_user_id }}');
+    const currentUserName = '{{ current_user_name|escapejs }}';
+
+    // State Variables
+    let activeRoomId = null;
+    let roomSubscriptions = new Set();
+    let currentAblyChannel = null;
+    let fileToUpload = null;
+    let uploadXHR = null;
+
+    // Helper: Generate Avatar HTML
+    function getAvatarHTML(photoUrl, name, size = 45) {
+        if (photoUrl && photoUrl !== '/static/crm/img/default-avatar.png') {
+            return `<img src="${photoUrl}" class="rounded-circle me-3 chat-avatar" style="width:${size}px; height:${size}px; object-fit:cover;" onerror="this.onerror=null; this.parentElement.innerHTML=getInitialsAvatar('${name}', ${size});">`;
+        }
+        return getInitialsAvatar(name, size);
+    }
+
+    function getInitialsAvatar(name, size = 45) {
+        const initials = name ? name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : '?';
+        // Generate a consistent color based on name
+        let hash = 0;
+        for (let i = 0; i < name.length; i++) {
+            hash = name.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        const colors = ['#0d6efd', '#198754', '#dc3545', '#ffc107', '#0dcaf0', '#6f42c1', '#d63384', '#fd7e14'];
+        const color = colors[Math.abs(hash) % colors.length];
+        return `<div class="rounded-circle me-3 d-flex align-items-center justify-content-center text-white fw-bold" style="width:${size}px; height:${size}px; background-color:${color}; font-size: ${size * 0.38}px; flex-shrink: 0;">${initials}</div>`;
+    }
+
+    // Helper: Format bytes
+    function formatBytes(bytes, decimals = 1) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const dm = decimals < 0 ? 0 : decimals;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+    }
+
+    // Render Self Avatar
+    document.getElementById('selfAvatar').innerHTML = getAvatarHTML(null, currentUserName, 40);
+
+    // Render Sidebar Room List
+    function renderRoomList(roomsToRender = roomsData) {
+        const container = document.getElementById('roomListContainer');
+        container.innerHTML = '';
+
+        if (roomsToRender.length === 0) {
+            container.innerHTML = '<div class="p-3 text-center text-muted small">No conversations found</div>';
+            return;
+        }
+
+        roomsToRender.forEach(room => {
+            const lastMsgContent = room.last_message ? room.last_message.content : 'No messages yet';
+            let lastMsgTime = '';
+            if (room.last_message) {
+                const date = new Date(room.last_message.created_at);
+                lastMsgTime = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            }
+
+            const activeClass = room.id === activeRoomId ? 'active' : '';
+            const unreadBadgeHTML = room.unread_count > 0 
+                ? `<span class="unread-badge ms-2" id="unread-badge-${room.id}">${room.unread_count}</span>` 
+                : '';
+
+            const item = document.createElement('div');
+            item.className = `room-item ${activeClass}`;
+            item.setAttribute('data-room-id', room.id);
+            item.id = `room-item-${room.id}`;
+            item.onclick = () => selectRoom(room.id);
+
+            item.innerHTML = `
+                ${getAvatarHTML(room.photo_url, room.name)}
+                <div class="room-info">
+                    <div class="room-meta">
+                        <h6 class="room-name">${room.name}</h6>
+                        <span class="room-time" id="room-time-${room.id}">${lastMsgTime}</span>
+                    </div>
+                    <div class="room-preview">
+                        <p class="room-msg-text" id="room-preview-${room.id}">${lastMsgContent}</p>
+                        ${unreadBadgeHTML}
+                    </div>
+                </div>
+            `;
+            container.appendChild(item);
+        });
+    }
+
+    // Initial render
+    renderRoomList();
+
+    // Search Rooms Filter
+    document.getElementById('chatSearchInput').oninput = (e) => {
+        const query = e.target.value.toLowerCase().trim();
+        if (!query) {
+            renderRoomList();
+            return;
+        }
+        const filtered = roomsData.filter(r => r.name.toLowerCase().includes(query));
+        renderRoomList(filtered);
+    };
+
+    // Render User Selector lists
+    function renderUserList(containerId, listData = usersData, isCheckbox = false) {
+        const container = document.getElementById(containerId);
+        container.innerHTML = '';
+
+        if (listData.length === 0) {
+            container.innerHTML = '<div class="p-3 text-center text-muted small">No users found</div>';
+            return;
+        }
+
+        listData.forEach(user => {
+            const item = document.createElement('div');
+            item.className = 'user-select-item';
+            
+            if (isCheckbox) {
+                item.onclick = () => {
+                    const cb = item.querySelector('input[type="checkbox"]');
+                    cb.checked = !cb.checked;
+                };
+                item.innerHTML = `
+                    <div class="user-checkbox-wrapper">
+                        <input type="checkbox" class="form-check-input group-user-cb" value="${user.id}" onclick="event.stopPropagation();">
+                        ${getAvatarHTML(user.photo_url, user.name, 36)}
+                        <div class="user-meta-info">
+                            <p class="user-meta-name">${user.name}</p>
+                            <p class="user-meta-role">${user.role}</p>
+                        </div>
+                    </div>
+                `;
+            } else {
+                item.onclick = () => startDirectChat(user.id);
+                item.innerHTML = `
+                    <div class="d-flex align-items-center">
+                        ${getAvatarHTML(user.photo_url, user.name, 36)}
+                        <div class="user-meta-info">
+                            <p class="user-meta-name">${user.name}</p>
+                            <p class="user-meta-role">${user.role}</p>
+                        </div>
+                    </div>
+                    <i class="fas fa-chevron-right text-muted small"></i>
+                `;
+            }
+            container.appendChild(item);
+        });
+    }
+
+    // Initialize modals user lists
+    renderUserList('newChatUserList', usersData, false);
+    renderUserList('newGroupUserList', usersData, true);
+
+    // Search inside Modals
+    document.getElementById('userSearchInput').oninput = (e) => {
+        const query = e.target.value.toLowerCase().trim();
+        const filtered = usersData.filter(u => u.name.toLowerCase().includes(query) || u.role.toLowerCase().includes(query));
+        renderUserList('newChatUserList', filtered, false);
+    };
+
+    document.getElementById('groupUserSearchInput').oninput = (e) => {
+        const query = e.target.value.toLowerCase().trim();
+        const filtered = usersData.filter(u => u.name.toLowerCase().includes(query) || u.role.toLowerCase().includes(query));
+        renderUserList('newGroupUserList', filtered, true);
+    };
+
+    // start direct chat
+    function startDirectChat(userId) {
+        // Close modal
+        const modal = bootstrap.Modal.getInstance(document.getElementById('newChatModal'));
+        if (modal) modal.hide();
+
+        csrfFetch('/chat/new-direct-chat/', {
+            method: 'POST',
+            body: JSON.stringify({ user_id: userId }),
+            headers: { 'Content-Type': 'application/json' }
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.room_id) {
+                // Check if room is already in roomsData
+                let r = roomsData.find(room => room.id === data.room_id);
+                if (!r) {
+                    // Create basic room entry, selectRoom will fetch actual details
+                    const otherUser = usersData.find(u => u.id === userId);
+                    r = {
+                        id: data.room_id,
+                        name: otherUser ? otherUser.name : 'Direct Chat',
+                        is_group: false,
+                        photo_url: otherUser ? otherUser.photo_url : null,
+                        last_message: null,
+                        unread_count: 0,
+                        updated_at: new Date().toISOString()
+                    };
+                    roomsData.unshift(r);
+                    renderRoomList();
+                }
+                selectRoom(data.room_id);
+            } else {
+                alert(data.error || 'Failed to start chat');
+            }
+        })
+        .catch(err => {
+            console.error('Error starting direct chat', err);
+            alert('An error occurred');
+        });
+    }
+
+    // create group chat
+    document.getElementById('newGroupForm').onsubmit = (e) => {
+        e.preventDefault();
+        const name = document.getElementById('groupNameInput').value;
+        const photoFile = document.getElementById('groupPhotoInput').files[0];
+        
+        // Get selected checkboxes
+        const participantIds = [];
+        document.querySelectorAll('.group-user-cb:checked').forEach(cb => {
+            participantIds.push(Number(cb.value));
+        });
+
+        if (participantIds.length === 0) {
+            alert('Please select at least one participant.');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('name', name);
+        formData.append('participants', JSON.stringify(participantIds));
+        if (photoFile) {
+            formData.append('group_photo', photoFile);
+        }
+
+        csrfFetch('/chat/new-group-chat/', {
+            method: 'POST',
+            body: formData
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.room_id) {
+                // Reset form and close modal
+                document.getElementById('newGroupForm').reset();
+                const modal = bootstrap.Modal.getInstance(document.getElementById('newGroupModal'));
+                if (modal) modal.hide();
+
+                // select room
+                selectRoom(data.room_id);
+            } else {
+                alert(data.error || 'Failed to create group');
+            }
+        })
+        .catch(err => {
+            console.error('Error creating group chat', err);
+            alert('An error occurred');
+        });
+    };
+
+    // select active room
+    function selectRoom(roomId) {
+        if (activeRoomId === roomId) {
+            // Already active, just show if on mobile
+            document.getElementById('chatWindow').classList.add('active');
+            return;
+        }
+
+        // Clean up previous room subscription if any
+        if (currentAblyChannel) {
+            currentAblyChannel.unsubscribe();
+        }
+
+        activeRoomId = roomId;
+
+        // UI state toggles
+        document.getElementById('emptyState').classList.add('d-none');
+        document.getElementById('chatBoard').classList.remove('d-none');
+        document.getElementById('chatBoard').classList.add('d-flex');
+        document.getElementById('chatWindow').classList.add('active');
+
+        // highlight sidebar item
+        document.querySelectorAll('.room-item').forEach(el => {
+            el.classList.remove('active');
+        });
+        const activeItem = document.getElementById(`room-item-${roomId}`);
+        if (activeItem) {
+            activeItem.classList.add('active');
+        }
+
+        // clear unread badge
+        const badge = document.getElementById(`unread-badge-${roomId}`);
+        if (badge) badge.remove();
+
+        const roomObj = roomsData.find(r => r.id === roomId);
+        if (roomObj) roomObj.unread_count = 0;
+
+        // Fetch Room messages from backend
+        fetch(`/chat/room/${roomId}/`)
+        .then(r => r.json())
+        .then(data => {
+            renderActiveRoomHeader(data);
+            renderRoomMessages(data.messages);
+            scrollToBottom();
+            
+            // Subscribe to this room's channel for messages
+            subscribeToRoomChannel(roomId);
+        })
+        .catch(err => {
+            console.error('Error fetching room messages', err);
+            alert('Failed to load chat messages.');
+        });
+    }
+
+    // Back to Sidebar on mobile
+    document.getElementById('backToSidebarBtn').onclick = () => {
+        document.getElementById('chatWindow').classList.remove('active');
+    };
+
+    // Render active header
+    function renderActiveRoomHeader(data) {
+        document.getElementById('activeRoomName').textContent = data.room_name;
+        document.getElementById('activeRoomAvatar').innerHTML = getAvatarHTML(data.room_photo, data.room_name, 40);
+        
+        const subTextEl = document.getElementById('activeRoomMembers');
+        if (data.is_group) {
+            const memberNames = data.participants.map(p => p.name).join(', ');
+            subTextEl.textContent = memberNames;
+        } else {
+            const other = data.participants.find(p => p.id !== currentUserId);
+            subTextEl.textContent = other ? other.role : 'Direct Message';
+        }
+    }
+
+    // Render messages inside Pane
+    function renderRoomMessages(messages) {
+        const pane = document.getElementById('messagePane');
+        pane.innerHTML = '';
+
+        let lastDateString = null;
+
+        messages.forEach(msg => {
+            // Group messages by Date
+            const msgDate = new Date(msg.created_at);
+            const dateStr = msgDate.toLocaleDateString([], { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+            
+            if (dateStr !== lastDateString) {
+                const dateHeader = document.createElement('div');
+                dateHeader.className = 'msg-group-date';
+                dateHeader.textContent = dateStr;
+                pane.appendChild(dateHeader);
+                lastDateString = dateStr;
+            }
+
+            appendMessageDOM(msg, false); // don't scroll here, we'll do it once at the end
+        });
+    }
+
+    // Append a single message to DOM
+    function appendMessageDOM(msg, scroll = true) {
+        // Prevent duplicate rendering if already in DOM
+        if (document.getElementById(`msg-bubble-${msg.id}`)) return;
+
+        const pane = document.getElementById('messagePane');
+        const isSent = msg.sender_id === currentUserId;
+        const msgRow = document.createElement('div');
+        msgRow.className = `msg-row ${isSent ? 'sent' : 'received'}`;
+        msgRow.id = `msg-bubble-${msg.id}`;
+
+        const msgTime = new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        
+        let mediaHTML = '';
+        if (msg.message_type === 'image') {
+            mediaHTML = `
+                <div class="msg-media-image" onclick="window.open('${msg.file_url}', '_blank')">
+                    <img src="${msg.file_url}" alt="image upload">
+                </div>
+            `;
+        } else if (msg.message_type === 'document') {
+            const ext = msg.file_name ? msg.file_name.split('.').pop().toLowerCase() : '';
+            let iconClass = 'fa-file';
+            if (['pdf'].includes(ext)) iconClass = 'fa-file-pdf text-danger';
+            else if (['doc', 'docx'].includes(ext)) iconClass = 'fa-file-word text-primary';
+            else if (['xls', 'xlsx'].includes(ext)) iconClass = 'fa-file-excel text-success';
+            else if (['ppt', 'pptx'].includes(ext)) iconClass = 'fa-file-powerpoint text-warning';
+            else if (['zip', 'rar', '7z'].includes(ext)) iconClass = 'fa-file-archive text-secondary';
+
+            mediaHTML = `
+                <div class="msg-media-doc">
+                    <i class="fas ${iconClass} doc-icon"></i>
+                    <div class="doc-info">
+                        <p class="doc-name">${msg.file_name}</p>
+                        <p class="doc-size">${formatBytes(msg.file_size)}</p>
+                    </div>
+                    <a href="${msg.file_url}" download class="doc-download-btn" title="Download">
+                        <i class="fas fa-arrow-down-long"></i>
+                    </a>
+                </div>
+            `;
+        }
+
+        const senderHTML = (!isSent && msg.sender_name) ? `<span class="msg-sender">${msg.sender_name}</span>` : '';
+        const contentHTML = msg.content ? `<span class="msg-content">${escapeHTML(msg.content)}</span>` : '';
+
+        msgRow.innerHTML = `
+            <div class="msg-bubble">
+                ${senderHTML}
+                ${mediaHTML}
+                ${contentHTML}
+                <div class="msg-meta">
+                    <span class="msg-time">${msgTime}</span>
+                </div>
+            </div>
+        `;
+
+        pane.appendChild(msgRow);
+        if (scroll) {
+            scrollToBottom();
+        }
+    }
+
+    // Scroll Message Pane to bottom
+    function scrollToBottom() {
+        const pane = document.getElementById('messagePane');
+        pane.scrollTop = pane.scrollHeight;
+    }
+
+    // Escape HTML Helper
+    function escapeHTML(str) {
+        return str
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    // Send text message
+    function sendTextMessage() {
+        const input = document.getElementById('messageTextInput');
+        const text = input.value.trim();
+        if (!text || !activeRoomId) return;
+
+        input.value = ''; // Clear input immediately for snappy feel
+
+        csrfFetch(`/chat/room/${activeRoomId}/send/`, {
+            method: 'POST',
+            body: JSON.stringify({ content: text }),
+            headers: { 'Content-Type': 'application/json' }
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) {
+                alert(data.error);
+            }
+        })
+        .catch(err => {
+            console.error('Error sending message', err);
+            alert('Failed to send message.');
+        });
+    }
+
+    // Wire send controls
+    document.getElementById('sendBtn').onclick = sendTextMessage;
+    document.getElementById('messageTextInput').onkeydown = (e) => {
+        if (e.key === 'Enter') {
+            sendTextMessage();
+        }
+    };
+
+    // Attach File Click triggers input
+    document.getElementById('attachBtn').onclick = () => {
+        document.getElementById('fileInput').click();
+    };
+
+    // Handle File Input Selection
+    document.getElementById('fileInput').onchange = (e) => {
+        const file = e.target.files[0];
+        if (!file || !activeRoomId) return;
+        
+        fileToUpload = file;
+        
+        // Show Uploading bar
+        const bar = document.getElementById('uploadingIndicator');
+        const nameEl = document.getElementById('uploadingFileName');
+        bar.style.display = 'flex';
+        nameEl.textContent = `Uploading "${file.name}" (${formatBytes(file.size)})...`;
+
+        // Upload using XMLHttpRequest to support progress & aborting
+        const formData = new FormData();
+        formData.append('file', file);
+
+        uploadXHR = new XMLHttpRequest();
+        uploadXHR.open('POST', `/chat/room/${activeRoomId}/send/`, true);
+        uploadXHR.setRequestHeader('X-CSRFToken', csrftoken);
+        uploadXHR.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+
+        uploadXHR.onload = function() {
+            bar.style.display = 'none';
+            document.getElementById('fileInput').value = ''; // Reset input
+            fileToUpload = null;
+            uploadXHR = null;
+
+            if (uploadXHR.status >= 200 && uploadXHR.status < 300) {
+                // Success
+                const data = JSON.parse(uploadXHR.responseText);
+                if (data.error) {
+                    alert(data.error);
+                }
+            } else {
+                alert('Upload failed.');
+            }
+        };
+
+        uploadXHR.onerror = function() {
+            bar.style.display = 'none';
+            document.getElementById('fileInput').value = '';
+            fileToUpload = null;
+            uploadXHR = null;
+            alert('Upload failed due to network error.');
+        };
+
+        uploadXHR.send(formData);
+    };
+
+    // Cancel upload action
+    document.getElementById('cancelUploadBtn').onclick = () => {
+        if (uploadXHR) {
+            uploadXHR.abort();
+            uploadXHR = null;
+            fileToUpload = null;
+            document.getElementById('fileInput').value = '';
+            document.getElementById('uploadingIndicator').style.display = 'none';
+        }
+    };
+
+    // ==========================================
+    // Realtime Ably Logic
+    // ==========================================
+
+    let ably;
+
+    function initAbly() {
+        if (window.__ablyInstance) {
+            ably = window.__ablyInstance;
+            setupRealtimeSubscriptions();
+        } else {
+            console.log('Global Ably instance not found. Connecting manually...');
+            try {
+                ably = new Ably.Realtime({ authUrl: "{% url 'notifications:ably_token' %}" });
+                ably.connection.on('connected', () => {
+                    console.log('Ably manual connection successful');
+                    setupRealtimeSubscriptions();
+                });
+                ably.connection.on('failed', (err) => {
+                    console.error('Ably connection failed', err);
+                });
+            } catch (err) {
+                console.error('Failed to instantiate Ably', err);
+            }
+        }
+    }
+
+    function setupRealtimeSubscriptions() {
+        if (!ably) return;
+
+        // 1. Subscribe to personal updates channel (sidebar & unread counts)
+        const userChannelName = `user-chat:${currentUserId}`;
+        const userChannel = ably.channels.get(userChannelName);
+
+        userChannel.subscribe('message', (msg) => {
+            const data = msg.data;
+            handleIncomingMessageGlobal(data);
+        });
+
+        userChannel.subscribe('new_group', (msg) => {
+            const data = msg.data;
+            // Add new group to our roomsData array if not present
+            if (!roomsData.some(r => r.id === data.room_id)) {
+                const newRoom = {
+                    id: data.room_id,
+                    name: data.room_name,
+                    is_group: true,
+                    photo_url: data.room_photo,
+                    last_message: {
+                        content: data.content,
+                        sender: data.sender_name,
+                        created_at: data.created_at
+                    },
+                    unread_count: 1,
+                    updated_at: data.created_at
+                };
+                roomsData.unshift(newRoom);
+                renderRoomList();
+            }
+        });
+
+        console.log(`Subscribed to personal channel: ${userChannelName}`);
+    }
+
+    function subscribeToRoomChannel(roomId) {
+        if (!ably) return;
+
+        const roomChannelName = `room:${roomId}`;
+        currentAblyChannel = ably.channels.get(roomChannelName);
+
+        currentAblyChannel.subscribe('message', (msg) => {
+            const data = msg.data;
+            // Append message to DOM if we are in this room
+            if (activeRoomId === data.room_id) {
+                appendMessageDOM(data, true);
+                // Call mark-read on backend
+                csrfFetch(`/chat/room/${roomId}/mark-read/`, { method: 'POST' });
+            }
+        });
+
+        console.log(`Subscribed to active room channel: ${roomChannelName}`);
+    }
+
+    function handleIncomingMessageGlobal(data) {
+        // Update roomsData object
+        let room = roomsData.find(r => r.id === data.room_id);
+        
+        const isCurrentActive = (activeRoomId === data.room_id);
+        
+        let snippet = '';
+        if (data.message_type === 'text') snippet = data.content;
+        else if (data.message_type === 'image') snippet = '📷 Photo';
+        else if (data.message_type === 'document') snippet = `📄 Document: ${data.file_name}`;
+
+        if (room) {
+            room.last_message = {
+                content: snippet,
+                sender: data.sender_name,
+                created_at: data.created_at
+            };
+            room.updated_at = data.created_at;
+            
+            if (!isCurrentActive && data.sender_id !== currentUserId) {
+                room.unread_count += 1;
+            }
+            
+            // Move room to top of list
+            roomsData.sort((a, b) => {
+                const timeA = a.last_message ? new Date(a.last_message.created_at) : new Date(a.updated_at);
+                const timeB = b.last_message ? new Date(b.last_message.created_at) : new Date(b.updated_at);
+                return timeB - timeA;
+            });
+            
+            renderRoomList();
+        } else {
+            // This is a message in a room we aren't displaying yet. Fetch list again or add it dynamically.
+            // For robustness, let's create a new room entry. We don't have its full participant list,
+            // but we can generate its name.
+            const newRoom = {
+                id: data.room_id,
+                name: data.is_group ? (data.room_name || 'Group Chat') : data.sender_name,
+                is_group: data.is_group || false,
+                photo_url: null,
+                last_message: {
+                    content: snippet,
+                    sender: data.sender_name,
+                    created_at: data.created_at
+                },
+                unread_count: (data.sender_id !== currentUserId) ? 1 : 0,
+                updated_at: data.created_at
+            };
+            roomsData.unshift(newRoom);
+            renderRoomList();
+        }
+    }
+
+    // Start Ably connection on page load
+    window.addEventListener('load', initAbly);
+</script>
+{% endblock %}

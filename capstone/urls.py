@@ -12,6 +12,9 @@ urlpatterns = [
     # Main CRM
     path('', include('crm.urls')),
 
+    # Chat Application
+    path('chat/', include(('chat.urls', 'chat'), namespace='chat')),
+
     # Notifications (namespaced)
     path(
         'notifications/',

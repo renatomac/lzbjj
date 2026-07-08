@@ -392,6 +392,70 @@ document.addEventListener('DOMContentLoaded', async () => {
       // Check initial active timer
       checkActiveTimer();
 
+      // --- Ably Chat Real-time Notifications ---
+      const chatChannelName = "user-chat-{{ request.user.id }}";
+      const chatChannel = ably.channels.get("user-chat:{{ request.user.id }}");
+      
+      chatChannel.subscribe('message', (msg) => {
+        // If we are already on the chat page, ignore global toasts
+        if (window.location.pathname.startsWith('/chat/')) {
+          return;
+        }
+        
+        const data = msg.data;
+        if (Number(data.sender_id) === Number('{{ request.user.id }}')) {
+          return; // Ignore messages sent by ourselves
+        }
+
+        // Update toast content
+        document.getElementById('toastSenderName').textContent = data.sender_name || 'New Chat Message';
+        
+        let snippet = '';
+        if (data.message_type === 'text') {
+          snippet = data.content;
+        } else if (data.message_type === 'image') {
+          snippet = '📷 Photo';
+        } else if (data.message_type === 'document') {
+          snippet = `📄 Document: ${data.file_name}`;
+        }
+        
+        document.getElementById('toastMessageBody').textContent = snippet;
+        
+        // Clicking toast redirects to chat dashboard
+        document.getElementById('toastMessageBody').onclick = () => {
+          window.location.href = "{% url 'chat:chat_home' %}";
+        };
+
+        // Trigger Bootstrap Toast
+        const toastEl = document.getElementById('chatNotificationToast');
+        if (toastEl && typeof bootstrap !== 'undefined') {
+          const toast = new bootstrap.Toast(toastEl);
+          toast.show();
+        }
+      });
+
+      chatChannel.subscribe('new_group', (msg) => {
+        if (window.location.pathname.startsWith('/chat/')) {
+          return;
+        }
+        const data = msg.data;
+        if (Number(data.sender_id) === Number('{{ request.user.id }}')) {
+          return;
+        }
+
+        document.getElementById('toastSenderName').textContent = 'Added to Group';
+        document.getElementById('toastMessageBody').textContent = `You were added to the group "${data.room_name}"`;
+        document.getElementById('toastMessageBody').onclick = () => {
+          window.location.href = "{% url 'chat:chat_home' %}";
+        };
+
+        const toastEl = document.getElementById('chatNotificationToast');
+        if (toastEl && typeof bootstrap !== 'undefined') {
+          const toast = new bootstrap.Toast(toastEl);
+          toast.show();
+        }
+      });
+
       window.__notifSubscribed = true;
     }
   } catch (e) {
@@ -431,6 +495,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                        class="nav-link text-white d-flex align-items-center gap-3 rounded-3
                        {% if request.resolver_match.app_name == 'dashboard' %}active{% endif %}">
                         <i class="fas fa-tachometer-alt"></i> Dashboard
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <a href="{% url 'chat:chat_home' %}"
+                       class="nav-link text-white d-flex align-items-center gap-3 rounded-3
+                       {% if request.resolver_match.app_name == 'chat' %}active{% endif %}">
+                        <i class="fas fa-comments"></i> Chat
                     </a>
                 </li>
 
@@ -617,5 +689,20 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 {% block extra_scripts %}{% endblock %}
 <script src="{% static 'crm/js/crm.js' %}"></script>
+
+<!-- Chat Notification Toast -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1100;">
+  <div id="chatNotificationToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+    <div class="toast-header bg-success text-white">
+      <i class="fas fa-comment me-2"></i>
+      <strong class="me-auto" id="toastSenderName">New Chat Message</strong>
+      <small>Just now</small>
+      <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
+    </div>
+    <div class="toast-body" id="toastMessageBody" style="cursor: pointer;">
+      Message body here...
+    </div>
+  </div>
+</div>
 </body>
 </html>
