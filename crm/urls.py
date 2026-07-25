@@ -66,5 +66,6 @@ urlpatterns = [
     path("ajax/members/", views.member_autocomplete, name="member_autocomplete"),
     path("read/<int:pk>/", views.mark_notification_read, name="mark_read"),
     path('cast-receiver/', TemplateView.as_view(template_name='timers/cast_receiver.html'), name='cast_receiver'),
+    path('tv/', TemplateView.as_view(template_name='timers/TV.html'), name='tv_timer'),
     # API Routes
 ]
