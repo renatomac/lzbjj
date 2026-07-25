@@ -134,6 +134,17 @@ def chat_room_detail_api(request, room_id):
     last_read_obj.last_read_at = timezone.now()
     last_read_obj.save()
 
+    # Mark corresponding chat database notifications as read
+    try:
+        from notifications.models import Notification
+        Notification.objects.filter(
+            user=request.user,
+            is_read=False,
+            message__icontains="message"
+        ).update(is_read=True)
+    except Exception as e:
+        print(f"Failed to clear notification badges: {e}")
+
     # Get last 100 messages
     messages = room.messages.order_by('created_at')[:100]
     messages_data = []
@@ -260,6 +271,37 @@ def send_message_api(request, room_id):
     last_read_obj.last_read_at = timezone.now()
     last_read_obj.save()
 
+    # Create database notifications for all other participants
+    try:
+        from notifications.utils import create_notification
+        
+        snippet = ""
+        if msg.message_type == 'text':
+            snippet = msg.content
+            if snippet and len(snippet) > 60:
+                snippet = snippet[:57] + "..."
+        elif msg.message_type == 'image':
+            snippet = "📷 Photo"
+        elif msg.message_type == 'document':
+            snippet = f"📄 Document: {msg.file_name}"
+            
+        sender_name = get_display_name(request.user)
+        if room.is_group:
+            notification_message = f"New message from {sender_name} in {room.name}: {snippet}"
+        else:
+            notification_message = f"New message from {sender_name}: {snippet}"
+            
+        for participant in room.participants.all():
+            if participant.id != request.user.id:
+                create_notification(
+                    user=participant,
+                    notification_type="Chat",
+                    message=notification_message,
+                    data={'room_id': room.id, 'message_id': msg.id}
+                )
+    except Exception as e:
+        print(f"Failed to create database notification: {e}")
+
     # Form payload
     payload = {
         'id': msg.id,
@@ -372,6 +414,21 @@ def create_group_api(request):
         content=f"Group created by {get_display_name(request.user)}"
     )
 
+    # Notify participants about the new group in database
+    try:
+        from notifications.utils import create_notification
+        notification_message = f"You were added to a new group: {room.name}"
+        for p in participants:
+            if p.id != request.user.id:
+                create_notification(
+                    user=p,
+                    notification_type="Chat",
+                    message=notification_message,
+                    data={'room_id': room.id}
+                )
+    except Exception as e:
+        print(f"Failed to create group database notification: {e}")
+
     group_photo_url = room.group_photo.url if room.group_photo else '/static/crm/img/default-avatar.png'
     
     payload = {
@@ -414,5 +471,16 @@ def mark_read_api(request, room_id):
     last_read_obj, created = RoomLastRead.objects.get_or_create(room=room, user=request.user)
     last_read_obj.last_read_at = timezone.now()
     last_read_obj.save()
+
+    # Mark corresponding chat database notifications as read
+    try:
+        from notifications.models import Notification
+        Notification.objects.filter(
+            user=request.user,
+            is_read=False,
+            message__icontains="message"
+        ).update(is_read=True)
+    except Exception as e:
+        print(f"Failed to clear notification badges: {e}")
 
     return JsonResponse({'status': 'ok'})

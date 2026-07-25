@@ -4,6 +4,7 @@ from django.contrib.auth import get_user_model
 from django.contrib import messages
 from django.forms import inlineformset_factory
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 from datetime import timedelta, date
 from dateutil.relativedelta import relativedelta
@@ -61,7 +62,7 @@ ContactFormSet = inlineformset_factory(
 class MemberForm(forms.ModelForm):
 
     user = forms.ModelChoiceField(
-        queryset=User.objects.filter(is_active=True, member__isnull=True),  # avoid users already linked to a Member
+        queryset=User.objects.filter(is_active=True),
         required=False,
         help_text="Select an existing user (adult members only)"
     )
@@ -117,12 +118,26 @@ class MemberForm(forms.ModelForm):
             self.fields["membership_start_date"].initial = timezone.localdate()
             self.fields["membership_end_date"].initial = timezone.localdate() + relativedelta(months=12)
 
+        available_users = User.objects.filter(is_active=True)
+        if self.instance.pk and self.instance.user_id:
+            available_users = available_users.filter(Q(pk=self.instance.user_id) | Q(member__isnull=True))
+        else:
+            available_users = available_users.filter(member__isnull=True)
+
+        self.fields["user"].queryset = available_users.order_by("username")
+
         # Hide user field for children
         if self.instance.pk and self.instance.member_type == "child":
             self.fields.pop("user")
 
         # Disable or hide phone if under 21
         dob = self.initial.get("date_of_birth") or getattr(self.instance, "date_of_birth", None)
+        if isinstance(dob, str):
+            try:
+                dob = date.fromisoformat(dob)
+            except ValueError:
+                dob = None
+
         if dob:
             today = timezone.localdate()
             age = today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))

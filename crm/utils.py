@@ -1,9 +1,10 @@
 from datetime import datetime, date, timedelta
-from crm.models import ClassSession, Class, Member, SessionAttendance
+from crm.models import ClassSession, Class, Member, SessionAttendance, User
 from django.shortcuts import get_object_or_404
 from django.db import transaction
 from django.db.models import Count
 from django.db.models.functions import ExtractDay
+from notifications.models import Notification
 from django.utils import timezone
 from dateutil.relativedelta import relativedelta
 from .models import ADULT_BELT_ORDER, KID_BELT_ORDER
@@ -305,6 +306,40 @@ def birthdays_of_the_month():
         .order_by('day', 'last_name', 'first_name')
     )
     return members_with_birthdays_this_month
+
+
+def create_birthday_notifications():
+    today = timezone.localdate()
+    members = list(
+        Member.objects.filter(
+            is_active=True,
+            date_of_birth__month=today.month,
+            date_of_birth__day=today.day,
+        ).order_by('first_name', 'last_name')
+    )
+
+    if not members:
+        return 0
+
+    recipients = list(
+        User.objects.filter(is_staff=True, is_active=True).order_by('id')
+    )
+
+    if not recipients:
+        return 0
+
+    message = (
+        f"Today is {', '.join(f'{member.first_name} {member.last_name}' for member in members)}'s birthday."
+    )
+
+    for user in recipients:
+        Notification.objects.create(
+            user=user,
+            message=message,
+            is_read=False,
+        )
+
+    return len(recipients)
 
 
 def get_client_ip(request):

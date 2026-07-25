@@ -106,11 +106,16 @@ Members <span class="badge bg-primary ms-2">{{ members.paginator.count }}</span>
 
                                 <td>
                                     {% if member.last_promotion_date %}
-                                        <span class="badge bg-light text-dark">
-                                            <i class="fas fa-calendar-alt me-1 text-muted small"></i>
-                                            <span class="d-none d-md-inline">{{ member.last_promotion_date|date:"M d, Y" }}</span>
-                                            <span class="d-inline d-md-none">{{ member.last_promotion_date|date:"m/d/y" }}</span>
-                                        </span>
+                                        <div class="d-flex flex-column align-items-start">
+                                            <span class="badge bg-light text-dark">
+                                                <i class="fas fa-calendar-alt me-1 text-muted small"></i>
+                                                <span class="d-none d-md-inline">{{ member.last_promotion_date|date:"M d, Y" }}</span>
+                                                <span class="d-inline d-md-none">{{ member.last_promotion_date|date:"m/d/y" }}</span>
+                                            </span>
+                                            {% if member.promotion_age_text %}
+                                                <small class="text-muted mt-1">{{ member.promotion_age_text }} ago</small>
+                                            {% endif %}
+                                        </div>
                                     {% else %}
                                         <span class="text-muted">—</span>
                                     {% endif %}

@@ -69,6 +69,7 @@ def index(request):
         # Totals
         ak_distrib = adult_kids_distrib()
         birthdays = birthdays_of_the_month()
+        create_birthday_notifications()
         summary = {
             'active':active,
             'inactive':inactive,
@@ -285,12 +286,24 @@ def members(request):
     for m in all_members:
         # Get the most recent promotion date
         last_promotion = BeltPromotion.objects.filter(member=m).order_by('-promotion_date').first()
-        
+        last_promotion_date = last_promotion.promotion_date if last_promotion else None
+
+        promotion_age_text = None
+        if last_promotion_date:
+            today = timezone.localdate()
+            delta = today - last_promotion_date
+            months, days = divmod(delta.days, 30)
+            if months > 0:
+                promotion_age_text = f"{months} month{'s' if months != 1 else ''}, {days} day{'s' if days != 1 else ''}"
+            else:
+                promotion_age_text = f"{days} day{'s' if days != 1 else ''}"
+
         members_with_age.append({
             'id': m.id,
             'first_name': m.first_name,
             'last_name': m.last_name,
-            'last_promotion_date': last_promotion.promotion_date if last_promotion else None,
+            'last_promotion_date': last_promotion_date,
+            'promotion_age_text': promotion_age_text,
             'age': m.age,  # use the property directly
             'is_active': m.is_active,
             'belt_rank': makeRank(m.belt_rank, m.stripes),
