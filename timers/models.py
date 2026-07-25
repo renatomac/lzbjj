@@ -124,6 +124,7 @@ class Timer(models.Model):
                     print(f"Ably timer sync publish failed: {e}")
 
     def to_dict(self):
+        from django.utils import timezone
         return {
             'id': self.id,
             'name': self.name,
@@ -137,4 +138,5 @@ class Timer(models.Model):
             'rounds': self.rounds,
             'direction': self.direction,
             'sound_file_url': self.sound_file.url if self.sound_file else None,
+            'server_time': timezone.now().isoformat(),
         }

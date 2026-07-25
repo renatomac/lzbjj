@@ -403,6 +403,7 @@
 
         let localTimerState = null;
         let receiverInterval = null;
+        let receiverSkewOffset = 0;
 
         function parseDate(dateStr) {
             if (!dateStr) return null;
@@ -482,20 +483,23 @@
         }
 
         function updateReceiverTimer(timer) {
+            if (timer.server_time) {
+                receiverSkewOffset = timer.server_time - Date.now();
+            }
             localTimerState = timer;
             if (receiverInterval) {
                 clearInterval(receiverInterval);
                 receiverInterval = null;
             }
             if (timer.status === 'RUNNING') {
-                receiverInterval = setInterval(tickReceiver, 1000);
+                receiverInterval = setInterval(tickReceiver, 100);
             }
             renderReceiver();
         }
 
         function tickReceiver() {
             if (!localTimerState || localTimerState.status !== 'RUNNING') return;
-            const current = getTimerStateAt(localTimerState, new Date());
+            const current = getTimerStateAt(localTimerState, new Date(Date.now() + receiverSkewOffset));
             
             if (current.status === 'DONE') {
                 clearInterval(receiverInterval);
@@ -508,7 +512,7 @@
 
         function renderReceiver() {
             if (!localTimerState) return;
-            const current = getTimerStateAt(localTimerState, new Date());
+            const current = getTimerStateAt(localTimerState, new Date(Date.now() + receiverSkewOffset));
             renderReceiverWithValues(current);
         }
 
@@ -567,6 +571,9 @@
                 updateReceiverTimer(d);
                 setStatus('LIVE · SYNCED', true);
             } else {
+                if (d && d.server_time) {
+                    receiverSkewOffset = d.server_time - Date.now();
+                }
                 applyState(d);
                 setStatus('LIVE · RECEIVING', true);
             }

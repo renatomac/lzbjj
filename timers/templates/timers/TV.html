@@ -6,6 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>LZBJJ Fight Timer · TV</title>
     <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <!-- Ably client library -->
+    <script src="https://cdn.ably.com/lib/ably.min-1.js"></script>
     <style>
         :root {
             --red:     #e8001c;
@@ -408,17 +410,37 @@
             return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
         }
 
+        let activeTimerState = null;
+        let skewOffset = 0;
+        let ablyConnected = false;
+
         function applyState(state) {
+            updateState(state);
+        }
+
+        function updateState(state) {
             if (!state || !state.id) {
+                activeTimerState = null;
                 setReadyUI();
                 setStatus('NO ACTIVE TIMER', false);
                 return;
             }
 
-            const current = getTimerStateAt(state, new Date());
+            if (state.server_time) {
+                const serverTime = new Date(state.server_time);
+                skewOffset = serverTime.getTime() - Date.now();
+            }
+            activeTimerState = state;
+            render();
+        }
+
+        function render() {
+            if (!activeTimerState) return;
+
+            const current = getTimerStateAt(activeTimerState, new Date(Date.now() + skewOffset));
             let displayTime = current.time_remaining;
-            if (state.direction === 'UP' && current.current_state === 'WORK') {
-                displayTime = state.duration - current.time_remaining;
+            if (activeTimerState.direction === 'UP' && current.current_state === 'WORK') {
+                displayTime = activeTimerState.duration - current.time_remaining;
             }
 
             let labelText = 'READY';
@@ -430,14 +452,14 @@
                 phase = 'done';
             } else if (current.status === 'RUNNING' || current.status === 'PAUSED') {
                 if (current.current_state === 'WORK') {
-                    labelText = `WORK - Round ${current.current_round}/${state.rounds}`;
+                    labelText = `WORK - Round ${current.current_round}/${activeTimerState.rounds}`;
                     phase = 'work';
                     warning = displayTime < 10;
                 } else {
-                    labelText = `REST - Round ${current.current_round}/${state.rounds}`;
+                    labelText = `REST - Round ${current.current_round}/${activeTimerState.rounds}`;
                     phase = 'rest';
                 }
-            } else if (state.status === 'PAUSED') {
+            } else if (activeTimerState.status === 'PAUSED') {
                 labelText = 'PAUSED';
                 phase = 'ready';
             }
@@ -457,9 +479,19 @@
                 timerEl.classList.add('digits-done');
             }
 
-            const roundText = `ROUND &nbsp;<span>${current.current_round}</span>&nbsp;/&nbsp;<span>${state.rounds}</span>`;
+            const roundText = `ROUND &nbsp;<span>${current.current_round}</span>&nbsp;/&nbsp;<span>${activeTimerState.rounds}</span>`;
             roundEl.innerHTML = roundText;
-            setStatus('LIVE · SYNCED', true);
+            
+            if (ablyConnected) {
+                setStatus('LIVE · SYNCED', true);
+            } else {
+                setStatus('LIVE · POLLING', true);
+            }
+        }
+
+        function tick() {
+            if (!activeTimerState || activeTimerState.status !== 'RUNNING') return;
+            render();
         }
 
         function fetchTimerState() {
@@ -470,19 +502,52 @@
                 })
                 .then(data => {
                     if (data && data.active === false) {
-                        setReadyUI();
-                        setStatus('NO ACTIVE TIMER', false);
+                        updateState(null);
                         return;
                     }
-                    applyState(data);
+                    updateState(data);
                 })
                 .catch(() => {
                     setStatus('SYNC ERROR', false);
                 });
         }
 
+        // Initialize Ably if available
+        try {
+            if (typeof Ably !== 'undefined') {
+                const ablyInstance = new Ably.Realtime.Promise({
+                    authUrl: "{% url 'notifications:ably_token' %}",
+                });
+                
+                ablyInstance.connection.on('connected', () => {
+                    ablyConnected = true;
+                    if (activeTimerState) setStatus('LIVE · SYNCED', true);
+                });
+                
+                ablyInstance.connection.on('disconnected', () => {
+                    ablyConnected = false;
+                    if (activeTimerState) setStatus('LIVE · POLLING', true);
+                });
+                
+                ablyInstance.connection.on('failed', () => {
+                    ablyConnected = false;
+                    if (activeTimerState) setStatus('LIVE · POLLING', true);
+                });
+
+                const channelName = "user-{{ request.user.id }}-timer";
+                const channel = ablyInstance.channels.get(channelName);
+                channel.subscribe('update', (msg) => {
+                    console.log("Ably received TV timer sync update", msg.data);
+                    updateState(msg.data);
+                });
+            }
+        } catch (e) {
+            console.error("Ably initialization failed on TV page:", e);
+        }
+
         fetchTimerState();
-        setInterval(fetchTimerState, 1000);
+        setInterval(fetchTimerState, 5000); // 5s fallback polling
+        setInterval(tick, 100); // 100ms local precise ticking
     })();
     </script>
 </body>

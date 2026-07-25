@@ -80,6 +80,7 @@
     const CUSTOM_NAMESPACE = 'urn:x-cast:com.yourdomain.timer';
     
     let castSession = null;
+    window.timerSkewOffset = 0;
 
     function parseDate(dateStr) {
         if (!dateStr) return null;
@@ -217,7 +218,7 @@
         if (!castSession || !window.localTimerState) return;
         
         // 1. Calculate values for the old receiver (backwards compatibility)
-        const current = getTimerStateAt(window.localTimerState, new Date());
+        const current = getTimerStateAt(window.localTimerState, new Date(Date.now() + (window.timerSkewOffset || 0)));
         
         let displayTime = current.time_remaining;
         if (window.localTimerState.direction === 'UP' && current.current_state === 'WORK') {
@@ -242,7 +243,8 @@
         const payload = Object.assign({}, window.localTimerState, {
             time: timeStr,
             label: labelText,
-            warning: isWarning
+            warning: isWarning,
+            server_time: Date.now() + (window.timerSkewOffset || 0)
         });
         
         castSession.sendMessage(CUSTOM_NAMESPACE, payload)
@@ -333,6 +335,10 @@
 
 
         function updateLocalTimerState(timer) {
+            if (timer.server_time) {
+                const serverTime = new Date(timer.server_time);
+                window.timerSkewOffset = serverTime.getTime() - Date.now();
+            }
             localTimerState = timer;
             window.localTimerState = timer;
             if (timerInterval) {
@@ -341,7 +347,7 @@
             }
             
             if (timer.status === 'RUNNING') {
-                timerInterval = setInterval(tick, 1000);
+                timerInterval = setInterval(tick, 100);
             }
             renderLocalState();
         }
@@ -349,7 +355,7 @@
         function tick() {
             if (!localTimerState || localTimerState.status !== 'RUNNING') return;
             
-            const current = getTimerStateAt(localTimerState, new Date());
+            const current = getTimerStateAt(localTimerState, new Date(Date.now() + (window.timerSkewOffset || 0)));
             const prevRendered = window.lastRenderedState;
             
             if (prevRendered) {
@@ -379,7 +385,7 @@
 
         function renderLocalState() {
             if (!localTimerState) return;
-            const current = getTimerStateAt(localTimerState, new Date());
+            const current = getTimerStateAt(localTimerState, new Date(Date.now() + (window.timerSkewOffset || 0)));
             renderLocalStateWithValues(current);
         }
 

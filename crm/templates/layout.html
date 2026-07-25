@@ -119,6 +119,7 @@ document.addEventListener('click', (e) => {
 // --- Global Timer Javascript Helpers ---
 let activeTimerState = null;
 let globalTimerInterval = null;
+let globalTimerSkewOffset = 0;
 
 async function checkActiveTimer() {
   try {
@@ -135,6 +136,10 @@ async function checkActiveTimer() {
 }
 
 function updateGlobalTimerState(timer) {
+  if (timer.server_time) {
+    const serverTime = new Date(timer.server_time);
+    globalTimerSkewOffset = serverTime.getTime() - Date.now();
+  }
   activeTimerState = timer;
   if (globalTimerInterval) {
     clearInterval(globalTimerInterval);
@@ -249,7 +254,7 @@ function getGlobalTimerStateAt(state, targetTime) {
 
 function tickGlobalTimer() {
   if (!activeTimerState) return;
-  const current = getGlobalTimerStateAt(activeTimerState, new Date());
+  const current = getGlobalTimerStateAt(activeTimerState, new Date(Date.now() + globalTimerSkewOffset));
   
   if (current.status === 'DONE') {
     hideGlobalTimer();
@@ -265,7 +270,7 @@ function tickGlobalTimer() {
 
 function renderGlobalTimer() {
   if (!activeTimerState) return;
-  const current = getGlobalTimerStateAt(activeTimerState, new Date());
+  const current = getGlobalTimerStateAt(activeTimerState, new Date(Date.now() + globalTimerSkewOffset));
   renderGlobalTimerWithValues(current);
 }
 
