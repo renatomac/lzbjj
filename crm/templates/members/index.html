@@ -113,7 +113,7 @@ Members <span class="badge bg-primary ms-2">{{ members.paginator.count }}</span>
                                                 <span class="d-inline d-md-none">{{ member.last_promotion_date|date:"m/d/y" }}</span>
                                             </span>
                                             {% if member.promotion_age_text %}
-                                                <small class="text-muted mt-1">{{ member.promotion_age_text }} ago</small>
+                                                <small class="text-muted mt-1">{{ member.promotion_age_text }}</small>
                                             {% endif %}
                                         </div>
                                     {% else %}
