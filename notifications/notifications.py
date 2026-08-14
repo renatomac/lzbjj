@@ -49,7 +49,7 @@ def generate_birthday_notifications():
         # Calculate age
         age = today.year - member.date_of_birth.year
         
-        message = f"🎉 Happy Birthday, {member.first_name}! You're turning {age} today!"
+        message = f"Happy Birthday, {member.first_name}! You're turning {age} today!"
         
         notification = create_notification(
             user=member.user,
@@ -124,7 +124,7 @@ def generate_promotion_milestone_notifications():
             
             if not recent_notification:
                 message = (
-                    f"🥋 {member.first_name}, congratulations! You've completed "
+                    f"Congratulations {member.first_name}! You've completed "
                     f"{classes_attended} classes {time_descriptor} and may be ready for "
                     f"belt promotion evaluation. Talk to your instructor!"
                 )
@@ -198,7 +198,7 @@ def generate_low_attendance_notifications():
             
             if not recent_notification:
                 message = (
-                    f"📋 {member.first_name}, we haven't seen you in a week! "
+                    f"{member.first_name}, we haven't seen you in a week! "
                     f"Come back to class soon. Check the schedule and join us!"
                 )
                 
@@ -255,7 +255,7 @@ def generate_membership_expiration_warnings():
             days_until_expiry = (member.membership_end_date - today).days
             
             message = (
-                f"⏰ {member.first_name}, your membership expires in {days_until_expiry} days "
+                f"{member.first_name}, your membership expires in {days_until_expiry} days "
                 f"({member.membership_end_date.strftime('%B %d, %Y')}). "
                 f"Please renew to continue enjoying classes!"
             )
@@ -321,9 +321,8 @@ def generate_streak_milestone_notifications():
                 ).exists()
                 
                 if not recent_notification:
-                    streak_emoji = "🔥"
                     message = (
-                        f"{streak_emoji} Amazing, {member.first_name}! You've attended "
+                        f"Amazing, {member.first_name}! You've attended "
                         f"{milestone} consecutive classes! Keep up the great work!"
                     )
                     
@@ -366,7 +365,7 @@ def generate_class_cancellation_notifications(class_session):
     )
     
     message = (
-        f"⚠️ Class Alert: {class_session.class_template.name} on "
+        f"Class Alert: {class_session.class_template.name} on "
         f"{class_session.date.strftime('%B %d, %Y')} has been canceled."
     )
     
@@ -398,7 +397,7 @@ def generate_new_member_welcome_notification(member):
         return None
     
     message = (
-        f"🥋 Welcome to {member.user.first_name}! We're excited to have you join our academy. "
+        f"Welcome to {member.user.first_name}! We're excited to have you join our academy. "
         f"Check out the class schedule and don't hesitate to ask instructors questions!"
     )
     
@@ -433,7 +432,7 @@ def generate_belt_promotion_notification(belt_promotion):
         return None
     
     message = (
-        f"🎓 Congratulations, {member.first_name}! You've been promoted to "
+        f"Congratulations, {member.first_name}! You've been promoted to "
         f"{belt_promotion.new_rank.upper()} {belt_promotion.new_stripes} stripe(s)! "
         f"Well done on your hard work and dedication!"
     )
@@ -494,7 +493,7 @@ def generate_waiver_expiration_warnings():
             
             if not recent_notification:
                 message = (
-                    f"📝 {member.first_name}, your waiver expires soon. "
+                    f"{member.first_name}, your waiver expires soon. "
                     f"Please renew it to continue attending classes."
                 )
                 
