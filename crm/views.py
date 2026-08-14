@@ -269,8 +269,6 @@ def members(request):
         last_promotion = BeltPromotion.objects.filter(member=m).order_by('-promotion_date').first()
         last_promotion_date = last_promotion.promotion_date if last_promotion else m.join_date.date()
 
-        print(m.join_date.date())
-
         promotion_age_text = None
         classes_since_promotion = 0
         
