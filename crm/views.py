@@ -259,11 +259,12 @@ def members(request):
     # Base queryset
     all_members = Member.objects.all()
 
-    # Filter by status
+    # Filter by status - FIXED: apply filter to all_members
     if status == "active":
         all_members = all_members.filter(is_active=True)
     elif status == "inactive":
         all_members = all_members.filter(is_active=False)
+    # If status is empty or any other value, show all members
 
     # Filter by search query
     if query:
@@ -275,8 +276,9 @@ def members(request):
     # Order by last name, first name
     all_members = all_members.order_by("first_name", "last_name")
 
-    # Summary counts (aggregated)
-    summary = all_members.aggregate(
+    # Summary counts - FIXED: Get totals from ALL members (unfiltered)
+    total_members = Member.objects.all()
+    summary = total_members.aggregate(
         active=Count('id', filter=Q(is_active=True)),
         inactive=Count('id', filter=Q(is_active=False)),
         total=Count('id')
@@ -336,72 +338,6 @@ def members(request):
         'status': status,
     })
     
-def members_old(request):
-    query = request.GET.get("query", "")
-    status = request.GET.get("status", "active")
-
-    # Base queryset
-    all_members = Member.objects.all()
-
-    # Filter by status
-    if status == "active":
-        all_members = all_members.filter(is_active=True)
-    elif status == "inactive":
-        all_members = all_members.filter(is_active=False)
-
-    # Filter by search query
-    if query:
-        all_members = all_members.filter(
-            Q(first_name__icontains=query) |
-            Q(last_name__icontains=query)
-        )
-
-    # Order by last name, first name
-    all_members = all_members.order_by("first_name", "last_name")
-
-    # Summary counts (aggregated)
-    summary = all_members.aggregate(
-        active=Count('id', filter=Q(is_active=True)),
-        inactive=Count('id', filter=Q(is_active=False)),
-        total=Count('id')
-    )
-
-    # Add age and last promotion date to each member
-    members_with_age = []
-    for m in all_members:
-        # Get the most recent promotion date
-        last_promotion = BeltPromotion.objects.filter(member=m).order_by('-promotion_date').first()
-        last_promotion_date = last_promotion.promotion_date if last_promotion else None
-
-        promotion_age_text = None
-        if last_promotion_date:
-            today = timezone.localdate()
-            delta = today - last_promotion_date
-            months, days = divmod(delta.days, 30)
-            if months > 0:
-                promotion_age_text = f"{months} month{'s' if months != 1 else ''}, {days} day{'s' if days != 1 else ''}"
-            else:
-                promotion_age_text = f"{days} day{'s' if days != 1 else ''}"
-
-        members_with_age.append({
-            'id': m.id,
-            'first_name': m.first_name,
-            'last_name': m.last_name,
-            'last_promotion_date': last_promotion_date,
-            'promotion_age_text': promotion_age_text,
-            'age': m.age,  # use the property directly
-            'is_active': m.is_active,
-            'belt_rank': makeRank(m.belt_rank, m.stripes),
-            'belt_color': m.belt_rank,
-            'photo_url': m.get_photo_url(),
-        })
-
-    return render(request, "members/index.html", {
-        'all_members': members_with_age,
-        'summary': summary,
-        'query': query,
-        'status': status,
-    })
 
 @transaction.atomic
 def addMember(request):
