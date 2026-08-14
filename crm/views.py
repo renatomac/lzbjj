@@ -228,29 +228,6 @@ def dashboard(request):
 def view_session(request):
     return render(request, "classes/index.html")
 
-'''def members(request):
-    query = request.GET.get("query", "")
-    status = request.GET.get("status", "")
-    if status == "active":
-        all_members = Member.objects.filter(is_active = True).order_by("first_name")
-    elif status == "inactive":
-        all_members = Member.objects.filter(is_active = False).order_by("first_name")
-    else:
-        all_members = Member.objects.order_by("first_name", "last_name")
-    if query:
-        all_members = all_members.filter(
-            Q(first_name__icontains=query) |
-            Q(last_name__icontains=query)
-        )
-    summary = {'active':Member.objects.filter(is_active = True).count(), 'inactive':Member.objects.filter(is_active = False).count(),'total':Member.objects.all().count()}
-    all_members_age = [
-    {**m, 'age': calculateAge(m['date_of_birth'])} for m in all_members
-    ]
-    return render(request, "members/index.html", {
-        'all_members' : all_members_age,
-        'summary': summary
-        })'''
-
 
 def members(request):
     query = request.GET.get("query", "")
@@ -259,12 +236,11 @@ def members(request):
     # Base queryset
     all_members = Member.objects.all()
 
-    # Filter by status - FIXED: apply filter to all_members
+    # Filter by status
     if status == "active":
         all_members = all_members.filter(is_active=True)
     elif status == "inactive":
         all_members = all_members.filter(is_active=False)
-    # If status is empty or any other value, show all members
 
     # Filter by search query
     if query:
@@ -276,7 +252,7 @@ def members(request):
     # Order by last name, first name
     all_members = all_members.order_by("first_name", "last_name")
 
-    # Summary counts - FIXED: Get totals from ALL members (unfiltered)
+    # Summary counts
     total_members = Member.objects.all()
     summary = total_members.aggregate(
         active=Count('id', filter=Q(is_active=True)),
@@ -287,16 +263,19 @@ def members(request):
     # Add age and last promotion date to each member
     members_with_age = []
     for m in all_members:
+        today = timezone.localdate()
+        
         # Get the most recent promotion date
         last_promotion = BeltPromotion.objects.filter(member=m).order_by('-promotion_date').first()
-        last_promotion_date = last_promotion.promotion_date if last_promotion else None
+        last_promotion_date = last_promotion.promotion_date if last_promotion else m.join_date.date()
+
+        print(m.join_date.date())
 
         promotion_age_text = None
         classes_since_promotion = 0
         
         if last_promotion_date:
             # Calculate days since last promotion
-            today = timezone.localdate()
             delta = today - last_promotion_date
             months, days = divmod(delta.days, 30)
             if months > 0:
@@ -315,7 +294,33 @@ def members(request):
             
             promotion_age_text = f"{days_text} | {classes_since_promotion} classes"
         else:
-            promotion_age_text = "—"
+            # No promotion found - show days since join date and classes since join
+            if m.join_date:
+                # Convert to date if it's a datetime
+                if isinstance(m.join_date, datetime):
+                    join_date = m.join_date.date()
+                else:
+                    join_date = m.join_date
+                    
+                delta = today - join_date
+                months, days = divmod(delta.days, 30)
+                if months > 0:
+                    days_text = f"{months}m, {days}d"
+                else:
+                    days_text = f"{days}d"
+                
+                # Count all classes attended since join date
+                classes_since_join = SessionAttendance.objects.filter(
+                    member=m,
+                    present=True,
+                    session__date__gte=join_date,
+                    session__date__lte=today,
+                    session__is_canceled=False
+                ).count()
+                
+                promotion_age_text = f"{days_text} | {classes_since_join} classes"
+            else:
+                promotion_age_text = "—"
 
         members_with_age.append({
             'id': m.id,
