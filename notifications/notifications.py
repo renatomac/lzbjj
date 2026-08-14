@@ -22,6 +22,75 @@ User = get_user_model()
 
 
 # ============================================================================
+# HELPER FUNCTIONS FOR COACH NOTIFICATIONS
+# ============================================================================
+
+def get_coaches_for_member(member):
+    """
+    Get all coaches who teach classes attended by this member.
+    
+    Args:
+        member: Member instance
+        
+    Returns:
+        QuerySet: User objects who are coaches and teach member's classes
+    """
+    try:
+        # Get all classes attended by this member
+        attended_sessions = SessionAttendance.objects.filter(
+            member=member
+        ).values_list('session', flat=True).distinct()
+        
+        # Get coaches from those sessions
+        coaches = User.objects.filter(
+            is_coach=True,
+            sessions__in=attended_sessions
+        ).distinct()
+        
+        return coaches
+    except Exception:
+        # Fallback: get all coaches if something goes wrong
+        return User.objects.filter(is_coach=True)
+
+
+def notify_coaches_about_member_event(member, event_type, message_template, context_data):
+    """
+    Send a notification to all coaches about a member event.
+    
+    Args:
+        member: Member instance
+        event_type: Type of event (e.g., 'MEMBER_PROMOTION', 'LOW_ATTENDANCE')
+        message_template: Template string with {member_name}, {member_belt}, etc.
+        context_data: Dict with additional context (e.g., classes_attended, days_inactive)
+    """
+    coaches = get_coaches_for_member(member)
+    
+    if not coaches.exists():
+        return []
+    
+    # Build message for coaches
+    coach_message = message_template.format(
+        member_name=f"{member.first_name} {member.last_name}",
+        member_belt=member.belt_rank,
+        **context_data
+    )
+    
+    notifications = create_bulk_notifications(
+        users=coaches,
+        notification_type=event_type,
+        message=coach_message,
+        data={
+            "member_id": member.id,
+            "member_name": f"{member.first_name} {member.last_name}",
+            "belt_rank": member.belt_rank,
+            **context_data
+        }
+    )
+    
+    return notifications
+
+
+# ============================================================================
 # BIRTHDAY NOTIFICATIONS
 # ============================================================================
 
@@ -49,7 +118,7 @@ def generate_birthday_notifications():
         # Calculate age
         age = today.year - member.date_of_birth.year
         
-        message = f"Happy Birthday, {member.first_name}! You're turning {age} today!"
+        message = f"🎉 Happy Birthday, {member.first_name}! You're turning {age} today!"
         
         notification = create_notification(
             user=member.user,
@@ -124,7 +193,7 @@ def generate_promotion_milestone_notifications():
             
             if not recent_notification:
                 message = (
-                    f"Congratulations {member.first_name}! You've completed "
+                    f"🥋 {member.first_name}, congratulations! You've completed "
                     f"{classes_attended} classes {time_descriptor} and may be ready for "
                     f"belt promotion evaluation. Talk to your instructor!"
                 )
@@ -142,6 +211,23 @@ def generate_promotion_milestone_notifications():
                     }
                 )
                 notifications.append(notification)
+                
+                # Also notify coaches about this milestone
+                coach_message = (
+                    f"Promotion Ready: {member.first_name} {member.last_name} "
+                    f"({member.belt_rank}) has completed {classes_attended} classes "
+                    f"and may be ready for belt promotion evaluation."
+                )
+                coach_notifications = notify_coaches_about_member_event(
+                    member,
+                    "MEMBER_PROMOTION_READY",
+                    coach_message,
+                    {
+                        "classes_attended": classes_attended,
+                        "time_descriptor": time_descriptor,
+                    }
+                )
+                notifications.extend(coach_notifications)
     
     return notifications
 
@@ -198,7 +284,7 @@ def generate_low_attendance_notifications():
             
             if not recent_notification:
                 message = (
-                    f"{member.first_name}, we haven't seen you in a week! "
+                    f"📋 {member.first_name}, we haven't seen you in a week! "
                     f"Come back to class soon. Check the schedule and join us!"
                 )
                 
@@ -214,6 +300,22 @@ def generate_low_attendance_notifications():
                     }
                 )
                 notifications.append(notification)
+                
+                # Also notify coaches about inactive member
+                coach_message = (
+                    f"Low Attendance Alert: {member.first_name} {member.last_name} "
+                    f"({member.belt_rank}) hasn't attended any class in the past week. "
+                    f"Consider reaching out to re-engage them."
+                )
+                coach_notifications = notify_coaches_about_member_event(
+                    member,
+                    "MEMBER_LOW_ATTENDANCE",
+                    coach_message,
+                    {
+                        "days_since_last_class": 7,
+                    }
+                )
+                notifications.extend(coach_notifications)
     
     return notifications
 
@@ -255,7 +357,7 @@ def generate_membership_expiration_warnings():
             days_until_expiry = (member.membership_end_date - today).days
             
             message = (
-                f"{member.first_name}, your membership expires in {days_until_expiry} days "
+                f"⏰ {member.first_name}, your membership expires in {days_until_expiry} days "
                 f"({member.membership_end_date.strftime('%B %d, %Y')}). "
                 f"Please renew to continue enjoying classes!"
             )
@@ -321,8 +423,9 @@ def generate_streak_milestone_notifications():
                 ).exists()
                 
                 if not recent_notification:
+                    streak_emoji = "🔥"
                     message = (
-                        f"Amazing, {member.first_name}! You've attended "
+                        f"{streak_emoji} Amazing, {member.first_name}! You've attended "
                         f"{milestone} consecutive classes! Keep up the great work!"
                     )
                     
@@ -365,7 +468,7 @@ def generate_class_cancellation_notifications(class_session):
     )
     
     message = (
-        f"Class Alert: {class_session.class_template.name} on "
+        f"⚠️ Class Alert: {class_session.class_template.name} on "
         f"{class_session.date.strftime('%B %d, %Y')} has been canceled."
     )
     
@@ -397,7 +500,7 @@ def generate_new_member_welcome_notification(member):
         return None
     
     message = (
-        f"Welcome to {member.user.first_name}! We're excited to have you join our academy. "
+        f"🥋 Welcome to {member.user.first_name}! We're excited to have you join our academy. "
         f"Check out the class schedule and don't hesitate to ask instructors questions!"
     )
     
@@ -432,7 +535,7 @@ def generate_belt_promotion_notification(belt_promotion):
         return None
     
     message = (
-        f"Congratulations, {member.first_name}! You've been promoted to "
+        f"🎓 Congratulations, {member.first_name}! You've been promoted to "
         f"{belt_promotion.new_rank.upper()} {belt_promotion.new_stripes} stripe(s)! "
         f"Well done on your hard work and dedication!"
     )
@@ -447,6 +550,24 @@ def generate_belt_promotion_notification(belt_promotion):
             "old_rank": belt_promotion.old_rank,
             "new_rank": belt_promotion.new_rank,
             "old_stripes": belt_promotion.old_stripes,
+            "new_stripes": belt_promotion.new_stripes,
+            "promotion_date": belt_promotion.promotion_date.isoformat(),
+        }
+    )
+    
+    # Also notify coaches about the promotion
+    coach_message = (
+        f"Promotion Confirmed: {member.first_name} {member.last_name} "
+        f"has been promoted from {belt_promotion.old_rank} to "
+        f"{belt_promotion.new_rank} {belt_promotion.new_stripes} stripe(s)!"
+    )
+    notify_coaches_about_member_event(
+        member,
+        "MEMBER_PROMOTED",
+        coach_message,
+        {
+            "old_rank": belt_promotion.old_rank,
+            "new_rank": belt_promotion.new_rank,
             "new_stripes": belt_promotion.new_stripes,
             "promotion_date": belt_promotion.promotion_date.isoformat(),
         }
@@ -493,7 +614,7 @@ def generate_waiver_expiration_warnings():
             
             if not recent_notification:
                 message = (
-                    f"{member.first_name}, your waiver expires soon. "
+                    f"📝 {member.first_name}, your waiver expires soon. "
                     f"Please renew it to continue attending classes."
                 )
                 

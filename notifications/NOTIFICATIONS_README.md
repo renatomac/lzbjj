@@ -367,6 +367,180 @@ from crm.models import Member, BeltPromotion, ClassSession, SessionAttendance, A
 - Verify which model your system uses for tracking attendance
 - Adjust queries as needed for your data model
 
+## Persistent Notifications
+
+### Overview
+
+Notifications in the system are **persistent** - they do not automatically disappear after a set time. Members can:
+- View all their notifications in the notification center
+- Mark notifications as read
+- Delete individual notifications
+- Clear all notifications at once
+
+### Features
+
+1. **Persistent Storage**: All notifications stay in the database until the user deletes them
+2. **Read Status**: Notifications track whether they've been read by the user
+3. **Delete Functionality**: Users can delete individual or all notifications
+4. **Unread Counter**: Badge shows count of unread notifications
+5. **Timeline**: Each notification shows when it was created
+
+### UI Implementation
+
+Include the notification widget in your base template:
+
+```html
+<!-- In your base.html or layout template -->
+{% include "notifications/widget.html" %}
+```
+
+The widget provides:
+- Full list of all user's notifications
+- "Mark as read" button (✓)
+- "Delete" button (✕) for each notification
+- "Clear All" button to delete all notifications
+- Unread count badge
+- Timestamps (e.g., "5 minutes ago")
+
+### API Endpoints for Notifications
+
+```
+POST /notifications/mark/<id>/          # Mark notification as read
+POST /notifications/delete/<id>/        # Delete a notification
+POST /notifications/mark-all/           # Mark all as read
+POST /notifications/delete-all/         # Delete all notifications
+GET  /notifications/api/recent/         # Get 10 most recent notifications
+```
+
+### JavaScript Functions
+
+The widget template includes these functions:
+
+```javascript
+// Mark a notification as read
+markNotificationRead(notificationId);
+
+// Delete a single notification
+deleteNotification(notificationId);
+
+// Delete all notifications
+clearAllNotifications();
+
+// Update the unread badge count
+updateUnreadCount(count);
+
+// Refresh notifications (polling)
+refreshNotifications();
+```
+
+### Optional Polling
+
+To auto-refresh notifications every 30 seconds, uncomment in the widget:
+
+```javascript
+// Poll for new notifications every 30 seconds
+setInterval(refreshNotifications, 30000);
+```
+
+## Coach Notifications
+
+### Overview
+
+Coaches receive special notifications about member-related events, allowing them to stay informed and take action when needed.
+
+### Coach Notification Types
+
+#### 1. **Promotion Ready Alert**
+- **Trigger**: Member completes 30 classes milestone
+- **Message**: "Promotion Ready: [Member Name] ([Belt]) has completed X classes and may be ready for belt promotion evaluation."
+- **Purpose**: Alert coach to consider member for belt promotion test
+- **Recipient**: Coaches who teach classes attended by the member
+
+#### 2. **Low Attendance Alert**
+- **Trigger**: Member hasn't attended class in 7 days
+- **Message**: "Low Attendance Alert: [Member Name] ([Belt]) hasn't attended any class in the past week. Consider reaching out to re-engage them."
+- **Purpose**: Encourage coach to contact inactive member
+- **Recipient**: Coaches who teach classes attended by the member
+
+#### 3. **Member Promoted Confirmation**
+- **Trigger**: Member is officially promoted to a new belt rank
+- **Message**: "Promotion Confirmed: [Member Name] has been promoted from [Old Rank] to [New Rank] [Stripes]!"
+- **Purpose**: Confirm promotion action and update coach's awareness
+- **Recipient**: Coaches who teach classes attended by the member
+
+### How Coach Notifications Work
+
+The system automatically determines which coaches should receive notifications by:
+
+1. Finding all classes attended by the member
+2. Getting the primary instructor for each class
+3. Sending notifications to all unique coaches
+
+```python
+# Example: Getting coaches for a member
+from notifications.notifications import get_coaches_for_member
+
+member = Member.objects.get(id=1)
+coaches = get_coaches_for_member(member)  # Returns all coaches who teach this member
+```
+
+### Sending Coach Notifications Programmatically
+
+```python
+from notifications.notifications import notify_coaches_about_member_event
+
+member = Member.objects.get(id=1)
+
+# Notify coaches about an event
+notify_coaches_about_member_event(
+    member=member,
+    event_type="MEMBER_PROMOTION_READY",
+    message_template="Member {member_name} ({member_belt}) is ready for promotion!",
+    context_data={
+        "classes_attended": 35,
+        "since_date": "2026-06-01",
+    }
+)
+```
+
+### Coach Notification Flow Diagram
+
+```
+Member Event Occurs
+    ↓
+Notification generated for member
+    ↓
+Coaches identified (who teach this member)
+    ↓
+Notification sent to all coaches
+    ↓
+Coaches see alert in their notification center
+    ↓
+Coach can take action (schedule test, reach out, etc.)
+```
+
+### Filtering Coach Notifications
+
+Coaches see notifications about:
+- Members they directly teach
+- Members in classes they instruct
+- Member milestones and achievements
+- Member attendance issues
+
+To view only member-related notifications, coaches can filter by type:
+- MEMBER_PROMOTION_READY
+- MEMBER_LOW_ATTENDANCE
+- MEMBER_PROMOTED
+
+### Future Coach Features
+
+Potential enhancements:
+- Coach preferences (receive/ignore certain notification types)
+- Team-level notifications for group classes
+- Notification scheduling (quiet hours, etc.)
+- Coach dashboard with member metrics
+- Action tracking (coach acknowledged, took action, etc.)
+
 ## Future Enhancements
 
 Potential additions:

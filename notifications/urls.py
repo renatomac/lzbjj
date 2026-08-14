@@ -8,6 +8,8 @@ urlpatterns = [
     path('', views.notification_list, name='list'),
     path('mark/<int:pk>/', views.mark_notification_read, name='mark_read'),
     path('mark-all/', views.mark_all_read, name='mark_all'),
+    path('delete/<int:pk>/', views.delete_notification, name='delete'),
+    path('delete-all/', views.delete_all_notifications, name='delete_all'),
     path('ably-token/', views.ably_token, name='ably_token'),
     path('api/recent/', views.recent_notifications_api, name='recent_api'),
 ]

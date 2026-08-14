@@ -76,11 +76,38 @@ def mark_notification_read(request, pk):
     return JsonResponse({"status": "ok", "id": n.id, "unread": unread})
 
 @login_required
+def delete_notification(request, pk):
+    """Delete a notification permanently"""
+    if request.method not in ("POST", "GET"):
+        return JsonResponse({"error": "Method not allowed"}, status=405)
+
+    n = get_object_or_404(Notification, pk=pk)
+    # Only owner or staff can delete
+    if n.user != request.user and not request.user.is_staff:
+        return HttpResponseForbidden("Not allowed")
+
+    notification_id = n.id
+    n.delete()
+
+    # Return updated counts
+    unread = Notification.objects.filter(user=request.user, is_read=False).count()
+    return JsonResponse({"status": "ok", "id": notification_id, "unread": unread})
+
+@login_required
 def mark_all_read(request):
     if request.method not in ("POST", "GET"):
         return JsonResponse({"error": "Method not allowed"}, status=405)
 
     Notification.objects.filter(user=request.user, is_read=False).update(is_read=True)
+    return JsonResponse({"status": "ok", "unread": 0})
+
+@login_required
+def delete_all_notifications(request):
+    """Delete all notifications for the user"""
+    if request.method not in ("POST", "GET"):
+        return JsonResponse({"error": "Method not allowed"}, status=405)
+
+    Notification.objects.filter(user=request.user).delete()
     return JsonResponse({"status": "ok", "unread": 0})
 
 # Optional: JSON for the 5 most recent (for repopulating dropdown if you want)

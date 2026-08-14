@@ -1,0 +1,316 @@
+<!--
+Notification Widget Template
+Place this in your base template or a reusable component template.
+
+This template displays:
+1. Persistent notifications (don't disappear after time)
+2. Delete button for each notification
+3. "Clear All" button to delete all notifications
+4. Unread indicator
+-->
+
+<div id="notifications-widget" class="notifications-container">
+    <div class="notifications-header">
+        <h3>Notifications</h3>
+        {% if notifications_unread_count > 0 %}
+        <span class="badge badge-primary">{{ notifications_unread_count }} new</span>
+        {% endif %}
+        {% if notifications_all|length > 0 %}
+        <button class="btn btn-sm btn-outline-danger" onclick="clearAllNotifications()">
+            Clear All
+        </button>
+        {% endif %}
+    </div>
+
+    <div id="notifications-list" class="notifications-list">
+        {% if notifications_all %}
+            {% for notification in notifications_all %}
+            <div class="notification-item {% if not notification.is_read %}unread{% endif %}" 
+                 id="notification-{{ notification.id }}">
+                <div class="notification-content">
+                    <p class="notification-message">{{ notification.message }}</p>
+                    <small class="notification-time" title="{{ notification.created_at|date:'Y-m-d H:i:s' }}">
+                        {{ notification.created_at|timesince }} ago
+                    </small>
+                </div>
+                <div class="notification-actions">
+                    {% if not notification.is_read %}
+                    <button class="btn-icon" 
+                            onclick="markNotificationRead({{ notification.id }})" 
+                            title="Mark as read">
+                        ✓
+                    </button>
+                    {% endif %}
+                    <button class="btn-icon btn-delete" 
+                            onclick="deleteNotification({{ notification.id }})" 
+                            title="Delete notification">
+                        ✕
+                    </button>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <p class="text-center text-muted" style="padding: 20px;">
+                No notifications
+            </p>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+.notifications-container {
+    background: #ffffff;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    max-width: 500px;
+    margin: 20px 0;
+}
+
+.notifications-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px;
+    border-bottom: 1px solid #e0e0e0;
+    background: #f8f9fa;
+}
+
+.notifications-header h3 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.notifications-header .badge {
+    font-size: 12px;
+    padding: 4px 8px;
+}
+
+.notifications-list {
+    max-height: 600px;
+    overflow-y: auto;
+}
+
+.notification-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 15px;
+    border-bottom: 1px solid #f0f0f0;
+    transition: background-color 0.2s;
+}
+
+.notification-item:hover {
+    background-color: #f8f9fa;
+}
+
+.notification-item.unread {
+    background-color: #e3f2fd;
+    font-weight: 500;
+}
+
+.notification-content {
+    flex-grow: 1;
+    margin-right: 10px;
+}
+
+.notification-message {
+    margin: 0 0 5px 0;
+    font-size: 14px;
+    line-height: 1.4;
+    color: #333;
+}
+
+.notification-time {
+    color: #999;
+    font-size: 12px;
+}
+
+.notification-actions {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.btn-icon {
+    background: none;
+    border: none;
+    color: #999;
+    cursor: pointer;
+    font-size: 16px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 28px;
+    height: 28px;
+}
+
+.btn-icon:hover {
+    background-color: #e0e0e0;
+    color: #333;
+}
+
+.btn-icon.btn-delete:hover {
+    background-color: #ffebee;
+    color: #d32f2f;
+}
+
+@media (max-width: 576px) {
+    .notifications-container {
+        max-width: 100%;
+    }
+    
+    .notification-item {
+        flex-direction: column;
+    }
+    
+    .notification-actions {
+        margin-top: 10px;
+        justify-content: flex-end;
+    }
+}
+</style>
+
+<script>
+/**
+ * Mark a notification as read
+ */
+function markNotificationRead(notificationId) {
+    fetch(`{% url 'notifications:mark_read' pk=0 %}`.replace('0', notificationId), {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'ok') {
+            const element = document.getElementById(`notification-${data.id}`);
+            if (element) {
+                element.classList.remove('unread');
+            }
+            updateUnreadCount(data.unread);
+        }
+    })
+    .catch(error => console.error('Error:', error));
+}
+
+/**
+ * Delete a notification permanently
+ */
+function deleteNotification(notificationId) {
+    if (confirm('Are you sure you want to delete this notification?')) {
+        fetch(`{% url 'notifications:delete' pk=0 %}`.replace('0', notificationId), {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'ok') {
+                const element = document.getElementById(`notification-${data.id}`);
+                if (element) {
+                    element.style.opacity = '0';
+                    element.style.transition = 'opacity 0.3s';
+                    setTimeout(() => element.remove(), 300);
+                    
+                    // Show empty state if no more notifications
+                    const list = document.getElementById('notifications-list');
+                    if (list.querySelectorAll('.notification-item').length === 0) {
+                        list.innerHTML = '<p class="text-center text-muted" style="padding: 20px;">No notifications</p>';
+                    }
+                }
+                updateUnreadCount(data.unread);
+            }
+        })
+        .catch(error => console.error('Error:', error));
+    }
+}
+
+/**
+ * Clear all notifications
+ */
+function clearAllNotifications() {
+    if (confirm('Are you sure you want to delete all notifications?')) {
+        fetch('{% url "notifications:delete_all" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'ok') {
+                const list = document.getElementById('notifications-list');
+                list.innerHTML = '<p class="text-center text-muted" style="padding: 20px;">No notifications</p>';
+                updateUnreadCount(0);
+            }
+        })
+        .catch(error => console.error('Error:', error));
+    }
+}
+
+/**
+ * Update unread badge count
+ */
+function updateUnreadCount(count) {
+    const header = document.querySelector('.notifications-header');
+    const badge = header.querySelector('.badge');
+    
+    if (count > 0) {
+        if (!badge) {
+            const newBadge = document.createElement('span');
+            newBadge.className = 'badge badge-primary';
+            newBadge.textContent = count + ' new';
+            header.insertBefore(newBadge, header.querySelector('button'));
+        } else {
+            badge.textContent = count + ' new';
+        }
+    } else {
+        if (badge) badge.remove();
+    }
+}
+
+/**
+ * Get CSRF token from cookies
+ */
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+/**
+ * Refresh notifications periodically (optional - for polling)
+ */
+function refreshNotifications() {
+    fetch('{% url "notifications:recent_api" %}')
+        .then(response => response.json())
+        .then(data => {
+            // Update UI with fresh notifications
+            updateUnreadCount(data.unread);
+            // Optionally reload the full notifications list
+        })
+        .catch(error => console.error('Error refreshing notifications:', error));
+}
+
+// Optional: Poll for new notifications every 30 seconds
+// setInterval(refreshNotifications, 30000);
+</script>
