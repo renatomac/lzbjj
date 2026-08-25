@@ -1,5 +1,19 @@
 # LZBJJ CRM
 
+## Getting Started
+
+1. Create and activate a virtual environment.
+2. Install dependencies from `/home/runner/work/lzbjj/lzbjj/requirements.txt`.
+3. Run database migrations.
+4. Start the development server.
+
+Typical commands:
+- `python -m venv venv`
+- `source venv/bin/activate`
+- `pip install -r /home/runner/work/lzbjj/lzbjj/requirements.txt`
+- `python /home/runner/work/lzbjj/lzbjj/manage.py migrate`
+- `python /home/runner/work/lzbjj/lzbjj/manage.py runserver`
+
 ## Product Reference and Success Goals
 
 This CRM is designed for a Brazilian Jiu-Jitsu gym operation where staff need one system for member records, attendance, waivers, promotions, billing, and reporting.
