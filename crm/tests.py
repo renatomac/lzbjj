@@ -1,10 +1,13 @@
+from datetime import timedelta
+
 from django.contrib.auth import authenticate, get_user_model
 from django.test import TestCase
+from django.urls import reverse
 from django.utils import timezone
 
 from notifications.models import Notification
 from .forms import MemberForm
-from .models import Member
+from .models import Member, Payment
 from .utils import create_birthday_notifications
 
 
@@ -93,3 +96,53 @@ class BirthdayNotificationTests(TestCase):
         self.assertTrue(
             Notification.objects.filter(user=staff_user, message__icontains="birthday").exists()
         )
+
+
+class BillingPaymentListTests(TestCase):
+    def test_current_month_completed_payments_are_listed(self):
+        User = get_user_model()
+        user = User.objects.create_user(
+            username="payer-user",
+            email="payer@example.com",
+            password="123456",
+        )
+
+        Member.objects.create(
+            first_name="Alice",
+            last_name="Smith",
+            date_of_birth="2000-01-01",
+            address="123 Main St",
+            city="Chicago",
+            zip_code="60601",
+            user=user,
+        )
+
+        today = timezone.localdate()
+        Payment.objects.create(
+            user=user,
+            amount=120.00,
+            payment_date=today,
+            payment_method="credit_card",
+            status="paid",
+        )
+        Payment.objects.create(
+            user=user,
+            amount=75.00,
+            payment_date=today - timedelta(days=35),
+            payment_method="cash",
+            status="paid",
+        )
+        Payment.objects.create(
+            user=user,
+            amount=50.00,
+            payment_date=today - timedelta(days=40),
+            payment_method="cash",
+            status="pending",
+        )
+
+        response = self.client.get(reverse("billing"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Alice Smith")
+        self.assertContains(response, "$120.00")
+        self.assertNotContains(response, "Pending")

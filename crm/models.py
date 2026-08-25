@@ -160,6 +160,7 @@ class Member(models.Model):
     first_name = models.CharField(max_length=150)
     last_name = models.CharField(max_length=150)
     email = models.EmailField(blank=True, null=True)
+    authorize_customer_profile_id = models.CharField(max_length=64, blank=True, default="", db_index=True)
 
     gender = models.CharField(max_length=20, choices = GENDER, null=True, blank=True)
     date_of_birth = models.DateField()
@@ -590,6 +591,36 @@ class Payment(models.Model):
             "status": self.status,
             "timestamp": self.timestamp.isoformat(),
         }
+
+
+class Transaction(models.Model):
+    """External payment identity with the latest Authorize.Net state."""
+
+    STATUS_CHOICES = [
+        ("settled", "Settled"), ("failed", "Failed"), ("refunded", "Refunded"),
+        ("voided", "Voided"), ("pending", "Pending"), ("unknown", "Unknown"),
+    ]
+
+    member = models.ForeignKey("Member", on_delete=models.SET_NULL, null=True, blank=True, related_name="authorize_transactions")
+    transaction_id = models.CharField(max_length=32, unique=True, db_index=True)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    status = models.CharField(max_length=32, choices=STATUS_CHOICES, default="unknown", db_index=True)
+    payment_method = models.CharField(max_length=50, default="authorize_net")
+    subscription_id = models.CharField(max_length=64, blank=True, default="", db_index=True)
+    response_code = models.CharField(max_length=16, blank=True, default="")
+    customer_profile_id = models.CharField(max_length=64, blank=True, default="", db_index=True)
+    invoice_number = models.CharField(max_length=64, blank=True, default="", db_index=True)
+    processed_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    raw_response = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ["-processed_at", "-created_at"]
+        indexes = [models.Index(fields=["status", "processed_at"]), models.Index(fields=["member", "processed_at"])]
+
+    def __str__(self):
+        return f"Authorize.Net transaction {self.transaction_id}"
 
 
 
