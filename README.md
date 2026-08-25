@@ -1,5 +1,7 @@
 # LZBJJ CRM
 
+LZBJJ CRM is a customer relationship management system for the Lake Zurich Brazilian Jiu-Jitsu academy.
+
 ## Getting Started
 
 1. Create and activate a virtual environment.
