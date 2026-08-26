@@ -601,6 +601,20 @@ class Transaction(models.Model):
         ("voided", "Voided"), ("pending", "Pending"), ("unknown", "Unknown"),
     ]
 
+    MATCH_STATUS_CHOICES = [
+        ("matched", "Matched"),
+        ("needs_review", "Needs Review"),
+        ("unmatched", "Unmatched"),
+    ]
+
+    MATCHED_BY_CHOICES = [
+        ("", "N/A"),
+        ("invoice", "Invoice / Profile Reference"),
+        ("payer_link", "Linked Payer"),
+        ("heuristic", "Name + Amount Heuristic"),
+        ("manual", "Manual"),
+    ]
+
     member = models.ForeignKey("Member", on_delete=models.SET_NULL, null=True, blank=True, related_name="authorize_transactions")
     transaction_id = models.CharField(max_length=32, unique=True, db_index=True)
     amount = models.DecimalField(max_digits=12, decimal_places=2)
@@ -610,6 +624,12 @@ class Transaction(models.Model):
     response_code = models.CharField(max_length=16, blank=True, default="")
     customer_profile_id = models.CharField(max_length=64, blank=True, default="", db_index=True)
     invoice_number = models.CharField(max_length=64, blank=True, default="", db_index=True)
+    # Cardholder / billing name from Authorize.Net's billTo block. Often the payer
+    # (e.g. a parent), not the student the payment is for.
+    cardholder_first_name = models.CharField(max_length=150, blank=True, default="")
+    cardholder_last_name = models.CharField(max_length=150, blank=True, default="")
+    match_status = models.CharField(max_length=20, choices=MATCH_STATUS_CHOICES, default="unmatched", db_index=True)
+    matched_by = models.CharField(max_length=20, choices=MATCHED_BY_CHOICES, blank=True, default="")
     processed_at = models.DateTimeField(null=True, blank=True, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -617,10 +637,60 @@ class Transaction(models.Model):
 
     class Meta:
         ordering = ["-processed_at", "-created_at"]
-        indexes = [models.Index(fields=["status", "processed_at"]), models.Index(fields=["member", "processed_at"])]
+        indexes = [
+            models.Index(fields=["status", "processed_at"]),
+            models.Index(fields=["member", "processed_at"]),
+            models.Index(fields=["match_status", "processed_at"]),
+        ]
 
     def __str__(self):
         return f"Authorize.Net transaction {self.transaction_id}"
+
+    @property
+    def cardholder_name(self):
+        name = f"{self.cardholder_first_name} {self.cardholder_last_name}".strip()
+        return name or "Unknown"
+
+    @property
+    def is_split(self):
+        """True if this transaction pays for more than one member (e.g. siblings on one card)."""
+        return len(self.allocations.all()) > 1
+
+
+class TransactionAllocation(models.Model):
+    """Splits a single gateway transaction's amount across multiple members."""
+
+    transaction = models.ForeignKey("Transaction", on_delete=models.CASCADE, related_name="allocations")
+    member = models.ForeignKey("Member", on_delete=models.CASCADE, related_name="transaction_allocations")
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("transaction", "member")
+        ordering = ["member__last_name", "member__first_name"]
+
+    def __str__(self):
+        return f"{self.transaction.transaction_id}: ${self.amount} -> {self.member}"
+
+
+class PayerLink(models.Model):
+    """Remembers that a cardholder name (often a parent) pays for a given member.
+
+    Created automatically when staff manually resolve an unmatched transaction,
+    so future payments from the same cardholder auto-match to the same member.
+    """
+
+    first_name = models.CharField(max_length=150)
+    last_name = models.CharField(max_length=150)
+    member = models.ForeignKey("Member", on_delete=models.CASCADE, related_name="payer_links")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("first_name", "last_name", "member")
+        indexes = [models.Index(fields=["last_name", "first_name"])]
+
+    def __str__(self):
+        return f"{self.first_name} {self.last_name} -> {self.member}"
 
 
 

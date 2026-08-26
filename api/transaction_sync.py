@@ -8,7 +8,7 @@ from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.utils import timezone
 
-from crm.models import Member, Transaction
+from crm.models import Member, PayerLink, Transaction
 from .authorize_net import AuthorizeNetClient
 
 logger = logging.getLogger(__name__)
@@ -54,6 +54,7 @@ def _processed_at(value):
 
 
 def _find_member(tx):
+    """Tier A: exact match via stored metadata (invoice reference / profile id / email)."""
     bill_to = tx.get("billTo") or {}
     profile_id = str(_value(tx, "customerProfileId", "customer_profile_id"))
     invoice = tx.get("invoiceNumber") or tx.get("invoice_number") or ""
@@ -74,6 +75,59 @@ def _find_member(tx):
     return None
 
 
+def _cardholder_name(tx):
+    # getTransactionListRequest summaries put firstName/lastName at the top level;
+    # only the detailed getTransactionDetailsRequest response nests them under billTo.
+    bill_to = tx.get("billTo") or {}
+    first_name = str(_value(tx, "firstName", "first_name") or _value(bill_to, "firstName", "first_name")).strip()
+    last_name = str(_value(tx, "lastName", "last_name") or _value(bill_to, "lastName", "last_name")).strip()
+    return first_name, last_name
+
+
+def _payer_link_member(first_name, last_name):
+    """Tier B: cardholder name explicitly pre-linked to a member by staff."""
+    if not (first_name and last_name):
+        return None
+    links = list(PayerLink.objects.filter(first_name__iexact=first_name, last_name__iexact=last_name).select_related("member"))
+    if len(links) == 1:
+        return links[0].member
+    return None
+
+
+def _heuristic_member(last_name, amount):
+    """Tier C: same last name + exact plan fee. Only auto-assigned when unambiguous."""
+    if not last_name:
+        return None
+    candidates = list(
+        Member.objects.filter(last_name__iexact=last_name, plan__membership_price=amount)
+    )
+    if len(candidates) == 1:
+        return candidates[0]
+    return None
+
+
+def match_transaction(tx, first_name, last_name, amount):
+    """Return (member, match_status, matched_by) using the tiered reconciliation strategy."""
+    member = _find_member(tx)
+    if member:
+        return member, "matched", "invoice"
+
+    member = _payer_link_member(first_name, last_name)
+    if member:
+        return member, "matched", "payer_link"
+
+    member = _heuristic_member(last_name, amount)
+    if member:
+        return member, "matched", "heuristic"
+
+    # Ambiguous heuristic candidates (same last name + amount matches multiple members)
+    # still need admin attention rather than being silently left unmatched.
+    if last_name and Member.objects.filter(last_name__iexact=last_name, plan__membership_price=amount).count() > 1:
+        return None, "needs_review", ""
+
+    return None, "unmatched", ""
+
+
 def upsert_transaction(tx):
     transaction_id = str(_value(tx, "transId", "transaction_id", "id"))
     if not transaction_id:
@@ -85,8 +139,8 @@ def upsert_transaction(tx):
 
     raw_status = str(_value(tx, "transactionStatus", "status") or "unknown").lower()
     status = "settled" if raw_status in SETTLED_STATUSES else "failed" if "declin" in raw_status or "error" in raw_status else raw_status[:32]
+    first_name, last_name = _cardholder_name(tx)
     defaults = {
-        "member": _find_member(tx),
         "amount": amount,
         "status": status,
         "payment_method": _payment_method(tx),
@@ -94,9 +148,24 @@ def upsert_transaction(tx):
         "response_code": str(_value(tx, "responseCode", "response_code")),
         "customer_profile_id": str(_value(tx, "customerProfileId", "customer_profile_id")),
         "invoice_number": str(_value(tx, "invoiceNumber", "invoice_number")),
+        "cardholder_first_name": first_name,
+        "cardholder_last_name": last_name,
         "processed_at": _processed_at(_value(tx, "_settlementTimeUTC", "submitTimeUTC", "submitTimeLocal", "_settlementTimeLocal")),
         "raw_response": tx,
     }
+
+    existing = Transaction.objects.filter(transaction_id=transaction_id).first()
+    if existing and existing.match_status == "matched":
+        # Preserve staff-confirmed (or previously auto-matched) assignments on resync.
+        defaults["member"] = existing.member
+        defaults["match_status"] = existing.match_status
+        defaults["matched_by"] = existing.matched_by
+    else:
+        member, match_status, matched_by = match_transaction(tx, first_name, last_name, amount)
+        defaults["member"] = member
+        defaults["match_status"] = match_status
+        defaults["matched_by"] = matched_by
+
     try:
         with transaction.atomic():
             record, created = Transaction.objects.update_or_create(transaction_id=transaction_id, defaults=defaults)
@@ -110,9 +179,15 @@ def _ingest(transactions):
     created = updated = skipped = 0
     for tx in transactions:
         try:
-            _, is_new = upsert_transaction(tx)
+            record, is_new = upsert_transaction(tx)
             created += is_new
             updated += not is_new
+            if is_new and record.match_status in ("unmatched", "needs_review"):
+                try:
+                    from notifications.notifications import generate_unmatched_payment_notification
+                    generate_unmatched_payment_notification(record)
+                except Exception:
+                    logger.exception("Failed to send unmatched payment notification for %s", record.transaction_id)
         except (ValueError, TypeError):
             skipped += 1
             logger.exception("Skipping malformed Authorize.Net transaction")

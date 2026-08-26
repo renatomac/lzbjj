@@ -635,6 +635,45 @@ def generate_waiver_expiration_warnings():
 
 
 # ============================================================================
+# BILLING / PAYMENT RECONCILIATION NOTIFICATIONS
+# ============================================================================
+
+def generate_unmatched_payment_notification(tx):
+    """
+    Notify staff that an incoming gateway payment couldn't be automatically
+    tied to a member, so it needs manual review in the Unmatched Transactions queue.
+
+    Args:
+        tx: crm.models.Transaction instance with match_status in
+            ("unmatched", "needs_review").
+
+    Returns:
+        list: Created notifications (one per staff user).
+    """
+    staff_users = User.objects.filter(is_staff=True, is_active=True)
+    if not staff_users.exists():
+        return []
+
+    reason = "no matching student" if tx.match_status == "unmatched" else "multiple possible students (ambiguous match)"
+    message = (
+        f"⚠️ Unrecognized payment: ${tx.amount} from {tx.cardholder_name} "
+        f"could not be matched to a student ({reason}). Please review and link it."
+    )
+
+    return create_bulk_notifications(
+        users=staff_users,
+        notification_type="UNMATCHED_PAYMENT",
+        message=message,
+        data={
+            "transaction_id": tx.transaction_id,
+            "amount": float(tx.amount),
+            "cardholder_name": tx.cardholder_name,
+            "match_status": tx.match_status,
+        }
+    )
+
+
+# ============================================================================
 # BATCH NOTIFICATION RUNNER
 # ============================================================================
 

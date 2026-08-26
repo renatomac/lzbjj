@@ -11,6 +11,9 @@
     </h1>
     <div class="btn-toolbar mb-2 mb-md-0">
         <div class="btn-group me-2">
+            <a href="{% url 'unmatched_transactions' %}" class="btn btn-outline-warning">
+                <i class="fas fa-unlink me-2"></i>Unmatched Transactions
+            </a>
             <a href="{% url 'billing' %}" class="btn btn-outline-secondary">
                 <i class="fas fa-sync-alt me-2"></i>Refresh
             </a>
@@ -105,6 +108,8 @@
                         <th>Status</th>
                         <th>Amount</th>
                         <th>Method</th>
+                        <th>Student</th>
+                        <th>Cardholder</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -120,11 +125,16 @@
                             </td>
                             <td>${{ payment.amount }}</td>
                             <td>{{ payment.method|default:payment.payment_method }}</td>
+                            <td>
+                                {% if payment.is_split %}<span class="badge bg-info text-dark me-1">Split</span>{% endif %}
+                                {{ payment.member_name }}
+                            </td>
+                            <td>{{ payment.cardholder_name|default:payment.member_name }}</td>
                         </tr>
                         {% endfor %}
                     {% else %}
                         <tr>
-                            <td colspan="5" class="text-center text-muted py-4">
+                            <td colspan="7" class="text-center text-muted py-4">
                                 No completed payments found for the current month.
                             </td>
                         </tr>
@@ -167,6 +177,8 @@
                         <th scope="col">Status</th>
                         <th scope="col">Amount</th>
                         <th scope="col">Method</th>
+                        <th scope="col">Student</th>
+                        <th scope="col">Cardholder</th>
                         <th scope="col">Source</th>
                     </tr>
                 </thead>
@@ -183,6 +195,11 @@
                         <td>${{ payment.amount }}</td>
                         <td>{{ payment.method|default:payment.payment_method }}</td>
                         <td>
+                            {% if payment.is_split %}<span class="badge bg-info text-dark me-1">Split</span>{% endif %}
+                            {{ payment.member_name }}
+                        </td>
+                        <td>{{ payment.cardholder_name|default:payment.member_name }}</td>
+                        <td>
                             <span class="badge {% if payment.source == 'Authorize.Net' %}bg-info text-dark{% else %}bg-secondary{% endif %}">
                                 {{ payment.source|default:'Local' }}
                             </span>
@@ -190,7 +207,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="6" class="text-center text-muted py-5">
+                        <td colspan="8" class="text-center text-muted py-5">
                             <i class="fas fa-info-circle me-2"></i>No payments found in the selected date range.
                         </td>
                     </tr>

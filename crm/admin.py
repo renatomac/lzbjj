@@ -13,6 +13,9 @@ from .models import (
     Class,
     Attendance,
     BeltPromotion,
+    Transaction,
+    PayerLink,
+    TransactionAllocation,
 )
 
 
@@ -173,6 +176,33 @@ class PaymentAdmin(admin.ModelAdmin):
     list_filter = ("payment_method", "status", "payment_date")
     search_fields = ("user__username",)
     autocomplete_fields = ("user",)
+
+
+
+# Transaction / PayerLink Admin
+
+
+class TransactionAllocationInline(admin.TabularInline):
+    model = TransactionAllocation
+    extra = 0
+    autocomplete_fields = ("member",)
+
+
+@admin.register(Transaction)
+class TransactionAdmin(admin.ModelAdmin):
+    list_display = ("transaction_id", "member", "amount", "status", "match_status", "matched_by", "cardholder_name", "processed_at")
+    list_filter = ("status", "match_status", "matched_by", "payment_method")
+    search_fields = ("transaction_id", "cardholder_first_name", "cardholder_last_name", "member__first_name", "member__last_name")
+    autocomplete_fields = ("member",)
+    readonly_fields = ("created_at", "updated_at", "raw_response")
+    inlines = [TransactionAllocationInline]
+
+
+@admin.register(PayerLink)
+class PayerLinkAdmin(admin.ModelAdmin):
+    list_display = ("first_name", "last_name", "member", "created_at")
+    search_fields = ("first_name", "last_name", "member__first_name", "member__last_name")
+    autocomplete_fields = ("member",)
 
 
 

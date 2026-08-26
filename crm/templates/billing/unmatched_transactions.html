@@ -1,0 +1,218 @@
+{% extends "layout.html" %}
+
+{% block title %}Unmatched Transactions{% endblock %}
+{% block header_title %}Unmatched Transactions{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">
+        <i class="fas fa-unlink me-2"></i>Unmatched Transactions
+        <span class="badge bg-danger rounded-pill">{{ queue.count }}</span>
+    </h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="{% url 'billing' %}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Back to Billing
+        </a>
+    </div>
+</div>
+
+<p class="text-muted">
+    Transactions here couldn't be automatically tied to a student (e.g. paid with a parent's card that
+    doesn't match a name/amount on file). Link each one to the correct student below &mdash; the cardholder
+    name will be remembered so future payments from the same card auto-match.
+</p>
+
+<div class="card shadow-sm">
+    <div class="table-responsive">
+        <table class="table table-striped table-hover align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>Transaction ID</th>
+                    <th>Date</th>
+                    <th>Cardholder</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                    <th>Match Status</th>
+                    <th>Link to Student</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for tx in queue %}
+                <tr>
+                    <td>{{ tx.transaction_id }}</td>
+                    <td>{{ tx.processed_at|date:"M d, Y" }}</td>
+                    <td>{{ tx.cardholder_name }}</td>
+                    <td>${{ tx.amount }}</td>
+                    <td>{{ tx.get_status_display }}</td>
+                    <td>
+                        <span class="badge {% if tx.match_status == 'needs_review' %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
+                            {{ tx.get_match_status_display }}
+                        </span>
+                    </td>
+                    <td>
+                        <form method="POST" class="d-flex gap-2">
+                            {% csrf_token %}
+                            <input type="hidden" name="transaction_id" value="{{ tx.id }}">
+                            <select name="member_id" class="form-select form-select-sm" required>
+                                <option value="" disabled {% if not tx.has_single_suggestion %}selected{% endif %}>Select student...</option>
+                                {% if tx.suggested_members %}
+                                <optgroup label="Suggested (name match)">
+                                    {% for member in tx.suggested_members %}
+                                    <option value="{{ member.id }}" {% if tx.has_single_suggestion %}selected{% endif %}>
+                                        {{ member.first_name }} {{ member.last_name }}
+                                    </option>
+                                    {% endfor %}
+                                </optgroup>
+                                {% endif %}
+                                <optgroup label="All Students">
+                                    {% for member in tx.other_members %}
+                                    <option value="{{ member.id }}">{{ member.first_name }} {{ member.last_name }}</option>
+                                    {% endfor %}
+                                </optgroup>
+                            </select>
+                            <button type="submit" class="btn btn-sm btn-primary text-nowrap">
+                                <i class="fas fa-link me-1"></i>Link
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-info text-nowrap" data-bs-toggle="collapse" data-bs-target="#split-{{ tx.id }}">
+                                <i class="fas fa-code-branch me-1"></i>Split
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                <tr class="collapse" id="split-{{ tx.id }}">
+                    <td colspan="7">
+                        <div class="p-3 bg-light rounded">
+                            <p class="small text-muted mb-2">
+                                Split this ${{ tx.amount }} payment across the students it actually covers
+                                (e.g. one card charge for multiple siblings).
+                            </p>
+                            <form method="POST" class="split-form" data-total="{{ tx.amount }}">
+                                {% csrf_token %}
+                                <input type="hidden" name="transaction_id" value="{{ tx.id }}">
+                                <input type="hidden" name="action" value="split">
+                                <div class="split-rows">
+                                    {% for i in "12" %}
+                                    <div class="row g-2 align-items-center split-row mb-2">
+                                        <div class="col-md-6">
+                                            <select name="split_member_id" class="form-select form-select-sm" required>
+                                                <option value="" disabled selected>Select student...</option>
+                                                {% for member in members %}
+                                                <option value="{{ member.id }}">{{ member.first_name }} {{ member.last_name }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <input type="number" step="0.01" min="0" name="split_amount" class="form-control form-control-sm split-amount" placeholder="Amount" required>
+                                        </div>
+                                        <div class="col-md-2">
+                                            <button type="button" class="btn btn-sm btn-outline-danger remove-split-row" title="Remove"><i class="fas fa-times"></i></button>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center mt-2 flex-wrap gap-2">
+                                    <div>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary add-split-row">
+                                            <i class="fas fa-plus me-1"></i>Add another student
+                                        </button>
+                                        <span class="text-muted small ms-2 split-remaining"></span>
+                                    </div>
+                                    <div>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary cancel-split" data-bs-toggle="collapse" data-bs-target="#split-{{ tx.id }}">
+                                            <i class="fas fa-ban me-1"></i>Cancel
+                                        </button>
+                                        <button type="submit" class="btn btn-sm btn-success">
+                                            <i class="fas fa-check me-1"></i>Save Split
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" class="text-center text-muted py-5">
+                        <i class="fas fa-check-circle me-2"></i>No unmatched transactions. All caught up!
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    (function () {
+        function updateRemaining(form) {
+            const total = parseFloat(form.dataset.total || '0');
+            const amounts = Array.from(form.querySelectorAll('.split-amount'))
+                .map((input) => parseFloat(input.value) || 0);
+            const sum = amounts.reduce((a, b) => a + b, 0);
+            const remaining = (total - sum).toFixed(2);
+            const label = form.querySelector('.split-remaining');
+            label.textContent = `Remaining to allocate: $${remaining}`;
+            label.classList.toggle('text-danger', remaining != '0.00');
+            label.classList.toggle('text-success', remaining == '0.00');
+        }
+
+        document.querySelectorAll('.split-form').forEach(updateRemaining);
+
+        document.addEventListener('input', (event) => {
+            if (event.target.classList.contains('split-amount')) {
+                updateRemaining(event.target.closest('.split-form'));
+            }
+        });
+
+        document.addEventListener('click', (event) => {
+            const addBtn = event.target.closest('.add-split-row');
+            if (addBtn) {
+                const rows = addBtn.closest('form').querySelector('.split-rows');
+                const newRow = rows.querySelector('.split-row').cloneNode(true);
+                newRow.querySelectorAll('select, input').forEach((field) => { field.value = ''; });
+                rows.appendChild(newRow);
+                return;
+            }
+            const removeBtn = event.target.closest('.remove-split-row');
+            if (removeBtn) {
+                const form = removeBtn.closest('.split-form');
+                const rows = form.querySelectorAll('.split-row');
+                if (rows.length > 2) {
+                    removeBtn.closest('.split-row').remove();
+                    updateRemaining(form);
+                }
+                return;
+            }
+
+            const cancelBtn = event.target.closest('.cancel-split');
+            if (cancelBtn) {
+                const form = cancelBtn.closest('.split-form');
+                const rows = form.querySelectorAll('.split-row');
+                // Reset back to the original two empty rows so a reopened form starts fresh.
+                rows.forEach((row, index) => {
+                    if (index < 2) {
+                        row.querySelectorAll('select, input').forEach((field) => { field.value = ''; });
+                    } else {
+                        row.remove();
+                    }
+                });
+                updateRemaining(form);
+            }
+        });
+
+        document.querySelectorAll('.split-form').forEach((form) => {
+            form.addEventListener('submit', (event) => {
+                const total = parseFloat(form.dataset.total || '0');
+                const amounts = Array.from(form.querySelectorAll('.split-amount')).map((i) => parseFloat(i.value) || 0);
+                const sum = amounts.reduce((a, b) => a + b, 0);
+                if (Math.abs(sum - total) > 0.001) {
+                    event.preventDefault();
+                    alert(`Split amounts ($${sum.toFixed(2)}) must add up to the transaction total ($${total.toFixed(2)}).`);
+                }
+            });
+        });
+    })();
+</script>
+{% endblock %}

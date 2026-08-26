@@ -30,6 +30,7 @@ urlpatterns = [
     path("attendance/checkin/", views.attendance_member_checkin, name="attendance_member_checkin"),
     path("getSessionsByDate/<str:date>/", views.getSessionsByDate, name="getSessionsByDate"),
     path("billing", views.billing, name="billing"),
+    path("billing/unmatched-transactions", views.unmatched_transactions, name="unmatched_transactions"),
     path("reports", views.reports, name="reports"),
     path('revenue', views.reportsRevenue, name='revenue'),
     path("staff", views.staff, name="staff"),

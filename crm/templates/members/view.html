@@ -33,6 +33,11 @@
                     </a>
                 </li>
                 <li class="nav-item">
+                    <a class="nav-link" id="payments-tab" data-bs-toggle="tab" href="#payments" role="tab" aria-controls="payments" aria-selected="false">
+                        <i class="fas fa-dollar-sign me-2"></i>Payments
+                    </a>
+                </li>
+                <li class="nav-item">
                     <a class="nav-link" id="attendance-tab" data-bs-toggle="tab" href="#attendance" role="tab" aria-controls="attendance" aria-selected="false">
                         <i class="fas fa-calendar-check me-2"></i>Attendance
                     </a>
@@ -182,6 +187,48 @@
                                         {% empty %}
                                         <tr>
                                             <td colspan="4" class="text-center text-muted">No promotion history recorded.</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tab-pane fade" id="payments" role="tabpanel" aria-labelledby="payments-tab">
+                    <div class="card shadow-sm rounded-3">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center mb-4">
+                                <h4 class="fw-bold mb-0">Payments (Year-to-Date)</h4>
+                                <span class="badge bg-success rounded-pill fs-6">${{ payments_ytd_total|floatformat:2 }} total</span>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Amount</th>
+                                            <th>Method</th>
+                                            <th>Status</th>
+                                            <th>Source</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for payment in payments_ytd %}
+                                        <tr>
+                                            <td>{{ payment.date|date:"M d, Y" }}</td>
+                                            <td>
+                                                ${{ payment.amount }}
+                                                {% if payment.is_split %}<span class="badge bg-info text-dark ms-1">Split</span>{% endif %}
+                                            </td>
+                                            <td>{{ payment.method }}</td>
+                                            <td>{{ payment.status }}</td>
+                                            <td>{{ payment.source }}</td>
+                                        </tr>
+                                        {% empty %}
+                                        <tr>
+                                            <td colspan="5" class="text-center text-muted">No payments recorded this year.</td>
                                         </tr>
                                         {% endfor %}
                                     </tbody>
