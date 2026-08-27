@@ -610,6 +610,7 @@ class Transaction(models.Model):
     MATCHED_BY_CHOICES = [
         ("", "N/A"),
         ("invoice", "Invoice / Profile Reference"),
+        ("name_match", "Cardholder Name Match"),
         ("payer_link", "Linked Payer"),
         ("heuristic", "Name + Amount Heuristic"),
         ("manual", "Manual"),

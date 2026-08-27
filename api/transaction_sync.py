@@ -53,23 +53,27 @@ def _processed_at(value):
         return timezone.now()
 
 
+def _normalize_name(value):
+    """Lowercase + strip so name comparisons never fail on case/whitespace differences."""
+    return (value or "").strip().lower()
+
+
 def _find_member(tx):
-    """Tier A: exact match via stored metadata (invoice reference / profile id / email)."""
+    """Tier A: exact match via trustworthy stored metadata (profile id / email).
+
+    Does NOT use Authorize.Net's invoiceNumber as a member id: that field isn't set by
+    this app and its digits are essentially arbitrary, so treating them as a member
+    primary key produced false-positive matches whenever the number coincidentally
+    equaled some unrelated member's id.
+    """
     bill_to = tx.get("billTo") or {}
     profile_id = str(_value(tx, "customerProfileId", "customer_profile_id"))
-    invoice = tx.get("invoiceNumber") or tx.get("invoice_number") or ""
     email = _value(bill_to, "email") or _value(tx.get("customer") or {}, "email")
     query = Member.objects.all()
     if profile_id:
         member = query.filter(authorize_customer_profile_id=profile_id).first()
         if member:
             return member
-    if invoice:
-        digits = str(invoice).split("-")[-1]
-        if digits.isdigit():
-            member = query.filter(pk=int(digits)).first()
-            if member:
-                return member
     if email:
         return query.filter(email__iexact=email).first() or query.filter(user__email__iexact=email).first()
     return None
@@ -84,26 +88,50 @@ def _cardholder_name(tx):
     return first_name, last_name
 
 
-def _payer_link_member(first_name, last_name):
-    """Tier B: cardholder name explicitly pre-linked to a member by staff."""
+def _name_match_member(first_name, last_name):
+    """Tier B: cardholder's full name exactly matches a member's name.
+
+    Most payments are made by the student (or a parent with the same last name whose
+    card is registered under the student's own name), so a direct case-insensitive
+    name match is the most common and most reliable signal available.
+    """
+    first_name = _normalize_name(first_name)
+    last_name = _normalize_name(last_name)
     if not (first_name and last_name):
         return None
-    links = list(PayerLink.objects.filter(first_name__iexact=first_name, last_name__iexact=last_name).select_related("member"))
-    if len(links) == 1:
+    candidates = [
+        m for m in Member.objects.filter(last_name__iexact=last_name)
+        if _normalize_name(m.first_name) == first_name and _normalize_name(m.last_name) == last_name
+    ]
+    return candidates[0] if len(candidates) == 1 else None
+
+
+def _payer_link_member(first_name, last_name):
+    """Tier C: cardholder name explicitly pre-linked to a member by staff."""
+    first_name = _normalize_name(first_name)
+    last_name = _normalize_name(last_name)
+    if not (first_name and last_name):
+        return None
+    links = [
+        link for link in PayerLink.objects.filter(last_name__iexact=last_name).select_related("member")
+        if _normalize_name(link.first_name) == first_name and _normalize_name(link.last_name) == last_name
+    ]
+    member_ids = {link.member_id for link in links}
+    if len(member_ids) == 1:
         return links[0].member
     return None
 
 
 def _heuristic_member(last_name, amount):
-    """Tier C: same last name + exact plan fee. Only auto-assigned when unambiguous."""
+    """Tier D: same last name + exact plan fee. Only auto-assigned when unambiguous."""
+    last_name = _normalize_name(last_name)
     if not last_name:
         return None
-    candidates = list(
-        Member.objects.filter(last_name__iexact=last_name, plan__membership_price=amount)
-    )
-    if len(candidates) == 1:
-        return candidates[0]
-    return None
+    candidates = [
+        m for m in Member.objects.filter(last_name__iexact=last_name, plan__membership_price=amount)
+        if _normalize_name(m.last_name) == last_name
+    ]
+    return candidates[0] if len(candidates) == 1 else None
 
 
 def match_transaction(tx, first_name, last_name, amount):
@@ -111,6 +139,10 @@ def match_transaction(tx, first_name, last_name, amount):
     member = _find_member(tx)
     if member:
         return member, "matched", "invoice"
+
+    member = _name_match_member(first_name, last_name)
+    if member:
+        return member, "matched", "name_match"
 
     member = _payer_link_member(first_name, last_name)
     if member:
@@ -122,7 +154,8 @@ def match_transaction(tx, first_name, last_name, amount):
 
     # Ambiguous heuristic candidates (same last name + amount matches multiple members)
     # still need admin attention rather than being silently left unmatched.
-    if last_name and Member.objects.filter(last_name__iexact=last_name, plan__membership_price=amount).count() > 1:
+    normalized_last = _normalize_name(last_name)
+    if normalized_last and Member.objects.filter(last_name__iexact=normalized_last, plan__membership_price=amount).count() > 1:
         return None, "needs_review", ""
 
     return None, "unmatched", ""
