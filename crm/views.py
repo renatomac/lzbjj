@@ -993,8 +993,12 @@ def toggleStatus(request, type, member_id):
 
     if instance.is_active:
         instance.is_active = False
+        if hasattr(instance, "lifecycle_status"):
+            instance.lifecycle_status = Member.LifecycleStatus.INACTIVE
     else:
         instance.is_active = True
+        if hasattr(instance, "lifecycle_status") and instance.lifecycle_status == Member.LifecycleStatus.INACTIVE:
+            instance.lifecycle_status = Member.LifecycleStatus.ACTIVE
     instance.save()
     return JsonResponse({"active": instance.is_active})
 

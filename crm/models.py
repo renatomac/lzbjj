@@ -136,6 +136,12 @@ class Contact(models.Model):
 
 
 class Member(models.Model):
+    class LifecycleStatus(models.TextChoices):
+        LEAD = "lead", "Lead"
+        TRIAL = "trial", "Trial"
+        ACTIVE = "active", "Active"
+        INACTIVE = "inactive", "Inactive"
+
     GENDER = [
         ('male', 'Male'),
         ('female', 'Female'),
@@ -156,6 +162,12 @@ class Member(models.Model):
     )
     member_type = models.CharField(max_length=10,choices=MEMBER_TYPE, default='adult' )
     is_active = models.BooleanField(default=True)
+    lifecycle_status = models.CharField(
+        max_length=10,
+        choices=LifecycleStatus.choices,
+        default=LifecycleStatus.ACTIVE,
+        db_index=True,
+    )
 
     first_name = models.CharField(max_length=150)
     last_name = models.CharField(max_length=150)
@@ -188,6 +200,13 @@ class Member(models.Model):
 
     def __str__(self):
         return f"{self.first_name} {self.last_name} ({self.belt_rank})"
+
+    def save(self, *args, **kwargs):
+        if self.lifecycle_status == self.LifecycleStatus.INACTIVE:
+            self.is_active = False
+        elif self.is_active is False:
+            self.lifecycle_status = self.LifecycleStatus.INACTIVE
+        super().save(*args, **kwargs)
     
     def get_photo_url(self):
         """
@@ -1006,5 +1025,3 @@ class WaiverSignature(models.Model):
         if self.guardian_first_name or self.guardian_last_name:
             return f"{self.guardian_first_name} {self.guardian_last_name}".strip()
         return ""
-
-

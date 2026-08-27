@@ -77,6 +77,7 @@ class MemberForm(forms.ModelForm):
         fields = [
             "user",
             "is_active",
+            "lifecycle_status",
             "member_type",
             "email",
             "first_name",
@@ -99,6 +100,7 @@ class MemberForm(forms.ModelForm):
         widgets = {
             'phone': forms.TextInput(attrs={'class': 'form-control'}),
             "belt_rank":  forms.Select(attrs={"class": "form-control"}),
+            "lifecycle_status": forms.Select(attrs={"class": "form-control"}),
             "state": USStateSelect(attrs={"class": "form-control"}),
             "date_of_birth": forms.DateInput(attrs={"type": "date"}),
             "membership_start_date": forms.DateInput(attrs={"type": "date"}),
@@ -115,6 +117,7 @@ class MemberForm(forms.ModelForm):
             self.fields["belt_rank"].initial = "white"
             self.fields["stripes"].initial = 0
             self.fields["is_active"].initial = True
+            self.fields["lifecycle_status"].initial = Member.LifecycleStatus.ACTIVE
             self.fields["membership_start_date"].initial = timezone.localdate()
             self.fields["membership_end_date"].initial = timezone.localdate() + relativedelta(months=12)
 
@@ -652,5 +655,4 @@ class WaiverEditForm(forms.ModelForm):
                 self._name_mismatch = True
 
         return member
-
 

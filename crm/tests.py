@@ -68,6 +68,15 @@ class MemberFormTests(TestCase):
         self.assertIn(linked_user.username, choices)
         self.assertIn(other_user.username, choices)
 
+    def test_member_form_includes_lifecycle_status_field(self):
+        form = MemberForm()
+        self.assertIn("lifecycle_status", form.fields)
+        choices = [choice[0] for choice in form.fields["lifecycle_status"].choices]
+        self.assertIn(Member.LifecycleStatus.LEAD, choices)
+        self.assertIn(Member.LifecycleStatus.TRIAL, choices)
+        self.assertIn(Member.LifecycleStatus.ACTIVE, choices)
+        self.assertIn(Member.LifecycleStatus.INACTIVE, choices)
+
 
 class BirthdayNotificationTests(TestCase):
     def test_create_birthday_notifications_creates_one_per_staff_user(self):
@@ -93,3 +102,47 @@ class BirthdayNotificationTests(TestCase):
         self.assertTrue(
             Notification.objects.filter(user=staff_user, message__icontains="birthday").exists()
         )
+
+
+class MemberLifecycleTests(TestCase):
+    def test_member_defaults_to_active_lifecycle(self):
+        member = Member.objects.create(
+            first_name="John",
+            last_name="Doe",
+            date_of_birth="2000-01-01",
+            address="123 Main St",
+            city="Chicago",
+            zip_code="60601",
+        )
+
+        self.assertTrue(member.is_active)
+        self.assertEqual(member.lifecycle_status, Member.LifecycleStatus.ACTIVE)
+
+    def test_inactive_lifecycle_forces_inactive_flag(self):
+        member = Member.objects.create(
+            first_name="John",
+            last_name="Doe",
+            date_of_birth="2000-01-01",
+            address="123 Main St",
+            city="Chicago",
+            zip_code="60601",
+            lifecycle_status=Member.LifecycleStatus.INACTIVE,
+            is_active=True,
+        )
+
+        self.assertFalse(member.is_active)
+        self.assertEqual(member.lifecycle_status, Member.LifecycleStatus.INACTIVE)
+
+    def test_is_active_false_sets_inactive_lifecycle(self):
+        member = Member.objects.create(
+            first_name="John",
+            last_name="Doe",
+            date_of_birth="2000-01-01",
+            address="123 Main St",
+            city="Chicago",
+            zip_code="60601",
+            is_active=False,
+        )
+
+        self.assertFalse(member.is_active)
+        self.assertEqual(member.lifecycle_status, Member.LifecycleStatus.INACTIVE)
