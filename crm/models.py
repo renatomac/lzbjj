@@ -182,6 +182,10 @@ class Member(models.Model):
     membership_start_date = models.DateField(null=True, blank=True)
     membership_end_date = models.DateField(null=True, blank=True)
     plan = models.ForeignKey("Plan", on_delete=models.PROTECT, related_name="members", null=True, blank=True)
+    trial_started_on = models.DateField(null=True, blank=True)
+    trial_expires_on = models.DateField(null=True, blank=True)
+    trial_extension_used = models.BooleanField(default=False)
+    trial_expired_notified = models.BooleanField(default=False)
 
     notes = models.TextField(null=True, blank=True)
     timestamp = models.DateTimeField(auto_now_add=True)

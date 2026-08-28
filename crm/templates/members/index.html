@@ -54,6 +54,17 @@ Members <span class="badge bg-primary ms-2">{{ members.paginator.count }}</span>
                             </select>
                         </div>
 
+                        <div>
+                            <label class="form-label fw-semibold mb-1 small">
+                                <i class="fas fa-users me-1"></i>Member type
+                            </label>
+                            <select name="member_type" class="form-select">
+                                <option value="" {% if not member_type %}selected{% endif %}>All Types</option>
+                                <option value="adult" {% if member_type == "adult" %}selected{% endif %}>Adults</option>
+                                <option value="child" {% if member_type == "child" %}selected{% endif %}>Children</option>
+                            </select>
+                        </div>
+
                         <button type="submit" class="btn btn-primary w-100 shadow-sm">
                             <i class="fas fa-filter me-2"></i>Apply Filters
                         </button>

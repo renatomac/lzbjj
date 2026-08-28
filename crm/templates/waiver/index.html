@@ -78,6 +78,7 @@ Signed Waivers <span class="badge bg-primary ms-2"></span>
                             <th>Member</th>
                             <th>Waiver Version</th>
                             <th>Signed At</th>
+                            <th>Trial</th>
                             <th>IP</th>
                             <th>Actions</th>
                         </tr>
@@ -134,6 +135,35 @@ Signed Waivers <span class="badge bg-primary ms-2"></span>
                                 </span>
                             </td>
 
+                            <td>
+                                {% if waiver.member and waiver.member.trial_expires_on %}
+                                    <div class="small mb-1">Expires {{ waiver.member.trial_expires_on|date:"M d, Y" }}</div>
+                                    <div class="btn-group btn-group-sm">
+                                        <form method="post" action="{% url 'trial_action' waiver.member.id 'extend' %}">
+                                            {% csrf_token %}<button class="btn btn-outline-primary" title="Extend trial">Extend</button>
+                                        </form>
+                                        <form method="post" action="{% url 'trial_action' waiver.member.id 'deactivate' %}">
+                                            {% csrf_token %}<button class="btn btn-outline-danger" title="Deactivate member">Deactivate</button>
+                                        </form>
+                                    </div>
+                                    <form method="post" action="{% url 'trial_action' waiver.member.id 'convert' %}" class="mt-1">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="next" value="{% url 'waivers' %}">
+                                        <div class="input-group input-group-sm">
+                                            <select name="plan_id" class="form-select" required>
+                                                <option value="">Convert to plan...</option>
+                                                {% for plan in membership_plans %}<option value="{{ plan.id }}">{{ plan.name }}</option>{% endfor %}
+                                            </select>
+                                            <button class="btn btn-outline-success" title="Convert to membership">Convert</button>
+                                        </div>
+                                    </form>
+                                {% elif waiver.member and not waiver.member.is_active %}
+                                    <span class="badge bg-secondary">Inactive</span>
+                                {% else %}
+                                    <span class="text-muted">Membership</span>
+                                {% endif %}
+                            </td>
+
                             <!-- IP -->
                             <td class="text-muted small">
                                 {{ waiver.ip_address }}
@@ -177,7 +207,7 @@ Signed Waivers <span class="badge bg-primary ms-2"></span>
 
                         {% empty %}
                         <tr>
-                            <td colspan="7" class="text-center text-muted py-5">
+                            <td colspan="8" class="text-center text-muted py-5">
                                 <i class="fas fa-info-circle me-2"></i>No signed waivers found.
                             </td>
                         </tr>

@@ -2,210 +2,79 @@ from __future__ import annotations
 
 import logging
 from datetime import date, datetime, timedelta
-from decimal import Decimal, InvalidOperation
 
-from django.db import IntegrityError, transaction
-from django.db.models import Q
 from django.utils import timezone
 
-from crm.models import Member, PayerLink, Transaction
+from api.transaction_reconciliation import match_transaction, upsert_transaction
+from crm.models import Transaction
 from .authorize_net import AuthorizeNetClient
 
 logger = logging.getLogger(__name__)
 
 SETTLED_STATUSES = {"settledsuccessfully", "settled", "paid", "completed", "success"}
 
-# Authorize.Net's `accountType` values, normalized for display (e.g. "MasterCard" -> "Mastercard").
-_ACCOUNT_TYPE_LABELS = {
-    "amex": "American Express",
-    "americanexpress": "American Express",
-    "discover": "Discover",
-    "echeck": "eCheck",
-    "mastercard": "Mastercard",
-    "visa": "Visa",
-    "jcb": "JCB",
-    "dinersclub": "Diners Club",
-}
-
-
-def _payment_method(tx):
-    account_type = str(_value(tx, "accountType", "account_type") or "").strip()
-    if not account_type:
-        return "authorize_net"
-    return _ACCOUNT_TYPE_LABELS.get(account_type.lower(), account_type)
+# Backward-compatible exports for existing imports and management commands.
+__all__ = [
+    "SETTLED_STATUSES",
+    "_cardholder_name",
+    "_payment_method",
+    "_value",
+    "_processed_at",
+    "_normalize_name",
+    "_find_member",
+    "_name_match_member",
+    "_payer_link_member",
+    "_heuristic_member",
+    "match_transaction",
+    "upsert_transaction",
+    "sync_transactions",
+    "sync_last_hours",
+]
 
 
 def _value(data, *keys):
-    for key in keys:
-        value = data.get(key)
-        if value not in (None, ""):
-            return value
-    return ""
+    from api.transaction_reconciliation import _value as service_value
+    return service_value(data, *keys)
+
+
+def _payment_method(tx):
+    from api.transaction_reconciliation import _payment_method as service_payment_method
+    return service_payment_method(tx)
 
 
 def _processed_at(value):
-    if not value:
-        return timezone.now()
-    try:
-        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
-        return timezone.make_aware(parsed) if timezone.is_naive(parsed) else parsed
-    except ValueError:
-        return timezone.now()
+    from api.transaction_reconciliation import _processed_at as service_processed_at
+    return service_processed_at(value)
 
 
 def _normalize_name(value):
-    """Lowercase + strip so name comparisons never fail on case/whitespace differences."""
-    return (value or "").strip().lower()
+    from api.transaction_reconciliation import _normalize_name as service_normalize_name
+    return service_normalize_name(value)
 
 
 def _find_member(tx):
-    """Tier A: exact match via trustworthy stored metadata (profile id / email).
-
-    Does NOT use Authorize.Net's invoiceNumber as a member id: that field isn't set by
-    this app and its digits are essentially arbitrary, so treating them as a member
-    primary key produced false-positive matches whenever the number coincidentally
-    equaled some unrelated member's id.
-    """
-    bill_to = tx.get("billTo") or {}
-    profile_id = str(_value(tx, "customerProfileId", "customer_profile_id"))
-    email = _value(bill_to, "email") or _value(tx.get("customer") or {}, "email")
-    query = Member.objects.all()
-    if profile_id:
-        member = query.filter(authorize_customer_profile_id=profile_id).first()
-        if member:
-            return member
-    if email:
-        return query.filter(email__iexact=email).first() or query.filter(user__email__iexact=email).first()
-    return None
+    from api.transaction_reconciliation import _find_member as service_find_member
+    return service_find_member(tx)
 
 
 def _cardholder_name(tx):
-    # getTransactionListRequest summaries put firstName/lastName at the top level;
-    # only the detailed getTransactionDetailsRequest response nests them under billTo.
-    bill_to = tx.get("billTo") or {}
-    first_name = str(_value(tx, "firstName", "first_name") or _value(bill_to, "firstName", "first_name")).strip()
-    last_name = str(_value(tx, "lastName", "last_name") or _value(bill_to, "lastName", "last_name")).strip()
-    return first_name, last_name
+    from api.transaction_reconciliation import _cardholder_name as service_cardholder_name
+    return service_cardholder_name(tx)
 
 
 def _name_match_member(first_name, last_name):
-    """Tier B: cardholder's full name exactly matches a member's name.
-
-    Most payments are made by the student (or a parent with the same last name whose
-    card is registered under the student's own name), so a direct case-insensitive
-    name match is the most common and most reliable signal available.
-    """
-    first_name = _normalize_name(first_name)
-    last_name = _normalize_name(last_name)
-    if not (first_name and last_name):
-        return None
-    candidates = [
-        m for m in Member.objects.filter(last_name__iexact=last_name)
-        if _normalize_name(m.first_name) == first_name and _normalize_name(m.last_name) == last_name
-    ]
-    return candidates[0] if len(candidates) == 1 else None
+    from api.transaction_reconciliation import _name_match_member as service_name_match_member
+    return service_name_match_member(first_name, last_name)
 
 
 def _payer_link_member(first_name, last_name):
-    """Tier C: cardholder name explicitly pre-linked to a member by staff."""
-    first_name = _normalize_name(first_name)
-    last_name = _normalize_name(last_name)
-    if not (first_name and last_name):
-        return None
-    links = [
-        link for link in PayerLink.objects.filter(last_name__iexact=last_name).select_related("member")
-        if _normalize_name(link.first_name) == first_name and _normalize_name(link.last_name) == last_name
-    ]
-    member_ids = {link.member_id for link in links}
-    if len(member_ids) == 1:
-        return links[0].member
-    return None
+    from api.transaction_reconciliation import _payer_link_member as service_payer_link_member
+    return service_payer_link_member(first_name, last_name)
 
 
 def _heuristic_member(last_name, amount):
-    """Tier D: same last name + exact plan fee. Only auto-assigned when unambiguous."""
-    last_name = _normalize_name(last_name)
-    if not last_name:
-        return None
-    candidates = [
-        m for m in Member.objects.filter(last_name__iexact=last_name, plan__membership_price=amount)
-        if _normalize_name(m.last_name) == last_name
-    ]
-    return candidates[0] if len(candidates) == 1 else None
-
-
-def match_transaction(tx, first_name, last_name, amount):
-    """Return (member, match_status, matched_by) using the tiered reconciliation strategy."""
-    member = _find_member(tx)
-    if member:
-        return member, "matched", "invoice"
-
-    member = _name_match_member(first_name, last_name)
-    if member:
-        return member, "matched", "name_match"
-
-    member = _payer_link_member(first_name, last_name)
-    if member:
-        return member, "matched", "payer_link"
-
-    member = _heuristic_member(last_name, amount)
-    if member:
-        return member, "matched", "heuristic"
-
-    # Ambiguous heuristic candidates (same last name + amount matches multiple members)
-    # still need admin attention rather than being silently left unmatched.
-    normalized_last = _normalize_name(last_name)
-    if normalized_last and Member.objects.filter(last_name__iexact=normalized_last, plan__membership_price=amount).count() > 1:
-        return None, "needs_review", ""
-
-    return None, "unmatched", ""
-
-
-def upsert_transaction(tx):
-    transaction_id = str(_value(tx, "transId", "transaction_id", "id"))
-    if not transaction_id:
-        raise ValueError("Authorize.Net transaction has no transaction ID")
-    try:
-        amount = Decimal(str(_value(tx, "settlementAmount", "settleAmount", "authAmount", "amount") or "0"))
-    except (InvalidOperation, TypeError) as exc:
-        raise ValueError(f"Invalid amount for transaction {transaction_id}") from exc
-
-    raw_status = str(_value(tx, "transactionStatus", "status") or "unknown").lower()
-    status = "settled" if raw_status in SETTLED_STATUSES else "failed" if "declin" in raw_status or "error" in raw_status else raw_status[:32]
-    first_name, last_name = _cardholder_name(tx)
-    defaults = {
-        "amount": amount,
-        "status": status,
-        "payment_method": _payment_method(tx),
-        "subscription_id": str(_value(tx, "subscriptionId", "subscription_id")),
-        "response_code": str(_value(tx, "responseCode", "response_code")),
-        "customer_profile_id": str(_value(tx, "customerProfileId", "customer_profile_id")),
-        "invoice_number": str(_value(tx, "invoiceNumber", "invoice_number")),
-        "cardholder_first_name": first_name,
-        "cardholder_last_name": last_name,
-        "processed_at": _processed_at(_value(tx, "_settlementTimeUTC", "submitTimeUTC", "submitTimeLocal", "_settlementTimeLocal")),
-        "raw_response": tx,
-    }
-
-    existing = Transaction.objects.filter(transaction_id=transaction_id).first()
-    if existing and existing.match_status == "matched":
-        # Preserve staff-confirmed (or previously auto-matched) assignments on resync.
-        defaults["member"] = existing.member
-        defaults["match_status"] = existing.match_status
-        defaults["matched_by"] = existing.matched_by
-    else:
-        member, match_status, matched_by = match_transaction(tx, first_name, last_name, amount)
-        defaults["member"] = member
-        defaults["match_status"] = match_status
-        defaults["matched_by"] = matched_by
-
-    try:
-        with transaction.atomic():
-            record, created = Transaction.objects.update_or_create(transaction_id=transaction_id, defaults=defaults)
-    except IntegrityError:
-        record = Transaction.objects.get(transaction_id=transaction_id)
-        created = False
-    return record, created
+    from api.transaction_reconciliation import _heuristic_member as service_heuristic_member
+    return service_heuristic_member(last_name, amount)
 
 
 def _ingest(transactions):

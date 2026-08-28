@@ -16,6 +16,7 @@ from django.db.models import Q, Count
 from django.contrib.auth import get_user_model
 
 from crm.models import Member, BeltPromotion, ClassSession, SessionAttendance, Attendance
+from crm.services.trials import expire_trials
 from .utils import create_notification, create_bulk_notifications
 
 User = get_user_model()
@@ -631,6 +632,29 @@ def generate_waiver_expiration_warnings():
     except Exception as e:
         print(f"Error generating waiver expiration warnings: {e}")
     
+    return notifications
+
+
+def generate_trial_expiration_notifications(today=None):
+    """Deactivate expired trials and notify every active staff user once."""
+    today = today or timezone.localdate()
+    staff_users = User.objects.filter(is_staff=True, is_active=True)
+    notifications = []
+
+    for member in expire_trials(today):
+        message = (
+            f"Trial expired: {member.first_name} {member.last_name}. "
+            "Extend the trial, deactivate the member, or convert them to a membership."
+        )
+        notifications.extend(create_bulk_notifications(
+            users=staff_users,
+            notification_type="TRIAL_EXPIRED",
+            message=message,
+            data={"member_id": member.id, "member_name": str(member)},
+        ))
+        member.trial_expired_notified = True
+        member.save(update_fields=["trial_expired_notified", "updated_at"])
+
     return notifications
 
 

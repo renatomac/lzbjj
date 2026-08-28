@@ -64,6 +64,7 @@ urlpatterns = [
     path("waivers/<int:pk>/pdf/", views.waiver_pdf, name="waiver_pdf"),
     path("waivers/<int:pk>/edit/", views.waiver_edit, name="waiver_edit"),
     path("waivers/<int:pk>/delete/", views.waiver_delete, name="waiver_delete"),
+    path("members/<int:member_id>/trial/<str:action>/", views.trial_action, name="trial_action"),
     path("ajax/members/", views.member_autocomplete, name="member_autocomplete"),
     path("read/<int:pk>/", views.mark_notification_read, name="mark_read"),
     path('cast-receiver/', TemplateView.as_view(template_name='timers/cast_receiver.html'), name='cast_receiver'),

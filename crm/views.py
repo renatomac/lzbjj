@@ -29,6 +29,9 @@ import logging
 import calendar
 from django.db.models import Prefetch
 from crm.transaction_dashboard import transaction_dashboard_metrics
+from crm.services.attendance import get_session_attendance, record_member_attendance
+from crm.services.billing import get_billing_summary
+from crm.services.trials import convert_trial_to_membership, deactivate_trial, extend_trial, start_trial_from_waiver
 
 logger = logging.getLogger(__name__)
 
@@ -235,6 +238,7 @@ def view_session(request):
 def members(request):
     query = request.GET.get("query", "")
     status = request.GET.get("status", "active")
+    member_type = request.GET.get("member_type", "")
 
     # Base queryset
     all_members = Member.objects.all()
@@ -244,6 +248,9 @@ def members(request):
         all_members = all_members.filter(is_active=True)
     elif status == "inactive":
         all_members = all_members.filter(is_active=False)
+
+    if member_type in {"adult", "child"}:
+        all_members = all_members.filter(member_type=member_type)
 
     # Filter by search query
     if query:
@@ -342,6 +349,7 @@ def members(request):
         'summary': summary,
         'query': query,
         'status': status,
+        'member_type': member_type,
     })
     
 
@@ -710,13 +718,7 @@ def attendanceRecord(request, session_id):
     weekday = today.strftime("%A")
 
     if session.is_canceled == False:
-        base_qs = SessionAttendance.objects.select_related("member").filter(session=sessionSelected)
-        if filter == "all":
-            attending_list = base_qs.order_by('member__first_name', 'member__last_name')
-        elif filter == "checked":
-            attending_list = base_qs.filter(present=True).order_by('member__first_name', 'member__last_name')
-        else:
-            attending_list = base_qs.filter(present=False).order_by('member__first_name', 'member__last_name')
+        attending_list = get_session_attendance(sessionSelected, filter)
     else:
         attending_list = None
 
@@ -832,14 +834,7 @@ def attendance_bulk(request):
                 for member_id in member_ids:
                     member = Member.objects.filter(pk=member_id).first()
                     if member:
-                        attendance, created = SessionAttendance.objects.get_or_create(
-                            session=session,
-                            member=member,
-                            defaults={"present": True},
-                        )
-                        if not created and not attendance.present:
-                            attendance.present = True
-                            attendance.save(update_fields=["present"])
+                        record_member_attendance(session, member)
                         face_confidence = next(
                             (match["Similarity"] for match in matches
                              if match["Face"].get("ExternalImageId") == str(member_id)),
@@ -899,14 +894,7 @@ def attendance_member_checkin(request):
         elif selected_session.is_canceled:
             messages.error(request, "This session has been canceled.")
         elif request.POST.get("checkin_manual"):
-            attendance, created = SessionAttendance.objects.get_or_create(
-                session=selected_session,
-                member=member,
-                defaults={"present": True},
-            )
-            if not created and not attendance.present:
-                attendance.present = True
-                attendance.save(update_fields=["present"])
+            record_member_attendance(selected_session, member)
             attendance_status = f"Manual check-in recorded for {selected_session.class_template.name} on {selected_session.date}."
         elif request.POST.get("checkin_face"):
             image_file = request.FILES.get("face_image")
@@ -932,14 +920,7 @@ def attendance_member_checkin(request):
                             recognized_member = True
 
                     if recognized_member:
-                        attendance, created = SessionAttendance.objects.get_or_create(
-                            session=selected_session,
-                            member=member,
-                            defaults={"present": True},
-                        )
-                        if not created and not attendance.present:
-                            attendance.present = True
-                            attendance.save(update_fields=["present"])
+                        record_member_attendance(selected_session, member)
                         attendance_status = "Face check-in successful. Your attendance was recorded."
                     else:
                         messages.error(request, "Face did not match your profile. Please try again or use manual check-in.")
@@ -1066,163 +1047,37 @@ def classes(request):
 
 def billing(request):
     today = timezone.localdate()
-    first_day_of_month = today.replace(day=1)
-
     start_date = request.GET.get('start_date')
     end_date = request.GET.get('end_date')
 
     try:
-        range_start = date.fromisoformat(start_date) if start_date else first_day_of_month
+        range_start = date.fromisoformat(start_date) if start_date else today.replace(day=1)
     except ValueError:
-        range_start = first_day_of_month
+        range_start = today.replace(day=1)
 
     try:
         range_end = date.fromisoformat(end_date) if end_date else today
     except ValueError:
         range_end = today
 
-    def humanize_status(raw):
-        if not raw:
-            return 'Paid'
-        spaced = re.sub(r'(?<=[a-z0-9])(?=[A-Z])', ' ', str(raw))
-        return spaced.title()
-
-    def normalize_gateway_transaction(tx):
-        member = tx.member
-        member_name = f"{member.first_name} {member.last_name}" if member else "Unknown Member"
-        member_ref = None if not member else {'id': member.id, 'full_name': member_name}
-        local_dt = timezone.localtime(tx.processed_at) if tx.processed_at else None
-        tx_date = local_dt.date() if local_dt else today
-
-        allocations = list(tx.allocations.all())
-        is_split = len(allocations) > 1
-        if is_split:
-            member_name = ", ".join(f"{a.member.first_name} {a.member.last_name} (${a.amount})" for a in allocations)
-
-        return {
-            'id': tx.id,
-            'transaction_id': tx.transaction_id,
-            'member_name': member_name,
-            'member': member_ref,
-            'amount': float(tx.amount),
-            'payment_method': tx.payment_method,
-            'method': tx.payment_method,
-            'payment_date': tx_date,
-            'settlement_date': tx_date,
-            'status': humanize_status(tx.status),
-            'status_raw': tx.status,
-            'source': 'Authorize.Net',
-            'cardholder_name': tx.cardholder_name,
-            'is_split': is_split,
-        }
-
-    gateway_qs = Transaction.objects.select_related('member').prefetch_related('allocations__member').filter(
-        status='settled',
-        # Use aware datetime bounds instead of __date lookups: MySQL's __date
-        # lookup needs CONVERT_TZ, which requires timezone tables that aren't loaded.
-        processed_at__gte=timezone.make_aware(datetime.combine(range_start, datetime.min.time())),
-        processed_at__lte=timezone.make_aware(datetime.combine(range_end, datetime.max.time())),
-    ).order_by('-processed_at')
-    gateway_transactions = [normalize_gateway_transaction(tx) for tx in gateway_qs]
-
-    status_values = ['paid', 'completed', 'success']
-    payments_qs = Payment.objects.select_related('user').order_by('-payment_date', '-timestamp')
-    if start_date:
-        payments_qs = payments_qs.filter(payment_date__gte=start_date)
-    if end_date:
-        payments_qs = payments_qs.filter(payment_date__lte=end_date)
-
-    local_paid_payments = payments_qs.filter(status__in=status_values)
-    local_current_month_payments = local_paid_payments.filter(
-        payment_date__gte=first_day_of_month,
-        payment_date__lte=today,
-    )
-
-    def payment_entry(payment):
-        member = getattr(payment.user, 'member', None)
-        member_name = (
-            f"{member.first_name} {member.last_name}"
-            if member
-            else payment.user.get_full_name() if payment.user else 'Unknown Member'
-        )
-        member_ref = None if not member else {'id': member.id, 'full_name': member_name}
-
-        return {
-            'id': payment.id,
-            'transaction_id': str(payment.id),
-            'member_name': member_name,
-            'member': member_ref,
-            'amount': float(payment.amount),
-            'payment_method': payment.payment_method,
-            'method': payment.payment_method,
-            'payment_date': payment.payment_date,
-            'settlement_date': payment.payment_date,
-            'status': payment.status,
-            'source': 'Local',
-            'cardholder_name': member_name,
-        }
-
-    if gateway_transactions:
-        current_month_transactions = [tx for tx in gateway_transactions if first_day_of_month <= tx['payment_date'] <= today]
-        payment_history = gateway_transactions
-        payment_methods = {}
-        for tx in payment_history:
-            method = tx['payment_method'] or 'Unknown'
-            payment_methods[method] = payment_methods.get(method, 0) + 1
-        payments_by_method = list(payment_methods.items())
-    else:
-        current_month_transactions = [payment_entry(payment) for payment in local_current_month_payments]
-        payment_history = [payment_entry(payment) for payment in local_paid_payments]
-        payment_methods = (
-            local_paid_payments.values_list('payment_method', flat=True)
-            .annotate(count=Count('id'))
-            .order_by('-count')
-        )
-        payments_by_method = [(method or 'Unknown', count) for method, count in payment_methods.values_list('payment_method', 'count')]
-
-    # Total Revenue / Total Payments always reflect the current month, regardless of the payment history filter.
-    current_month_start = timezone.make_aware(datetime.combine(first_day_of_month, datetime.min.time()))
-    current_month_end = timezone.make_aware(datetime.combine(today, datetime.max.time()))
-    current_month_gateway_qs = Transaction.objects.filter(
-        status='settled',
-        processed_at__gte=current_month_start,
-        processed_at__lte=current_month_end,
-    )
-    current_month_local_qs = Payment.objects.filter(
-        status__in=status_values,
-        payment_date__gte=first_day_of_month,
-        payment_date__lte=today,
-    )
-    if Transaction.objects.filter(status='settled').exists():
-        total_revenue = float(current_month_gateway_qs.aggregate(total=Sum('amount'))['total'] or 0)
-        payments_total = current_month_gateway_qs.count()
-    else:
-        total_revenue = float(current_month_local_qs.aggregate(total=Sum('amount'))['total'] or 0)
-        payments_total = current_month_local_qs.count()
-    payments_this_month = payments_total
-
-    payment_history_count = len(payment_history)
-    payment_history_total = sum(float(item['amount']) for item in payment_history)
-
+    summary = get_billing_summary(range_start, range_end)
     metrics = transaction_dashboard_metrics()
+
     context = {
-        'current_month_transactions': current_month_transactions,
-        'current_month_total': sum(float(item['amount']) for item in current_month_transactions),
-        'current_month_count': len(current_month_transactions),
-        'total_revenue': f"${total_revenue:,.2f}",
-        'payments_total': payments_total,
-        'payments_this_month': payments_this_month,
-        'payments_by_method': payments_by_method,
-        'payments': {
-            'total': payments_total,
-            'items': payment_history,
-        },
-        'payment_history_count': payment_history_count,
-        'payment_history_total': f"${payment_history_total:,.2f}",
+        'current_month_transactions': summary['current_month_transactions'],
+        'current_month_total': summary['current_month_total'],
+        'current_month_count': summary['current_month_count'],
+        'total_revenue': summary['total_revenue'],
+        'payments_total': summary['payments_total'],
+        'payments_this_month': summary['payments_this_month'],
+        'payments_by_method': summary['payments_by_method'],
+        'payments': summary['payments'],
+        'payment_history_count': summary['payment_history_count'],
+        'payment_history_total': summary['payment_history_total'],
         'transaction_metrics': metrics,
         'monthly_revenue_json': json.dumps(metrics['monthly_revenue']),
-        'start_date': start_date or '',
-        'end_date': end_date or '',
+        'start_date': summary['start_date'],
+        'end_date': summary['end_date'],
     }
     return render(request, "billing/index.html", context)
 
@@ -1824,6 +1679,7 @@ def waivers(request):
         {
             "all_waivers": all_waivers,
             "show_voided": show_voided,
+            "membership_plans": Plan.objects.all().order_by("name"),
         }
     )
 
@@ -1844,11 +1700,12 @@ def adult_waiver(request, member_id=None):
             sig = form.save(commit=False)
             sig.participant_type = WaiverSignature.ADULT
             sig.waiver_version = waiver
-            sig.ip_address = request.META.get("REMOTE_ADDR"),
+            sig.ip_address = request.META.get("REMOTE_ADDR")
             sig.user_agent = request.META.get("HTTP_USER_AGENT", "")
             if member_id:
                 sig.member_id = member_id
             sig.save()
+            start_trial_from_waiver(sig)
             return redirect("waiver_success")
     else:
         form = AdultWaiverForm()
@@ -1880,6 +1737,7 @@ def minor_waiver(request, member_id=None):
             if member_id:
                 sig.member_id = member_id
             sig.save()
+            start_trial_from_waiver(sig)
             messages.success(request, "Waiver signed successfully.")
             return redirect("waiver_success")
         else:
@@ -1962,6 +1820,35 @@ def waiver_delete(request, pk):
     return render(request, "waiver/delete.html", {
         "waiver": waiver,
     })
+
+
+@login_required
+@require_POST
+def trial_action(request, member_id, action):
+    if not request.user.is_staff:
+        return HttpResponse("Staff access only", status=403)
+
+    member = get_object_or_404(Member, pk=member_id)
+    try:
+        if action == "extend":
+            extend_trial(member)
+            messages.success(request, "Trial extended by one week.")
+        elif action == "deactivate":
+            deactivate_trial(member)
+            messages.success(request, "Member deactivated.")
+        elif action == "convert":
+            plan_id = request.POST.get("plan_id")
+            if not plan_id:
+                messages.error(request, "Please select a membership plan.")
+            else:
+                convert_trial_to_membership(member, plan_id)
+                messages.success(request, "Trial converted to a membership.")
+        else:
+            return HttpResponse("Unknown trial action", status=400)
+    except (ValueError, Plan.DoesNotExist):
+        messages.error(request, "This trial action is no longer available.")
+
+    return redirect(request.POST.get("next") or "waivers")
 
 def member_autocomplete(request):
     q = request.GET.get("q", "").strip()
