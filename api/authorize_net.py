@@ -123,9 +123,10 @@ class AuthorizeNetClient:
                 "raw": body,
             }
         except Exception as exc:
+            logger.exception("Authorize.Net transaction lookup failed for transaction_id=%s", transaction_id)
             return {
                 "status": "error",
-                "message": str(exc),
+                "message": "Unable to retrieve transaction details from Authorize.Net.",
                 "transaction_id": str(transaction_id),
             }
 

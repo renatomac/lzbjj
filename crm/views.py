@@ -1852,7 +1852,7 @@ def trial_action(request, member_id, action):
     except (ValueError, Plan.DoesNotExist):
         messages.error(request, "This trial action is no longer available.")
 
-    return redirect(request.POST.get("next") or "waivers")
+    return redirect("waivers")
 
 def member_autocomplete(request):
     q = request.GET.get("q", "").strip()
