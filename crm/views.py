@@ -3,10 +3,10 @@ import io
 import json
 import re
 from decimal import Decimal, InvalidOperation
-from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth import authenticate, login, logout, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.db import IntegrityError, transaction
+from django.db import transaction
 from django.db.models import Count, Q, F, Sum
 from django.db.models.functions import Coalesce, ExtractIsoWeekDay
 from django.forms import inlineformset_factory
@@ -18,7 +18,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import  require_POST
 from .models import User, Plan, Member, Membership, BeltPromotion, BeltRank, Staff, Contact, Class, Attendance, Technique, Position, ClassSession, SessionAttendance, SessionTechnique, WaiverVersion, WaiverSignature, Payment, Transaction, PayerLink, TransactionAllocation
 from notifications.models import Notification
-from .forms import PlanForm, StaffForm , MemberForm, MembershipForm, ClassForm, ContactFormSet, ContactForm,BeltPromotionForm, AttendanceForm, MinorWaiverForm, AdultWaiverForm, ClassSessionForm, WaiverEditForm
+from .forms import PlanForm, StaffForm , MemberForm, MembershipForm, ClassForm, ContactFormSet, ContactForm,BeltPromotionForm, AttendanceForm, MinorWaiverForm, AdultWaiverForm, ClassSessionForm, WaiverEditForm, UserRegisterForm, StrongPasswordChangeForm
 from .formsets import SessionAttendanceFormSet
 from .aws_utils import index_member_face, search_faces_by_image
 from datetime import datetime, date, timedelta
@@ -121,6 +121,12 @@ def login_view(request):
         # Check if authentication successful
         if user is not None:
             login(request, user)
+            if user.must_change_password:
+                messages.info(
+                    request,
+                    "You must set a new password before continuing."
+                )
+                return HttpResponseRedirect(reverse("change_password"))
             return HttpResponseRedirect(reverse("dashboard"))
         else:
             return render(request, "login/login.html", {
@@ -135,32 +141,97 @@ def logout_view(request):
     return HttpResponseRedirect(reverse("login"))
 
 
-def register(request):
+@login_required
+def change_password(request):
+    """Allow the current user to change their own password.
+
+    Newly created users have ``must_change_password`` set to ``True`` and
+    are redirected here (see ``login_view``) until they set a new password.
+    """
+    forced = request.user.must_change_password
     if request.method == "POST":
-        email = request.POST["email"]
-
-        # Ensure password matches confirmation
-        password = request.POST["password"]
-        confirmation = request.POST["confirmation"]
-        if password != confirmation:
-            return render(request, "register.html", {
-                "message": "Passwords must match."
-            })
-
-        # Attempt to create new user
-        try:
-            user = User.objects.create_user(email, email, password)
-            user.save()
-        except IntegrityError as e:
-            print(e)
-            return render(request, "login/register.html", {
-                "message": "Email address already taken."
-            })
-        login(request, user)
-        #return render(request, "login/register.html")
-        return HttpResponseRedirect(reverse("dashboard"))
+        form = StrongPasswordChangeForm(request.user, request.POST)
+        if form.is_valid():
+            user = form.save()
+            user.must_change_password = False
+            user.save(update_fields=["must_change_password"])
+            # Keep the user logged in after the password hash changes.
+            update_session_auth_hash(request, user)
+            messages.success(request, "Your password has been updated.")
+            return HttpResponseRedirect(reverse("dashboard"))
     else:
-        return render(request, "login/register.html")
+        form = StrongPasswordChangeForm(request.user)
+    return render(request, "login/change_password.html", {
+        "form": form,
+        "forced": forced,
+    })
+
+
+@login_required
+def users(request):
+    if not request.user.is_staff:
+        return HttpResponse("Staff access only", status=403)
+
+    query = request.GET.get("query", "")
+    status = request.GET.get("status", "")
+    all_users = User.objects.all().order_by("username")
+    if status == "active":
+        all_users = all_users.filter(is_active=True)
+    elif status == "inactive":
+        all_users = all_users.filter(is_active=False)
+    if query:
+        all_users = all_users.filter(
+            Q(username__icontains=query) |
+            Q(email__icontains=query)
+        )
+
+    summary = {
+        'active': User.objects.filter(is_active=True).count(),
+        'inactive': User.objects.filter(is_active=False).count(),
+        'total': User.objects.all().count(),
+    }
+    return render(request, "users/index.html", {
+        "all_users": all_users,
+        "summary": summary,
+    })
+
+
+@login_required
+def addUser(request):
+    if not request.user.is_staff:
+        return HttpResponse("Staff access only", status=403)
+
+    if request.method == "POST":
+        form = UserRegisterForm(request.POST)
+        if form.is_valid():
+            user = form.save(commit=False)
+            user.must_change_password = True
+            user.save()
+            messages.success(request, "User created successfully.")
+            return HttpResponseRedirect(reverse("users"))
+    else:
+        form = UserRegisterForm()
+    return render(request, "users/add.html", {
+        "form": form,
+        "title": "Add User",
+        "action_url": "addUser",
+    })
+
+
+@login_required
+def resetUserPassword(request, user_id):
+    if not request.user.is_staff:
+        return HttpResponse("Staff access only", status=403)
+
+    if request.method == "POST":
+        target_user = get_object_or_404(User, id=user_id)
+        target_user.must_change_password = True
+        target_user.save(update_fields=["must_change_password"])
+        messages.success(
+            request,
+            f"{target_user.username} will be asked to set a new password at their next login."
+        )
+    return HttpResponseRedirect(reverse("users"))
 
 def dashboard(request):
     # Authenticated users view the Dashboard
@@ -1338,6 +1409,8 @@ def getStudents(request, class_id):
 def toggleStatus(request, type, member_id):
     if type == 'Staff':
         instance = get_object_or_404(Staff, pk=member_id)
+    elif type == 'User':
+        instance = get_object_or_404(User, pk=member_id)
     else:
         instance = get_object_or_404(Member, pk=member_id)
 

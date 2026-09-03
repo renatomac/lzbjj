@@ -2,7 +2,7 @@ from datetime import timedelta
 
 from django.contrib.auth import authenticate, get_user_model
 from django.test import TestCase
-from django.urls import reverse
+from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
 
 from notifications.models import Notification
@@ -36,6 +36,172 @@ class EmailLoginTests(TestCase):
 
         self.assertIsNotNone(authenticated)
         self.assertEqual(authenticated, user)
+
+
+class LoginViewTests(TestCase):
+    """Confirms the login system (view + forced password change) behaves correctly."""
+
+    def setUp(self):
+        self.User = get_user_model()
+        self.raw_password = "S3cure!Passw0rd"
+        self.user = self.User.objects.create_user(
+            username="jamie-lee",
+            email="jamie-lee@example.com",
+            password=self.raw_password,
+        )
+
+    def test_login_page_does_not_offer_self_registration(self):
+        response = self.client.get(reverse("login"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Register")
+        with self.assertRaises(NoReverseMatch):
+            reverse("register")
+
+    def test_valid_credentials_redirect_to_dashboard(self):
+        response = self.client.post(reverse("login"), {
+            "email": "jamie-lee@example.com",
+            "password": self.raw_password,
+        })
+
+        self.assertRedirects(
+            response, reverse("dashboard"), fetch_redirect_response=False
+        )
+        self.assertIsNotNone(self.client.session.get("_auth_user_id"))
+
+    def test_invalid_credentials_show_error_message(self):
+        response = self.client.post(reverse("login"), {
+            "email": "jamie-lee@example.com",
+            "password": "wrong-password",
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Invalid email and/or password.")
+
+    def test_must_change_password_forces_redirect_after_login(self):
+        self.user.must_change_password = True
+        self.user.save(update_fields=["must_change_password"])
+
+        response = self.client.post(reverse("login"), {
+            "email": "jamie-lee@example.com",
+            "password": self.raw_password,
+        })
+
+        self.assertRedirects(response, reverse("change_password"))
+
+    def test_change_password_requires_authentication(self):
+        response = self.client.get(reverse("change_password"))
+
+        self.assertNotEqual(response.status_code, 200)
+
+    def test_user_can_change_password_and_flag_is_cleared(self):
+        self.user.must_change_password = True
+        self.user.save(update_fields=["must_change_password"])
+        self.client.force_login(self.user)
+
+        new_password = "An0ther$trongPW"
+        response = self.client.post(reverse("change_password"), {
+            "old_password": self.raw_password,
+            "new_password1": new_password,
+            "new_password2": new_password,
+        })
+
+        self.assertRedirects(
+            response, reverse("dashboard"), fetch_redirect_response=False
+        )
+        self.user.refresh_from_db()
+        self.assertFalse(self.user.must_change_password)
+        self.assertTrue(self.user.check_password(new_password))
+
+    def test_weak_new_password_is_rejected(self):
+        self.client.force_login(self.user)
+
+        response = self.client.post(reverse("change_password"), {
+            "old_password": self.raw_password,
+            "new_password1": "weakpassword",
+            "new_password2": "weakpassword",
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password(self.raw_password))
+
+
+class UserManagementTests(TestCase):
+    """Confirms the users management page enforces staff-only access and password rules."""
+
+    def setUp(self):
+        self.User = get_user_model()
+        self.admin = self.User.objects.create_user(
+            username="admin-user",
+            email="admin-user@example.com",
+            is_staff=True,
+            password="Adm1nStr0ng!",
+        )
+        self.regular = self.User.objects.create_user(
+            username="regular-user",
+            email="regular-user@example.com",
+            password="Regul4rStr0ng!",
+        )
+
+    def test_non_staff_cannot_access_users_page(self):
+        self.client.force_login(self.regular)
+
+        response = self.client.get(reverse("users"))
+
+        self.assertNotEqual(response.status_code, 200)
+
+    def test_staff_can_list_users(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.get(reverse("users"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "admin-user")
+        self.assertContains(response, "regular-user")
+
+    def test_staff_can_add_user_with_strong_password_and_it_forces_change(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.post(reverse("addUser"), {
+            "username": "new-teammate",
+            "email": "new-teammate@example.com",
+            "is_staff": False,
+            "is_coach": True,
+            "password1": "Br4nd$NewUser!",
+            "password2": "Br4nd$NewUser!",
+        })
+
+        self.assertRedirects(response, reverse("users"))
+        new_user = self.User.objects.get(username="new-teammate")
+        self.assertTrue(new_user.must_change_password)
+        self.assertTrue(new_user.check_password("Br4nd$NewUser!"))
+
+    def test_adding_user_with_weak_password_is_rejected(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.post(reverse("addUser"), {
+            "username": "weak-teammate",
+            "email": "weak-teammate@example.com",
+            "password1": "weakpassword",
+            "password2": "weakpassword",
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(
+            self.User.objects.filter(username="weak-teammate").exists()
+        )
+
+    def test_staff_can_force_password_reset(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.post(
+            reverse("resetUserPassword", args=[self.regular.id])
+        )
+
+        self.assertRedirects(response, reverse("users"))
+        self.regular.refresh_from_db()
+        self.assertTrue(self.regular.must_change_password)
 
 
 class MemberListFilterTests(TestCase):
