@@ -541,9 +541,10 @@ Potential enhancements:
 - Coach dashboard with member metrics
 - Action tracking (coach acknowledged, took action, etc.)
 
-## Future Enhancements
+## Current Status and Future Enhancements
 
-Potential additions:
+The notification system already includes persistent in-app notifications, real-time publishing, read/delete tracking, and coach-specific member alerts. The following items are still planned enhancements:
+
 - SMS notifications via Twilio
 - Email notifications
 - Push notifications for mobile apps

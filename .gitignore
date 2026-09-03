@@ -100,4 +100,4 @@ staticfiles/
 # Media uploads (usually not in Git)
 media/
 **/media/
-
+.env

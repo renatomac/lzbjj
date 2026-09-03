@@ -1,11 +1,13 @@
 import base64
 import io
 import json
+import re
+from decimal import Decimal, InvalidOperation
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db import IntegrityError, transaction
-from django.db.models import Count, Q, F
+from django.db.models import Count, Q, F, Sum
 from django.db.models.functions import Coalesce, ExtractIsoWeekDay
 from django.forms import inlineformset_factory
 from django.http import JsonResponse,Http404
@@ -14,7 +16,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import  require_POST
-from .models import User, Plan, Member, Membership, BeltPromotion, Staff, Contact, Class, Attendance, Technique, Position, ClassSession, SessionAttendance, SessionTechnique, WaiverVersion, WaiverSignature
+from .models import User, Plan, Member, Membership, BeltPromotion, Staff, Contact, Class, Attendance, Technique, Position, ClassSession, SessionAttendance, SessionTechnique, WaiverVersion, WaiverSignature, Payment, Transaction, PayerLink, TransactionAllocation
 from notifications.models import Notification
 from .forms import PlanForm, StaffForm , MemberForm, MembershipForm, ClassForm, ContactFormSet, ContactForm,BeltPromotionForm, AttendanceForm, MinorWaiverForm, AdultWaiverForm, ClassSessionForm, WaiverEditForm
 from .formsets import SessionAttendanceFormSet
@@ -26,6 +28,10 @@ from django.db.models.functions import ExtractYear, ExtractMonth
 import logging
 import calendar
 from django.db.models import Prefetch
+from crm.transaction_dashboard import transaction_dashboard_metrics
+from crm.services.attendance import get_session_attendance, record_member_attendance
+from crm.services.billing import get_billing_summary
+from crm.services.trials import convert_trial_to_membership, deactivate_trial, extend_trial, start_trial_from_waiver
 
 logger = logging.getLogger(__name__)
 
@@ -232,6 +238,7 @@ def view_session(request):
 def members(request):
     query = request.GET.get("query", "")
     status = request.GET.get("status", "active")
+    member_type = request.GET.get("member_type", "")
 
     # Base queryset
     all_members = Member.objects.all()
@@ -241,6 +248,9 @@ def members(request):
         all_members = all_members.filter(is_active=True)
     elif status == "inactive":
         all_members = all_members.filter(is_active=False)
+
+    if member_type in {"adult", "child"}:
+        all_members = all_members.filter(member_type=member_type)
 
     # Filter by search query
     if query:
@@ -339,6 +349,7 @@ def members(request):
         'summary': summary,
         'query': query,
         'status': status,
+        'member_type': member_type,
     })
     
 
@@ -491,10 +502,46 @@ def viewMember(request, member_id):
         month_idx = item['month'] - 1  # List is 0-indexed
         if month_idx < current_month:
             graph_data[month_idx] = item['count']
-            
-        # views.py inside viewMember function
-    print(f"DEBUG: Current Month Count: {current_month_count}")
-    print(f"DEBUG: Last Month Count: {last_month_count}")
+
+    # --- Payments (YTD) ---
+    year_start_dt = timezone.make_aware(datetime.combine(start_of_year, datetime.min.time()))
+    gateway_payments = (
+        Transaction.objects.filter(Q(member=instance) | Q(allocations__member=instance))
+        .filter(processed_at__gte=year_start_dt)
+        .distinct()
+        .prefetch_related('allocations__member')
+        .order_by('-processed_at')
+    )
+    payments_ytd = []
+    for tx in gateway_payments:
+        allocation = next((a for a in tx.allocations.all() if a.member_id == instance.id), None)
+        payments_ytd.append({
+            'date': timezone.localtime(tx.processed_at).date() if tx.processed_at else None,
+            'amount': allocation.amount if allocation else tx.amount,
+            'is_split': tx.is_split,
+            'method': tx.payment_method,
+            'status': tx.status,
+            'source': 'Authorize.Net',
+        })
+
+    if instance.user:
+        local_payments = Payment.objects.filter(
+            user=instance.user,
+            payment_date__gte=start_of_year,
+            payment_date__lte=today,
+        ).order_by('-payment_date')
+        for payment in local_payments:
+            payments_ytd.append({
+                'date': payment.payment_date,
+                'amount': payment.amount,
+                'is_split': False,
+                'method': payment.payment_method,
+                'status': payment.status,
+                'source': 'Local',
+            })
+
+    payments_ytd.sort(key=lambda p: p['date'] or today, reverse=True)
+    payments_ytd_total = sum(float(p['amount']) for p in payments_ytd)
     print(f"DEBUG: YTD Count: {ytd_count}")
     print(f"DEBUG: Graph Labels: {graph_labels}") 
     print(f"DEBUG: Promotions: {list(promotions.values()) }") 
@@ -510,7 +557,9 @@ def viewMember(request, member_id):
         "last_month_count": last_month_count,
         "ytd_count": ytd_count,
         "graph_labels": json.dumps(graph_labels),
-        "graph_data": json.dumps(graph_data)
+        "graph_data": json.dumps(graph_data),
+        "payments_ytd": payments_ytd,
+        "payments_ytd_total": payments_ytd_total,
     })
 
 def getContacts(request, member_id):
@@ -669,13 +718,7 @@ def attendanceRecord(request, session_id):
     weekday = today.strftime("%A")
 
     if session.is_canceled == False:
-        base_qs = SessionAttendance.objects.select_related("member").filter(session=sessionSelected)
-        if filter == "all":
-            attending_list = base_qs.order_by('member__first_name', 'member__last_name')
-        elif filter == "checked":
-            attending_list = base_qs.filter(present=True).order_by('member__first_name', 'member__last_name')
-        else:
-            attending_list = base_qs.filter(present=False).order_by('member__first_name', 'member__last_name')
+        attending_list = get_session_attendance(sessionSelected, filter)
     else:
         attending_list = None
 
@@ -791,14 +834,7 @@ def attendance_bulk(request):
                 for member_id in member_ids:
                     member = Member.objects.filter(pk=member_id).first()
                     if member:
-                        attendance, created = SessionAttendance.objects.get_or_create(
-                            session=session,
-                            member=member,
-                            defaults={"present": True},
-                        )
-                        if not created and not attendance.present:
-                            attendance.present = True
-                            attendance.save(update_fields=["present"])
+                        record_member_attendance(session, member)
                         face_confidence = next(
                             (match["Similarity"] for match in matches
                              if match["Face"].get("ExternalImageId") == str(member_id)),
@@ -858,14 +894,7 @@ def attendance_member_checkin(request):
         elif selected_session.is_canceled:
             messages.error(request, "This session has been canceled.")
         elif request.POST.get("checkin_manual"):
-            attendance, created = SessionAttendance.objects.get_or_create(
-                session=selected_session,
-                member=member,
-                defaults={"present": True},
-            )
-            if not created and not attendance.present:
-                attendance.present = True
-                attendance.save(update_fields=["present"])
+            record_member_attendance(selected_session, member)
             attendance_status = f"Manual check-in recorded for {selected_session.class_template.name} on {selected_session.date}."
         elif request.POST.get("checkin_face"):
             image_file = request.FILES.get("face_image")
@@ -891,14 +920,7 @@ def attendance_member_checkin(request):
                             recognized_member = True
 
                     if recognized_member:
-                        attendance, created = SessionAttendance.objects.get_or_create(
-                            session=selected_session,
-                            member=member,
-                            defaults={"present": True},
-                        )
-                        if not created and not attendance.present:
-                            attendance.present = True
-                            attendance.save(update_fields=["present"])
+                        record_member_attendance(selected_session, member)
                         attendance_status = "Face check-in successful. Your attendance was recorded."
                     else:
                         messages.error(request, "Face did not match your profile. Please try again or use manual check-in.")
@@ -1028,7 +1050,205 @@ def classes(request):
 
 
 def billing(request):
-    return render(request, "billing/index.html")
+    today = timezone.localdate()
+    start_date = request.GET.get('start_date')
+    end_date = request.GET.get('end_date')
+
+    try:
+        range_start = date.fromisoformat(start_date) if start_date else today.replace(day=1)
+    except ValueError:
+        range_start = today.replace(day=1)
+
+    try:
+        range_end = date.fromisoformat(end_date) if end_date else today
+    except ValueError:
+        range_end = today
+
+    summary = get_billing_summary(range_start, range_end)
+    metrics = transaction_dashboard_metrics()
+
+    context = {
+        'current_month_transactions': summary['current_month_transactions'],
+        'current_month_total': summary['current_month_total'],
+        'current_month_count': summary['current_month_count'],
+        'total_revenue': summary['total_revenue'],
+        'payments_total': summary['payments_total'],
+        'payments_this_month': summary['payments_this_month'],
+        'payments_by_method': summary['payments_by_method'],
+        'payments': summary['payments'],
+        'payment_history_count': summary['payment_history_count'],
+        'payment_history_total': summary['payment_history_total'],
+        'transaction_metrics': metrics,
+        'monthly_revenue_json': json.dumps(metrics['monthly_revenue']),
+        'start_date': summary['start_date'],
+        'end_date': summary['end_date'],
+    }
+    return render(request, "billing/index.html", context)
+
+def _relink_transactions_for_payer(tx, member):
+    """Retroactively match other unresolved transactions from the same cardholder to `member`.
+
+    Only safe when this cardholder name isn't linked to more than one member (siblings
+    sharing a card should keep going through the split/manual flow instead).
+    """
+    if not (tx.cardholder_first_name and tx.cardholder_last_name):
+        return 0
+    linked_member_ids = set(
+        PayerLink.objects.filter(
+            first_name__iexact=tx.cardholder_first_name,
+            last_name__iexact=tx.cardholder_last_name,
+        ).values_list('member_id', flat=True)
+    )
+    if linked_member_ids - {member.id}:
+        return 0
+
+    others = Transaction.objects.exclude(match_status='matched').exclude(pk=tx.pk).filter(
+        cardholder_first_name__iexact=tx.cardholder_first_name,
+        cardholder_last_name__iexact=tx.cardholder_last_name,
+    )
+    return others.update(member=member, match_status='matched', matched_by='payer_link')
+
+
+def _relink_split_transactions_for_payer(tx, split):
+    """Apply the same split (same members, same ratio) to other unresolved transactions
+    from the same cardholder with the exact same total amount."""
+    if not (tx.cardholder_first_name and tx.cardholder_last_name):
+        return 0
+
+    others = list(
+        Transaction.objects.exclude(match_status='matched').exclude(pk=tx.pk).filter(
+            cardholder_first_name__iexact=tx.cardholder_first_name,
+            cardholder_last_name__iexact=tx.cardholder_last_name,
+            amount=tx.amount,
+        )
+    )
+    for other in others:
+        other.allocations.all().delete()
+        TransactionAllocation.objects.bulk_create([
+            TransactionAllocation(transaction=other, member=member, amount=amount)
+            for member, amount in split
+        ])
+        other.member = split[0][0]
+        other.match_status = 'matched'
+        other.matched_by = 'payer_link'
+        other.save(update_fields=['member', 'match_status', 'matched_by', 'updated_at'])
+    return len(others)
+
+
+def unmatched_transactions(request):
+    """Queue of gateway transactions that couldn't be auto-matched to a member."""
+    if request.method == 'POST':
+        tx = get_object_or_404(Transaction, pk=request.POST.get('transaction_id'))
+        action = request.POST.get('action', 'single')
+
+        if action == 'split':
+            member_ids = [v for v in request.POST.getlist('split_member_id') if v]
+            raw_amounts = request.POST.getlist('split_amount')
+
+            if len(member_ids) < 2:
+                messages.error(request, "Select at least two students to split a payment.")
+                return redirect('unmatched_transactions')
+
+            try:
+                amounts = [Decimal(a) for a in raw_amounts if a]
+            except InvalidOperation:
+                messages.error(request, "Split amounts must be valid numbers.")
+                return redirect('unmatched_transactions')
+
+            if len(amounts) != len(member_ids):
+                messages.error(request, "Every student in a split needs an amount.")
+                return redirect('unmatched_transactions')
+
+            if len(set(member_ids)) != len(member_ids):
+                messages.error(request, "Each student can only appear once in a split.")
+                return redirect('unmatched_transactions')
+
+            if sum(amounts) != tx.amount:
+                messages.error(request, f"Split amounts must add up to the transaction total (${tx.amount}).")
+                return redirect('unmatched_transactions')
+
+            members_by_id = {str(m.id): m for m in Member.objects.filter(pk__in=member_ids)}
+            if len(members_by_id) != len(member_ids):
+                messages.error(request, "One or more selected students could not be found.")
+                return redirect('unmatched_transactions')
+
+            with transaction.atomic():
+                tx.allocations.all().delete()
+                split = [(members_by_id[mid], amount) for mid, amount in zip(member_ids, amounts)]
+                TransactionAllocation.objects.bulk_create([
+                    TransactionAllocation(transaction=tx, member=member, amount=amount)
+                    for member, amount in split
+                ])
+                tx.member = split[0][0]
+                tx.match_status = 'matched'
+                tx.matched_by = 'manual'
+                tx.save(update_fields=['member', 'match_status', 'matched_by', 'updated_at'])
+
+                if tx.cardholder_first_name and tx.cardholder_last_name:
+                    for member in members_by_id.values():
+                        PayerLink.objects.get_or_create(
+                            first_name=tx.cardholder_first_name,
+                            last_name=tx.cardholder_last_name,
+                            member=member,
+                        )
+
+                relinked_count = _relink_split_transactions_for_payer(tx, split)
+
+            names = ", ".join(str(m) for m in members_by_id.values())
+            message = f"Split transaction {tx.transaction_id} across {names}."
+            if relinked_count:
+                message += f" Also applied the same split to {relinked_count} other transaction{'s' if relinked_count != 1 else ''} from the same cardholder."
+            messages.success(request, message)
+            return redirect('unmatched_transactions')
+
+        member = get_object_or_404(Member, pk=request.POST.get('member_id'))
+        tx.allocations.all().delete()
+        tx.member = member
+        tx.match_status = 'matched'
+        tx.matched_by = 'manual'
+        tx.save(update_fields=['member', 'match_status', 'matched_by', 'updated_at'])
+
+        # Remember this cardholder -> member link so future payments auto-match.
+        if tx.cardholder_first_name and tx.cardholder_last_name:
+            PayerLink.objects.get_or_create(
+                first_name=tx.cardholder_first_name,
+                last_name=tx.cardholder_last_name,
+                member=member,
+            )
+
+        relinked_count = _relink_transactions_for_payer(tx, member)
+        message = f"Linked transaction {tx.transaction_id} to {member}."
+        if relinked_count:
+            message += f" Also matched {relinked_count} other transaction{'s' if relinked_count != 1 else ''} from the same cardholder."
+        messages.success(request, message)
+        return redirect('unmatched_transactions')
+
+    queue = (
+        Transaction.objects.exclude(match_status='matched')
+        .select_related('member')
+        .order_by('-processed_at')
+    )
+    members = Member.objects.filter(is_active=True).order_by('first_name', 'last_name')
+
+    # Suggest a member per transaction by matching the cardholder's last name (and first
+    # name when available), so staff aren't stuck scrolling the full member list.
+    for tx in queue:
+        suggestions = Member.objects.none()
+        if tx.cardholder_last_name:
+            suggestions = Member.objects.filter(last_name__iexact=tx.cardholder_last_name)
+            if tx.cardholder_first_name:
+                first_name_matches = suggestions.filter(first_name__iexact=tx.cardholder_first_name)
+                if first_name_matches.exists():
+                    suggestions = first_name_matches
+        tx.suggested_members = list(suggestions)
+        suggested_ids = {m.id for m in tx.suggested_members}
+        tx.other_members = [m for m in members if m.id not in suggested_ids]
+        tx.has_single_suggestion = len(tx.suggested_members) == 1
+
+    return render(request, "billing/unmatched_transactions.html", {
+        'queue': queue,
+        'members': members,
+    })
 
 def reports(request):
     return render(request, "reports/index.html")
@@ -1463,6 +1683,7 @@ def waivers(request):
         {
             "all_waivers": all_waivers,
             "show_voided": show_voided,
+            "membership_plans": Plan.objects.all().order_by("name"),
         }
     )
 
@@ -1483,11 +1704,12 @@ def adult_waiver(request, member_id=None):
             sig = form.save(commit=False)
             sig.participant_type = WaiverSignature.ADULT
             sig.waiver_version = waiver
-            sig.ip_address = request.META.get("REMOTE_ADDR"),
+            sig.ip_address = request.META.get("REMOTE_ADDR")
             sig.user_agent = request.META.get("HTTP_USER_AGENT", "")
             if member_id:
                 sig.member_id = member_id
             sig.save()
+            start_trial_from_waiver(sig)
             return redirect("waiver_success")
     else:
         form = AdultWaiverForm()
@@ -1519,6 +1741,7 @@ def minor_waiver(request, member_id=None):
             if member_id:
                 sig.member_id = member_id
             sig.save()
+            start_trial_from_waiver(sig)
             messages.success(request, "Waiver signed successfully.")
             return redirect("waiver_success")
         else:
@@ -1601,6 +1824,35 @@ def waiver_delete(request, pk):
     return render(request, "waiver/delete.html", {
         "waiver": waiver,
     })
+
+
+@login_required
+@require_POST
+def trial_action(request, member_id, action):
+    if not request.user.is_staff:
+        return HttpResponse("Staff access only", status=403)
+
+    member = get_object_or_404(Member, pk=member_id)
+    try:
+        if action == "extend":
+            extend_trial(member)
+            messages.success(request, "Trial extended by one week.")
+        elif action == "deactivate":
+            deactivate_trial(member)
+            messages.success(request, "Member deactivated.")
+        elif action == "convert":
+            plan_id = request.POST.get("plan_id")
+            if not plan_id:
+                messages.error(request, "Please select a membership plan.")
+            else:
+                convert_trial_to_membership(member, plan_id)
+                messages.success(request, "Trial converted to a membership.")
+        else:
+            return HttpResponse("Unknown trial action", status=400)
+    except (ValueError, Plan.DoesNotExist):
+        messages.error(request, "This trial action is no longer available.")
+
+    return redirect(request.POST.get("next") or "waivers")
 
 def member_autocomplete(request):
     q = request.GET.get("q", "").strip()

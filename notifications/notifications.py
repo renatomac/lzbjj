@@ -16,6 +16,7 @@ from django.db.models import Q, Count
 from django.contrib.auth import get_user_model
 
 from crm.models import Member, BeltPromotion, ClassSession, SessionAttendance, Attendance
+from crm.services.trials import expire_trials
 from .utils import create_notification, create_bulk_notifications
 
 User = get_user_model()
@@ -632,6 +633,68 @@ def generate_waiver_expiration_warnings():
         print(f"Error generating waiver expiration warnings: {e}")
     
     return notifications
+
+
+def generate_trial_expiration_notifications(today=None):
+    """Deactivate expired trials and notify every active staff user once."""
+    today = today or timezone.localdate()
+    staff_users = User.objects.filter(is_staff=True, is_active=True)
+    notifications = []
+
+    for member in expire_trials(today):
+        message = (
+            f"Trial expired: {member.first_name} {member.last_name}. "
+            "Extend the trial, deactivate the member, or convert them to a membership."
+        )
+        notifications.extend(create_bulk_notifications(
+            users=staff_users,
+            notification_type="TRIAL_EXPIRED",
+            message=message,
+            data={"member_id": member.id, "member_name": str(member)},
+        ))
+        member.trial_expired_notified = True
+        member.save(update_fields=["trial_expired_notified", "updated_at"])
+
+    return notifications
+
+
+# ============================================================================
+# BILLING / PAYMENT RECONCILIATION NOTIFICATIONS
+# ============================================================================
+
+def generate_unmatched_payment_notification(tx):
+    """
+    Notify staff that an incoming gateway payment couldn't be automatically
+    tied to a member, so it needs manual review in the Unmatched Transactions queue.
+
+    Args:
+        tx: crm.models.Transaction instance with match_status in
+            ("unmatched", "needs_review").
+
+    Returns:
+        list: Created notifications (one per staff user).
+    """
+    staff_users = User.objects.filter(is_staff=True, is_active=True)
+    if not staff_users.exists():
+        return []
+
+    reason = "no matching student" if tx.match_status == "unmatched" else "multiple possible students (ambiguous match)"
+    message = (
+        f"⚠️ Unrecognized payment: ${tx.amount} from {tx.cardholder_name} "
+        f"could not be matched to a student ({reason}). Please review and link it."
+    )
+
+    return create_bulk_notifications(
+        users=staff_users,
+        notification_type="UNMATCHED_PAYMENT",
+        message=message,
+        data={
+            "transaction_id": tx.transaction_id,
+            "amount": float(tx.amount),
+            "cardholder_name": tx.cardholder_name,
+            "match_status": tx.match_status,
+        }
+    )
 
 
 # ============================================================================

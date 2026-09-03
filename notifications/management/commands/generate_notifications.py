@@ -17,6 +17,7 @@ from notifications.notifications import (
     generate_membership_expiration_warnings,
     generate_streak_milestone_notifications,
     generate_waiver_expiration_warnings,
+    generate_trial_expiration_notifications,
     run_all_notifications,
 )
 
@@ -29,7 +30,7 @@ class Command(BaseCommand):
             '--type',
             type=str,
             default='all',
-            help='Type of notification to generate (birthday, promotion_milestone, low_attendance, membership_expiring, streak_milestone, waiver_expiring, all)',
+            help='Type of notification to generate (birthday, promotion_milestone, low_attendance, membership_expiring, streak_milestone, waiver_expiring, trial_expired, all)',
         )
         parser.add_argument(
             '--verbose',
@@ -101,6 +102,16 @@ class Command(BaseCommand):
             )
             if verbose and results['waiver_expiring']:
                 for notif in results['waiver_expiring']:
+                    self.stdout.write(f"  - {notif.message}")
+
+        if notification_type in ['trial_expired', 'all']:
+            self.stdout.write("Generating trial expiration notifications...")
+            results['trial_expired'] = generate_trial_expiration_notifications()
+            self.stdout.write(
+                self.style.SUCCESS(f"✓ Trial expiration notifications: {len(results['trial_expired'])} sent")
+            )
+            if verbose and results['trial_expired']:
+                for notif in results['trial_expired']:
                     self.stdout.write(f"  - {notif.message}")
 
         # Print summary

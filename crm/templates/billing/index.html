@@ -11,16 +11,21 @@
     </h1>
     <div class="btn-toolbar mb-2 mb-md-0">
         <div class="btn-group me-2">
+            <a href="{% url 'unmatched_transactions' %}" class="btn btn-outline-warning">
+                <i class="fas fa-unlink me-2"></i>Unmatched Transactions
+            </a>
             <a href="{% url 'billing' %}" class="btn btn-outline-secondary">
                 <i class="fas fa-sync-alt me-2"></i>Refresh
             </a>
-            {% if member %}
-            <a href="{% url 'billing.create_payment' member_id=member.id%}" class="btn btn-primary">
-                <i class="fas fa-plus me-2"></i>Record Payment
-            </a>
-            {% endif %}
         </div>
     </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-md-6 col-lg-3"><div class="card shadow-sm p-3"><small class="text-muted">MRR</small><strong>${{ transaction_metrics.mrr|floatformat:2 }}</strong></div></div>
+    <div class="col-md-6 col-lg-3"><div class="card shadow-sm p-3"><small class="text-muted">Gross revenue (YTD)</small><strong>${{ transaction_metrics.gross_revenue|default:0|floatformat:2 }}</strong></div></div>
+    <div class="col-md-6 col-lg-3"><div class="card shadow-sm p-3"><small class="text-muted">Gateway transactions (YTD)</small><strong>{{ transaction_metrics.transaction_count }}</strong></div></div>
+    <div class="col-md-6 col-lg-3"><div class="card shadow-sm p-3"><small class="text-muted">Failed payment rate</small><strong>{{ transaction_metrics.failed_payment_rate|floatformat:1 }}%</strong></div></div>
 </div>
 
 <div class="row g-4 mb-4">
@@ -29,7 +34,7 @@
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
-                        <h6 class="text-uppercase mb-0">Total Revenue</h6>
+                        <h6 class="text-uppercase mb-0">Total Revenue (This Month)</h6>
                         <h4 class="fw-bold mb-0">{{ total_revenue }}</h4>
                     </div>
                     <i class="fas fa-dollar-sign fa-2x opacity-75"></i>
@@ -42,7 +47,7 @@
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
-                        <h6 class="text-uppercase mb-0">Total Payments</h6>
+                        <h6 class="text-uppercase mb-0">Total Payments (This Month)</h6>
                         <h4 class="fw-bold mb-0">{{payments.total}} </h4>
                     </div>
                     <i class="fas fa-receipt fa-2x opacity-75"></i>
@@ -81,7 +86,72 @@
 
 <div class="card mb-4">
     <div class="card-header">
+        <h5 class="mb-0">Monthly Revenue History</h5>
+    </div>
+    <div class="card-body">
+        <canvas id="monthlyRevenueChart" height="90"></canvas>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">Completed Transactions This Month</h5>
+        <span class="badge bg-primary rounded-pill">{{ current_month_count }} total</span>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-striped table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Transaction ID</th>
+                        <th>Settlement Date</th>
+                        <th>Status</th>
+                        <th>Amount</th>
+                        <th>Method</th>
+                        <th>Student</th>
+                        <th>Cardholder</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if current_month_transactions %}
+                        {% for payment in current_month_transactions %}
+                        <tr>
+                            <td>{{ payment.transaction_id|default:payment.id }}</td>
+                            <td>{{ payment.settlement_date|default:payment.payment_date }}</td>
+                            <td>
+                                <span class="badge {% if 'settl' in payment.status|lower or 'paid' in payment.status|lower or 'success' in payment.status|lower %}bg-success{% else %}bg-warning{% endif %}">
+                                    {{ payment.status }}
+                                </span>
+                            </td>
+                            <td>${{ payment.amount }}</td>
+                            <td>{{ payment.method|default:payment.payment_method }}</td>
+                            <td>
+                                {% if payment.is_split %}<span class="badge bg-info text-dark me-1">Split</span>{% endif %}
+                                {{ payment.member_name }}
+                            </td>
+                            <td>{{ payment.cardholder_name|default:payment.member_name }}</td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="7" class="text-center text-muted py-4">
+                                No completed payments found for the current month.
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
         <h5 class="mb-0">Payment History</h5>
+        <div>
+            <span class="badge bg-primary rounded-pill">{{ payment_history_count }} transaction{{ payment_history_count|pluralize }}</span>
+            <span class="badge bg-success rounded-pill">{{ payment_history_total }} total</span>
+        </div>
     </div>
     <div class="card-body">
         <form method="GET" class="row g-3 mb-4 align-items-end">
@@ -102,66 +172,42 @@
             <table class="table table-striped table-hover">
                 <thead>
                     <tr>
-                        <th scope="col">Date</th>
-                        <th scope="col">Member</th>
+                        <th scope="col">Transaction ID</th>
+                        <th scope="col">Settlement Date</th>
+                        <th scope="col">Status</th>
                         <th scope="col">Amount</th>
                         <th scope="col">Method</th>
-                        <th scope="col">Status</th>
-                        <th scope="col">Actions</th>
+                        <th scope="col">Student</th>
+                        <th scope="col">Cardholder</th>
+                        <th scope="col">Source</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for payment in payments.items %}
                     <tr>
-                        <td>{{ payment.payment_date}}</td>
+                        <td>{{ payment.transaction_id|default:payment.id }}</td>
+                        <td>{{ payment.settlement_date|default:payment.payment_date }}</td>
                         <td>
-                            {% if payment.member %}
-                            <a href="{% url 'members.view' member_id=payment.member.id%}">
-                                {{ payment.member.full_name }}
-                            </a>
-                            {% else %}
-                            N/A
-                            {% endif %}
-                        </td>
-                        <td>${{ payment.amount  }}</td>
-                        <td>{{ payment.payment_method }}</td>
-                        <td>
-                            <span class="badge {% if payment.status == 'completed' %}bg-success{% else %}bg-warning{% endif %}">
+                            <span class="badge {% if 'settl' in payment.status|lower or 'paid' in payment.status|lower or 'success' in payment.status|lower %}bg-success{% else %}bg-warning{% endif %}">
                                 {{ payment.status }}
                             </span>
+                        </td>
+                        <td>${{ payment.amount }}</td>
+                        <td>{{ payment.method|default:payment.payment_method }}</td>
                         <td>
-                            <a href="{% url 'billing.edit_payment' payment_id=payment.id%}" class="btn btn-sm btn-outline-secondary">
-                                <i class="fas fa-edit"></i>
-                            </a>
-                            <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deletePaymentModal-{{ payment.id }}">
-                                <i class="fas fa-trash-alt"></i>
-                            </button>
+                            {% if payment.is_split %}<span class="badge bg-info text-dark me-1">Split</span>{% endif %}
+                            {{ payment.member_name }}
+                        </td>
+                        <td>{{ payment.cardholder_name|default:payment.member_name }}</td>
+                        <td>
+                            <span class="badge {% if payment.source == 'Authorize.Net' %}bg-info text-dark{% else %}bg-secondary{% endif %}">
+                                {{ payment.source|default:'Local' }}
+                            </span>
                         </td>
                     </tr>
-                    <!-- Delete Confirmation Modal -->
-                    <div class="modal fade" id="deletePaymentModal-{{ payment.id }}" tabindex="-1" aria-labelledby="deletePaymentModalLabel-{{ payment.id }}" aria-hidden="true">
-                        <div class="modal-dialog">
-                            <div class="modal-content">
-                                <div class="modal-header">
-                                    <h5 class="modal-title" id="deletePaymentModalLabel-{{ payment.id }}">Confirm Deletion</h5>
-                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                </div>
-                                <div class="modal-body">
-                                    Are you sure you want to delete this payment of ${{ payment.amount }}? This action cannot be undone.
-                                </div>
-                                <div class="modal-footer">
-                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                                    <form action="{% url 'billing.delete_payment' payment_id=payment.id %}" method="POST" style="display: inline;">
-                                        {{ csrf.csrf_token }}
-                                        <button type="submit" class="btn btn-danger">Delete</button>
-                                    </form>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
+                    {% empty %}
                     <tr>
-                        <td colspan="6" class="text-center text-muted py-5">
+                        <td colspan="8" class="text-center text-muted py-5">
                             <i class="fas fa-info-circle me-2"></i>No payments found in the selected date range.
                         </td>
                     </tr>
@@ -173,4 +219,36 @@
 </div>
 
 
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script>
+    (function () {
+        const monthlyRevenue = {{ monthly_revenue_json|default:"[]"|safe }};
+        const labels = monthlyRevenue.map(row => row.label);
+        const totals = monthlyRevenue.map(row => row.total);
+        const ctx = document.getElementById('monthlyRevenueChart');
+        if (ctx) {
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Settled revenue',
+                        data: totals,
+                        backgroundColor: 'rgba(25, 135, 84, 0.6)',
+                        borderColor: 'rgba(25, 135, 84, 1)',
+                        borderWidth: 1,
+                    }],
+                },
+                options: {
+                    responsive: true,
+                    scales: { y: { beginAtZero: true } },
+                    plugins: { legend: { display: false } },
+                },
+            });
+        }
+    })();
+</script>
 {% endblock %}
