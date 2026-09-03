@@ -1,0 +1,138 @@
+{% extends "layout.html" %}
+
+{% block title %}User List{% endblock %}
+{% block header_title %}<i class="fas fa-users me-2"></i>User Manager{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center ">
+    <div class="col-lg-8">
+        <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+            <div class="btn-toolbar mb-2 mb-md-0">
+                <div class="btn-group me-2">
+                    <a href="{% url 'addUser'%}" class="btn btn-primary">
+                        <i class="fas fa-user-plus me-2"></i>Add User
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm rounded-3 p-0 mb-2">
+            <a href="{% url 'dashboard' %}" class="btn btn-custom-ghost ms-auto">
+                <i class="fa-solid fa-arrow-left me-2"></i> Back to Dashboard
+            </a>
+            <div class="card-body">
+
+               <form method="GET" class="row g-3">
+
+                    <div class="col-md-4">
+                        <div class="input-group">
+                            <span class="input-group-text">
+                                <i class="fas fa-search"></i>
+                            </span>
+                            <input
+                                type="text"
+                                class="form-control"
+                                name="query"
+                                placeholder="Search users..."
+                                value="{{ query }}"
+                            >
+                        </div>
+                    </div>
+
+                    <div class="col-md-4">
+                        <select name="status" class="form-select">
+                            <option value="">All Users</option>
+                            <option value="active" {% if status == "active" %}selected{% endif %}>
+                                Active
+                            </option>
+                            <option value="inactive" {% if status == "inactive" %}selected{% endif %}>
+                                Inactive
+                            </option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-4">
+                        <button type="submit" class="btn btn-primary ">
+                            <i class="fas fa-filter me-2"></i>Filter
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="card main-card mb-4">
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover table-borderless align-middle staff-table">
+                        <thead class="text-muted text-uppercase">
+                            <tr>
+                                <th scope="col" class="py-3">Username</th>
+                                <th scope="col" class="py-3">Email</th>
+                                <th scope="col" class="py-3">Staff</th>
+                                <th scope="col" class="py-3">Coach</th>
+                                <th scope="col" class="py-3">Status</th>
+                                <th scope="col" class="py-3">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for u in all_users %}
+                            <tr>
+                                <td class="py-3 fw-bold">{{ u.username }}</td>
+                                <td class="py-3">{{ u.email }}</td>
+                                <td class="py-3">
+                                    {% if u.is_staff %}<i class="fas fa-check text-success"></i>{% endif %}
+                                </td>
+                                <td class="py-3">
+                                    {% if u.is_coach %}<i class="fas fa-check text-success"></i>{% endif %}
+                                </td>
+                                <td class="py-3">
+                                    {% if u.is_active %}
+                                        <span class="badge rounded-pill bg-success">Active</span>
+                                    {% else %}
+                                        <span class="badge rounded-pill bg-danger">Inactive</span>
+                                    {% endif %}
+                                </td>
+                                <td class="py-3">
+                                    <div class="d-flex gap-2">
+                                        <button type="button" data-id="{{ u.id }}" data-type="User"
+                                            class="btn btn-sm toggle-status {% if u.is_active %}btn-outline-danger{% else %}btn-outline-success{% endif %}"
+                                            title="{% if u.is_active %}Deactivate{% else %}Activate{% endif %}">
+                                            <i class="fas {% if u.is_active %}fa-user-slash{% else %}fa-user-plus{% endif %}"></i>
+                                        </button>
+                                        <form action="{% url 'resetUserPassword' user_id=u.id %}" method="POST" class="d-inline-block">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn-sm btn-outline-warning" onclick="return confirm('Force {{ u.username }} to set a new password at next login?');" title="Force password reset">
+                                                <i class="fa-solid fa-key"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-2">
+        <div class="card main-card mb-4">
+            <div class="card-body">
+                <h5 class="fw-bold mb-3">Summary</h5>
+                <div class="d-flex justify-content-between mb-2">
+                    <span class="text-muted">Total</span>
+                    <span id="sumTotal" class="fw-bold">{{ summary.total }}</span>
+                </div>
+                <div class="d-flex justify-content-between mb-2">
+                    <span class="text-muted">Active</span>
+                    <span id="sumActive" class="fw-bold text-success">{{ summary.active }}</span>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <span class="text-muted">Inactive</span>
+                    <span id="sumInactive" class="fw-bold text-danger">{{ summary.inactive }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

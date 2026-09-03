@@ -1,7 +1,10 @@
 from django import forms
-from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
+from django.contrib.auth.forms import (
+    UserCreationForm, AuthenticationForm, SetPasswordForm, PasswordChangeForm,
+)
 from django.contrib.auth import get_user_model
 from django.contrib import messages
+from django.core.exceptions import ValidationError
 from django.forms import inlineformset_factory
 from django.db import transaction
 from django.db.models import Q
@@ -15,19 +18,53 @@ from .models import (
     Class, Attendance, BeltPromotion, Contact,BeltRank,WaiverSignature, 
     SessionAttendance, ClassSession, BeltPromotion, ADULT_BELT_ORDER, KID_BELT_ORDER
 )
+from .password_validation import validate_password_strength
 import logging
 
 logger = logging.getLogger(__name__)
 
 User = get_user_model()
 
-class UserRegisterForm(UserCreationForm):
+
+class StrongPasswordFormMixin:
+    """Mixin that enforces the project's password strength rules.
+
+    Subclasses must define ``strong_password_field`` with the name of the
+    form field holding the password to validate (the second/confirmation
+    password field).
+    """
+    strong_password_field = "password2"
+
+    def clean(self):
+        cleaned_data = super().clean()
+        password = self.cleaned_data.get(self.strong_password_field)
+        if password:
+            try:
+                validate_password_strength(password)
+            except ValidationError as error:
+                self.add_error(self.strong_password_field, error)
+        return cleaned_data
+
+
+class UserRegisterForm(StrongPasswordFormMixin, UserCreationForm):
+    strong_password_field = "password2"
+
     class Meta:
         model = User
         fields = [
             "username",
             "email",
+            "is_staff",
+            "is_coach",
         ]
+
+
+class StrongSetPasswordForm(StrongPasswordFormMixin, SetPasswordForm):
+    strong_password_field = "new_password2"
+
+
+class StrongPasswordChangeForm(StrongPasswordFormMixin, PasswordChangeForm):
+    strong_password_field = "new_password2"
 
 class LoginForm(AuthenticationForm):
     username = forms.CharField(

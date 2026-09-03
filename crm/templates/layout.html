@@ -575,6 +575,16 @@ document.addEventListener('DOMContentLoaded', async () => {
                     </a>
                 </li>
 
+                {% if user.is_staff %}
+                <li class="nav-item">
+                    <a href="{% url 'users' %}"
+                       class="nav-link text-white d-flex align-items-center gap-3 rounded-3
+                       {% if request.resolver_match.url_name == 'users' %}active{% endif %}">
+                        <i class="fas fa-users-cog"></i> Users
+                    </a>
+                </li>
+                {% endif %}
+
                 <li class="nav-item">
                     <a href="{% url 'plan' %}"
                        class="nav-link text-white d-flex align-items-center gap-3 rounded-3
@@ -647,6 +657,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 {# Notification bell dropdown #}
                 {% include 'partials/navbar_bell.html' %}
+
+                <a href="{% url 'change_password' %}" class="ms-3 text-muted text-decoration-none">
+                    <i class="fas fa-key"></i> Change Password
+                </a>
 
                 <a href="{% url 'logout' %}" class="ms-3 text-muted text-decoration-none">
                     <i class="fas fa-sign-out-alt"></i> Logout

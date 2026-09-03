@@ -106,6 +106,15 @@ class User(AbstractUser):
         verbose_name=_("user permissions"),
     )
 
+    must_change_password = models.BooleanField(
+        _("must change password"),
+        default=False,
+        help_text=_(
+            "Designates whether the user must change their password before "
+            "accessing the system (e.g. on their first login)."
+        ),
+    )
+
     def __str__(self):
         return self.username
 
