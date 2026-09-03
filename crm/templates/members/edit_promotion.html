@@ -1,7 +1,7 @@
 {% extends "layout.html" %}
 
-{% block title %}Add Promotion{% endblock %}
-{% block header_title %}Add Promotion{% endblock %}
+{% block title %}Edit Promotion{% endblock %}
+{% block header_title %}Edit Promotion{% endblock %}
 
 {% block content %}
 <div class="container-fluid py-4 d-flex justify-content-center">
@@ -10,9 +10,9 @@
 
       <!-- Header -->
       <div class="text-center mb-4">
-        <h1 class="h3 fw-bold mb-1">Add Promotion</h1>
+        <h1 class="h3 fw-bold mb-1">Edit Promotion</h1>
         <p class="text-muted mb-0">
-          Record a belt or stripe promotion for
+          Update belt or stripe promotion for
           {{ member.first_name|capfirst }} {{ member.last_name|capfirst }}
         </p>
       </div>
@@ -41,8 +41,8 @@
           </div>
         </div>
 
-        <a href="{% url 'members' %}" class="btn btn-ghost btn-sm">
-          <i class="fa-solid fa-arrow-left me-1"></i> Back to Members
+        <a href="{% url 'addPromotion' member.id %}" class="btn btn-ghost btn-sm">
+          <i class="fa-solid fa-arrow-left me-1"></i> Back to Promotions
         </a>
       </div>
 
@@ -78,9 +78,12 @@
       <form method="post">
         {% csrf_token %}
         {{ form|crispy }}
-        <div class="d-flex justify-content-end mt-4">
+        <div class="d-flex justify-content-end gap-2 mt-4">
+          <a href="{% url 'addPromotion' member.id %}" class="btn btn-secondary btn-lg px-4">
+            <i class="fas fa-times me-2"></i>Cancel
+          </a>
           <button type="submit" class="btn btn-primary btn-lg px-4">
-            <i class="fas fa-check-circle me-2"></i>Record Promotion
+            <i class="fas fa-save me-2"></i>Save Changes
           </button>
         </div>
       </form>
@@ -103,35 +106,38 @@
               </tr>
             </thead>
             <tbody>
-              {% for promotion in promotions %}
-              <tr>
+              {% for p in promotions %}
+              <tr {% if p.id == promotion.id %}class="table-active"{% endif %}>
                 <td>
-                  <span class="fw-semibold">{{ promotion.promotion_date|date:"M d, Y" }}</span>
+                  <span class="fw-semibold">{{ p.promotion_date|date:"M d, Y" }}</span>
+                  {% if p.id == promotion.id %}<span class="badge bg-info ms-2">Editing</span>{% endif %}
                 </td>
                 <td>
                   <span class="badge bg-light text-dark">
-                    {{ promotion.old_rank|capfirst }} {% if promotion.old_stripes %}{{ promotion.old_stripes }}🥋{% endif %}
+                    {{ p.old_rank|capfirst }} {% if p.old_stripes %}{{ p.old_stripes }}🥋{% endif %}
                   </span>
                 </td>
                 <td>
-                  <span class="badge {{ promotion.new_rank }}-belt">
-                    {{ promotion.new_rank|capfirst }} {% if promotion.new_stripes %}{{ promotion.new_stripes }}🥋{% endif %}
+                  <span class="badge {{ p.new_rank }}-belt">
+                    {{ p.new_rank|capfirst }} {% if p.new_stripes %}{{ p.new_stripes }}🥋{% endif %}
                   </span>
                 </td>
                 <td>
                   <span class="text-muted">
-                    {{ promotion.promoted_by.first_name|default:"" }} {{ promotion.promoted_by.last_name|default:"—" }}
+                    {{ p.promoted_by.first_name|default:"" }} {{ p.promoted_by.last_name|default:"—" }}
                   </span>
                 </td>
                 <td class="text-end">
                   <div class="btn-group" role="group">
-                    <a href="{% url 'editPromotion' promotion.id %}" 
-                       class="btn btn-sm btn-outline-primary"
-                       data-bs-toggle="tooltip" 
-                       title="Edit this promotion">
-                      <i class="fas fa-edit"></i>
-                    </a>
-                    <a href="{% url 'deletePromotion' promotion.id %}"
+                    {% if p.id != promotion.id %}
+                      <a href="{% url 'editPromotion' p.id %}" 
+                         class="btn btn-sm btn-outline-primary"
+                         data-bs-toggle="tooltip" 
+                         title="Edit this promotion">
+                        <i class="fas fa-edit"></i>
+                      </a>
+                    {% endif %}
+                    <a href="{% url 'deletePromotion' p.id %}"
                        class="btn btn-sm btn-outline-danger"
                        data-bs-toggle="tooltip"
                        title="Delete this promotion">

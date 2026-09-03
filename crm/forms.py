@@ -323,7 +323,7 @@ class AttendanceForm(forms.ModelForm):
 class BeltPromotionForm(forms.ModelForm):
     class Meta:
         model = BeltPromotion
-        exclude = ["member"]
+        exclude = ["member", "notes"]
 
     def __init__(self, *args, member=None, **kwargs):
         super().__init__(*args, **kwargs)

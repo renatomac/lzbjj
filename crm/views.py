@@ -16,7 +16,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import  require_POST
-from .models import User, Plan, Member, Membership, BeltPromotion, Staff, Contact, Class, Attendance, Technique, Position, ClassSession, SessionAttendance, SessionTechnique, WaiverVersion, WaiverSignature, Payment, Transaction, PayerLink, TransactionAllocation
+from .models import User, Plan, Member, Membership, BeltPromotion, BeltRank, Staff, Contact, Class, Attendance, Technique, Position, ClassSession, SessionAttendance, SessionTechnique, WaiverVersion, WaiverSignature, Payment, Transaction, PayerLink, TransactionAllocation
 from notifications.models import Notification
 from .forms import PlanForm, StaffForm , MemberForm, MembershipForm, ClassForm, ContactFormSet, ContactForm,BeltPromotionForm, AttendanceForm, MinorWaiverForm, AdultWaiverForm, ClassSessionForm, WaiverEditForm
 from .formsets import SessionAttendanceFormSet
@@ -578,24 +578,39 @@ def getContacts(request, member_id):
     return JsonResponse({"contacts": contacts})
 
 def addPromotion(request, member_id):
+    # Staff-only check
+    if not (request.user.is_authenticated and hasattr(request.user, 'staff') and request.user.staff.is_active):
+        return redirect("members")
+    
     member = get_object_or_404(Member, id=member_id)
-    rank  = makeRank(member.belt_rank, member.stripes)
+    rank = makeRank(member.belt_rank, member.stripes)
+    
+    # Get all prior promotions for this member
+    promotions = BeltPromotion.objects.filter(member=member).select_related('promoted_by').order_by('-promotion_date')
+    
     if request.method == "POST":
         form = BeltPromotionForm(request.POST, member=member)
         if form.is_valid():
             promotion = form.save(commit=False)
             promotion.member = member
+            promotion.promoted_by = request.user.staff
             promotion.save()
             member.belt_rank = promotion.new_rank
             member.stripes = promotion.new_stripes
             member.save()
+            
+            # Generate notification for promotion
+            from notifications.notifications import generate_belt_promotion_notification
+            generate_belt_promotion_notification(promotion)
+            
             return redirect("members")
     else:
         form = BeltPromotionForm(member=member)
         return render(request, "members/add_promotion.html",{
-            "member":member,
+            "member": member,
             "form": form,
-            "rank":rank,
+            "rank": rank,
+            "promotions": promotions,
         })
 
 def makeRank(belt, stripes):
@@ -604,6 +619,78 @@ def makeRank(belt, stripes):
         belt = belt + " \u235F"
     belt = belt.capitalize()
     return belt
+
+
+def editPromotion(request, promotion_id):
+    # Staff-only check
+    if not (request.user.is_authenticated and hasattr(request.user, 'staff') and request.user.staff.is_active):
+        return redirect("members")
+    
+    promotion = get_object_or_404(BeltPromotion, id=promotion_id)
+    member = promotion.member
+    rank = makeRank(member.belt_rank, member.stripes)
+    
+    # Get all promotions for display
+    promotions = BeltPromotion.objects.filter(member=member).select_related('promoted_by').order_by('-promotion_date')
+    
+    if request.method == "POST":
+        form = BeltPromotionForm(request.POST, instance=promotion, member=member)
+        if form.is_valid():
+            old_new_rank = promotion.new_rank
+            old_new_stripes = promotion.new_stripes
+            
+            promotion = form.save(commit=False)
+            promotion.promoted_by = request.user.staff
+            promotion.save()
+            
+            # Update member's current rank to match the most recent promotion
+            latest_promotion = BeltPromotion.objects.filter(member=member).order_by('-promotion_date').first()
+            if latest_promotion:
+                member.belt_rank = latest_promotion.new_rank
+                member.stripes = latest_promotion.new_stripes
+                member.save()
+            
+            return redirect("members")
+    else:
+        form = BeltPromotionForm(instance=promotion, member=member)
+        return render(request, "members/edit_promotion.html",{
+            "member": member,
+            "form": form,
+            "rank": rank,
+            "promotions": promotions,
+            "promotion": promotion,
+            "is_edit": True,
+        })
+
+
+def deletePromotion(request, promotion_id):
+    # Staff-only check
+    if not (request.user.is_authenticated and hasattr(request.user, 'staff') and request.user.staff.is_active):
+        return redirect("members")
+    
+    promotion = get_object_or_404(BeltPromotion, id=promotion_id)
+    member = promotion.member
+    
+    if request.method == "POST":
+        promotion.delete()
+        
+        # Reset member's rank to the most recent remaining promotion
+        latest_promotion = BeltPromotion.objects.filter(member=member).order_by('-promotion_date').first()
+        if latest_promotion:
+            member.belt_rank = latest_promotion.new_rank
+            member.stripes = latest_promotion.new_stripes
+        else:
+            # No promotions left, reset to white belt
+            member.belt_rank = BeltRank.WHITE
+            member.stripes = 0
+        member.save()
+        
+        return redirect("members")
+    else:
+        return render(request, "members/delete_promotion.html", {
+            "member": member,
+            "promotion": promotion,
+        })
     
 
 
