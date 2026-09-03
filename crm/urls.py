@@ -50,6 +50,7 @@ urlpatterns = [
     path("deleteMember/<int:member_id>/", views.deleteMember, name="deleteMember"),
     path("exportMembers", views.exportMembers, name="exportMembers"),
     path("viewMember/<int:member_id>/", views.viewMember, name="viewMember"),
+    path("studentJourney/<int:member_id>/", views.student_journey, name="studentJourney"),
     path("recordPayment/<int:member_id>/", views.recordPayment, name="recordPayment"),
     path("addPromotion/<int:member_id>/", views.addPromotion, name="addPromotion"),
     path("editPromotion/<int:promotion_id>/", views.editPromotion, name="editPromotion"),

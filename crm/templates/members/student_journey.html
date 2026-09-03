@@ -1,0 +1,759 @@
+{% extends "layout.html" %}
+
+{% block title %}{{ member.first_name }}'s Student Journey{% endblock %}
+{% block header_title %}Student Journey{% endblock %}
+
+{% block content %}
+<style>
+    /* Premium Student Journey Styles */
+    :root {
+        --primary-dark: #0f1419;
+        --secondary-dark: #1a1f2e;
+        --accent-gold: #ffd700;
+        --accent-gold-light: #fff9e6;
+        --text-light: #e0e0e0;
+        --text-muted: #999;
+        --success: #10b981;
+        --warning: #f59e0b;
+        --info: #3b82f6;
+        --danger: #ef4444;
+    }
+
+    .journey-container {
+        background: linear-gradient(135deg, var(--primary-dark) 0%, var(--secondary-dark) 100%);
+        min-height: 100vh;
+        padding: 2rem 0;
+        color: var(--text-light);
+    }
+
+    /* Hero Section */
+    .hero-section {
+        background: linear-gradient(135deg, rgba(255, 215, 0, 0.1) 0%, rgba(255, 215, 0, 0.05) 100%);
+        border: 1px solid rgba(255, 215, 0, 0.2);
+        border-radius: 20px;
+        padding: 3rem 2rem;
+        margin-bottom: 3rem;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+        backdrop-filter: blur(10px);
+    }
+
+    .hero-content {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 2rem;
+        align-items: center;
+    }
+
+    .hero-avatar {
+        width: 120px;
+        height: 120px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--accent-gold), #ffaa00);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 3rem;
+        font-weight: bold;
+        color: var(--primary-dark);
+        box-shadow: 0 0 40px rgba(255, 215, 0, 0.5), inset 0 -2px 5px rgba(0, 0, 0, 0.3);
+        border: 3px solid var(--accent-gold);
+        flex-shrink: 0;
+    }
+
+    .hero-avatar img {
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+        object-fit: cover;
+    }
+
+    .hero-info h1 {
+        font-size: 2.5rem;
+        font-weight: 800;
+        margin: 0 0 0.5rem 0;
+        background: linear-gradient(135deg, var(--accent-gold), #ffaa00);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+
+    .hero-info p {
+        color: var(--text-muted);
+        margin: 0.5rem 0;
+        font-size: 0.95rem;
+    }
+
+    .hero-badges {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+        margin-top: 1rem;
+    }
+
+    .badge-large {
+        background: linear-gradient(135deg, var(--accent-gold), #ffaa00);
+        color: var(--primary-dark);
+        padding: 0.75rem 1.5rem;
+        border-radius: 50px;
+        font-weight: 700;
+        font-size: 0.9rem;
+        box-shadow: 0 5px 20px rgba(255, 215, 0, 0.3);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+
+    .badge-status {
+        background: rgba(16, 185, 129, 0.2);
+        color: var(--success);
+        padding: 0.5rem 1rem;
+        border-radius: 50px;
+        font-size: 0.85rem;
+        border: 1px solid var(--success);
+    }
+
+    /* Quick Stats */
+    .quick-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 3rem;
+    }
+
+    .stat-card {
+        background: linear-gradient(135deg, rgba(255, 215, 0, 0.08) 0%, rgba(255, 215, 0, 0.02) 100%);
+        border: 1px solid rgba(255, 215, 0, 0.15);
+        border-radius: 15px;
+        padding: 1.5rem;
+        text-align: center;
+        transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        cursor: pointer;
+    }
+
+    .stat-card:hover {
+        transform: translateY(-10px);
+        border-color: rgba(255, 215, 0, 0.4);
+        box-shadow: 0 20px 40px rgba(255, 215, 0, 0.2);
+    }
+
+    .stat-icon {
+        font-size: 2rem;
+        margin-bottom: 0.5rem;
+        color: var(--accent-gold);
+    }
+
+    .stat-number {
+        font-size: 2rem;
+        font-weight: 800;
+        color: var(--accent-gold);
+        margin: 0.5rem 0;
+    }
+
+    .stat-label {
+        color: var(--text-muted);
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+
+    /* Belt Timeline */
+    .timeline-section {
+        margin-bottom: 3rem;
+    }
+
+    .section-title {
+        font-size: 1.8rem;
+        font-weight: 800;
+        margin-bottom: 2rem;
+        color: var(--accent-gold);
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .belt-progression {
+        display: flex;
+        gap: 0.5rem;
+        overflow-x: auto;
+        padding: 1rem 0;
+        background: linear-gradient(to right, transparent, rgba(255, 215, 0, 0.05), transparent);
+        border-radius: 15px;
+        padding: 2rem 1rem;
+        scroll-behavior: smooth;
+    }
+
+    .belt-item {
+        flex-shrink: 0;
+        width: 100px;
+        position: relative;
+        text-align: center;
+    }
+
+    .belt-visual {
+        width: 80px;
+        height: 120px;
+        margin: 0 auto 1rem;
+        border-radius: 8px;
+        position: relative;
+        overflow: hidden;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        transition: all 0.3s ease;
+        opacity: 0.5;
+    }
+
+    .belt-item.completed .belt-visual {
+        opacity: 1;
+        box-shadow: 0 15px 40px rgba(0, 0, 0, 0.5);
+    }
+
+    .belt-item.current .belt-visual {
+        opacity: 1;
+        box-shadow: 0 0 30px var(--accent-gold), 0 15px 40px rgba(0, 0, 0, 0.5);
+        animation: glow-pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes glow-pulse {
+        0%, 100% { box-shadow: 0 0 20px var(--accent-gold), 0 15px 40px rgba(0, 0, 0, 0.5); }
+        50% { box-shadow: 0 0 40px var(--accent-gold), 0 15px 40px rgba(0, 0, 0, 0.5); }
+    }
+
+    .belt-visual::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(135deg, rgba(255,255,255,0.2) 0%, transparent 50%, rgba(0,0,0,0.2) 100%);
+    }
+
+    .belt-name {
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        transition: all 0.3s ease;
+    }
+
+    .belt-item.current .belt-name {
+        color: var(--accent-gold);
+    }
+
+    /* Belt Colors */
+    .white-belt { background: linear-gradient(135deg, #f5f5f5, #e8e8e8); }
+    .gray-white-belt { background: linear-gradient(135deg, #d0d0d0, #808080); }
+    .gray-belt { background: linear-gradient(135deg, #707070, #404040); }
+    .gray-black-belt { background: linear-gradient(135deg, #303030, #000000); }
+    .yellow-white-belt { background: linear-gradient(135deg, #ffff99, #ffff00); }
+    .yellow-belt { background: linear-gradient(135deg, #ffff00, #ffcc00); }
+    .yellow-black-belt { background: linear-gradient(135deg, #ffff00, #000000); }
+    .orange-white-belt { background: linear-gradient(135deg, #ffdd99, #ff9900); }
+    .orange-belt { background: linear-gradient(135deg, #ff9900, #ff6600); }
+    .orange-black-belt { background: linear-gradient(135deg, #ff9900, #000000); }
+    .green-white-belt { background: linear-gradient(135deg, #99ff99, #00cc00); }
+    .green-belt { background: linear-gradient(135deg, #00ff00, #009900); }
+    .green-black-belt { background: linear-gradient(135deg, #00ff00, #000000); }
+    .blue-belt { background: linear-gradient(135deg, #3399ff, #0066cc); }
+    .purple-belt { background: linear-gradient(135deg, #9933ff, #6600cc); }
+    .brown-belt { background: linear-gradient(135deg, #996633, #664422); }
+    .black-belt { background: linear-gradient(135deg, #222222, #000000); }
+    .red-black-belt { background: linear-gradient(135deg, #ff0000, #000000); }
+    .red-white-belt { background: linear-gradient(135deg, #ff0000, #ffffff); }
+    .red-belt { background: linear-gradient(135deg, #ff3333, #cc0000); }
+
+    /* Journey Feed */
+    .journey-feed {
+        position: relative;
+        padding: 2rem 0;
+    }
+
+    .journey-feed::before {
+        content: '';
+        position: absolute;
+        left: 50%;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: linear-gradient(to bottom, var(--accent-gold), transparent);
+    }
+
+    .journey-event {
+        margin-bottom: 2rem;
+        position: relative;
+    }
+
+    .journey-event:nth-child(even) .event-content {
+        margin-left: auto;
+        padding-right: 0;
+        padding-left: 2rem;
+        text-align: right;
+    }
+
+    .journey-event:nth-child(odd) .event-content {
+        padding-left: 0;
+        padding-right: 2rem;
+        text-align: left;
+    }
+
+    .event-dot {
+        position: absolute;
+        left: 50%;
+        top: 0;
+        width: 20px;
+        height: 20px;
+        background: var(--accent-gold);
+        border: 4px solid var(--secondary-dark);
+        border-radius: 50%;
+        transform: translateX(-50%);
+        z-index: 10;
+        box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+    }
+
+    .event-content {
+        background: linear-gradient(135deg, rgba(255, 215, 0, 0.08) 0%, rgba(255, 215, 0, 0.02) 100%);
+        border: 1px solid rgba(255, 215, 0, 0.15);
+        border-radius: 12px;
+        padding: 1.5rem;
+        transition: all 0.3s ease;
+    }
+
+    .event-content:hover {
+        border-color: rgba(255, 215, 0, 0.4);
+        box-shadow: 0 10px 30px rgba(255, 215, 0, 0.1);
+        transform: translateY(-5px);
+    }
+
+    .event-date {
+        color: var(--accent-gold);
+        font-weight: 700;
+        font-size: 0.9rem;
+        text-transform: uppercase;
+    }
+
+    .event-title {
+        font-size: 1.2rem;
+        font-weight: 700;
+        margin: 0.5rem 0;
+        color: var(--text-light);
+    }
+
+    .event-description {
+        color: var(--text-muted);
+        font-size: 0.9rem;
+    }
+
+    /* Analytics Section */
+    .analytics-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 2rem;
+        margin-bottom: 3rem;
+    }
+
+    .analytics-card {
+        background: linear-gradient(135deg, rgba(255, 215, 0, 0.08) 0%, rgba(255, 215, 0, 0.02) 100%);
+        border: 1px solid rgba(255, 215, 0, 0.15);
+        border-radius: 15px;
+        padding: 2rem;
+        transition: all 0.3s ease;
+    }
+
+    .analytics-card:hover {
+        border-color: rgba(255, 215, 0, 0.4);
+        box-shadow: 0 15px 40px rgba(255, 215, 0, 0.1);
+    }
+
+    .analytics-label {
+        color: var(--text-muted);
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 1rem;
+    }
+
+    .analytics-value {
+        font-size: 2.5rem;
+        font-weight: 800;
+        color: var(--accent-gold);
+        margin-bottom: 1rem;
+    }
+
+    .progress-bar-container {
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 10px;
+        height: 8px;
+        overflow: hidden;
+        margin: 1rem 0;
+    }
+
+    .progress-bar {
+        height: 100%;
+        background: linear-gradient(90deg, var(--accent-gold), #ffaa00);
+        transition: width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+        border-radius: 10px;
+    }
+
+    .readiness-notes {
+        margin-top: 1rem;
+        font-size: 0.85rem;
+    }
+
+    .readiness-note {
+        color: var(--text-muted);
+        padding: 0.5rem 0;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .readiness-note i {
+        color: var(--accent-gold);
+        font-size: 0.8rem;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+        .hero-content {
+            grid-template-columns: 1fr;
+            text-align: center;
+        }
+
+        .hero-avatar {
+            margin: 0 auto;
+        }
+
+        .hero-info h1 {
+            font-size: 1.8rem;
+        }
+
+        .quick-stats {
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+        }
+
+        .journey-feed::before {
+            left: 20px;
+        }
+
+        .journey-event:nth-child(even) .event-content,
+        .journey-event:nth-child(odd) .event-content {
+            margin-left: 60px;
+            padding: 1rem;
+            text-align: left;
+        }
+
+        .event-dot {
+            left: 20px;
+        }
+
+        .belt-progression {
+            justify-content: flex-start;
+        }
+
+        .analytics-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    @media (max-width: 480px) {
+        .hero-section {
+            padding: 2rem 1rem;
+        }
+
+        .hero-info h1 {
+            font-size: 1.5rem;
+        }
+
+        .quick-stats {
+            grid-template-columns: 1fr;
+        }
+
+        .stat-card {
+            padding: 1rem;
+        }
+
+        .stat-icon {
+            font-size: 1.5rem;
+        }
+
+        .stat-number {
+            font-size: 1.5rem;
+        }
+    }
+</style>
+
+<div class="journey-container">
+    <div class="container">
+        <!-- Hero Section -->
+        <div class="hero-section">
+            <div class="hero-content">
+                <div class="hero-avatar">
+                    {% if member.photo_url %}
+                        <img src="{{ member.photo_url }}" alt="{{ member.first_name }}">
+                    {% else %}
+                        {{ member.first_name|slice:":1"|upper }}{{ member.last_name|slice:":1"|upper }}
+                    {% endif %}
+                </div>
+                <div class="hero-info">
+                    <h1>{{ member.first_name|capfirst }} {{ member.last_name|capfirst }}</h1>
+                    <p><strong>Academy:</strong> Gracie Jiu-Jitsu Academy</p>
+                    <p><strong>Member Since:</strong> {{ join_date|date:"F d, Y" }}</p>
+                    <p><strong>Training Duration:</strong> {{ years_training }} years</p>
+                    
+                    <div class="hero-badges">
+                        <div class="badge-large">{{ current_rank }}</div>
+                        <div class="badge-status">
+                            <i class="fas fa-check-circle"></i> Active Member
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Stats -->
+        <div class="quick-stats">
+            <div class="stat-card">
+                <div class="stat-icon">📚</div>
+                <div class="stat-number">{{ total_classes }}</div>
+                <div class="stat-label">Classes Attended</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">⏱️</div>
+                <div class="stat-number">{{ total_training_hours }}h</div>
+                <div class="stat-label">Training Hours</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">📈</div>
+                <div class="stat-number">{{ classes_since_promotion }}</div>
+                <div class="stat-label">Classes Since Promotion</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">⏳</div>
+                <div class="stat-number">{{ days_since_promotion|add:"d" }}</div>
+                <div class="stat-label">Time in Current Rank</div>
+            </div>
+        </div>
+
+        <!-- Belt Progression Timeline -->
+        <div class="timeline-section">
+            <h2 class="section-title">
+                <i class="fas fa-belt-karate"></i> Belt Progression
+            </h2>
+            <div class="belt-progression">
+                {% for belt in belt_timeline_data %}
+                    <div class="belt-item {% if belt.is_completed %}completed{% endif %} {% if belt.is_current %}current{% endif %}">
+                        <div class="belt-visual {{ belt.rank }}-belt"></div>
+                        <div class="belt-name">{{ belt.display_name }}</div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Promotion History Timeline -->
+        {% if promotion_timeline %}
+        <div class="timeline-section">
+            <h2 class="section-title">
+                <i class="fas fa-star"></i> Promotion Milestones
+            </h2>
+            <div class="journey-feed">
+                {% for milestone in promotion_timeline %}
+                    <div class="journey-event">
+                        <div class="event-dot"></div>
+                        <div class="event-content">
+                            <div class="event-date">{{ milestone.promotion.promotion_date|date:"F d, Y" }}</div>
+                            <div class="event-title">{{ milestone.new_rank_display }}</div>
+                            <div class="event-description">
+                                <p><strong>From:</strong> {{ milestone.old_rank_display }}</p>
+                                <p><strong>Promoted by:</strong> {{ milestone.promoted_by_name }}</p>
+                                <p><strong>Time in Rank:</strong> 
+                                    {% if milestone.is_current %}
+                                        {{ milestone.time_in_rank_months }} months (ongoing)
+                                    {% else %}
+                                        {{ milestone.time_in_rank_months }} months
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Journey Events Feed -->
+        {% if journey_events %}
+        <div class="timeline-section">
+            <h2 class="section-title">
+                <i class="fas fa-map-pin"></i> Your Journey
+            </h2>
+            <div class="journey-feed">
+                {% for event in journey_events %}
+                    <div class="journey-event">
+                        <div class="event-dot"></div>
+                        <div class="event-content">
+                            <div class="event-date">{{ event.date|date:"F d, Y" }}</div>
+                            <div class="event-title">
+                                <i class="fas {{ event.icon }}"></i> {{ event.title }}
+                            </div>
+                            <div class="event-description">{{ event.description }}</div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Analytics & Progress -->
+        <div class="timeline-section">
+            <h2 class="section-title">
+                <i class="fas fa-chart-line"></i> Progress Analytics
+            </h2>
+            <div class="analytics-grid">
+                <!-- Promotion Readiness -->
+                <div class="analytics-card">
+                    <div class="analytics-label">Promotion Readiness Score</div>
+                    <div class="analytics-value">{{ readiness_score }}%</div>
+                    <div class="progress-bar-container">
+                        <div class="progress-bar" style="width: {{ readiness_score }}%"></div>
+                    </div>
+                    <div style="color: var(--text-muted); text-align: center; margin: 1rem 0;">
+                        <strong style="color: var(--accent-gold);">{{ readiness_level }}</strong>
+                    </div>
+                    <div class="readiness-notes">
+                        {% for note in readiness_notes %}
+                            <div class="readiness-note">
+                                <i class="fas fa-check"></i>
+                                {{ note }}
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Belt Age -->
+                <div class="analytics-card">
+                    <div class="analytics-label">Time in Current Rank</div>
+                    <div class="analytics-value">{{ days_since_promotion }}</div>
+                    <div style="color: var(--text-muted); font-size: 0.9rem;">
+                        {% if days_since_promotion < 30 %}
+                            <strong style="color: var(--info);">Building foundation</strong>
+                        {% elif days_since_promotion < 90 %}
+                            <strong style="color: var(--warning);">Growing strong</strong>
+                        {% elif days_since_promotion < 180 %}
+                            <strong style="color: var(--success);">Nearly ready</strong>
+                        {% else %}
+                            <strong style="color: var(--accent-gold);">Ready for next level!</strong>
+                        {% endif %}
+                    </div>
+                    <p style="margin-top: 1rem; color: var(--text-muted); font-size: 0.85rem;">
+                        days since promotion
+                    </p>
+                </div>
+
+                <!-- Attendance Trend -->
+                <div class="analytics-card">
+                    <div class="analytics-label">Attendance Trend</div>
+                    <div style="margin: 1.5rem 0;">
+                        <div style="margin-bottom: 1rem;">
+                            <div style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 0.25rem;">Last 30 Days</div>
+                            <div class="analytics-value" style="font-size: 1.8rem;">{{ attendance_trend.last_30 }}</div>
+                        </div>
+                        <div style="margin-bottom: 1rem;">
+                            <div style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 0.25rem;">Last 90 Days</div>
+                            <div class="analytics-value" style="font-size: 1.8rem;">{{ attendance_trend.last_90 }}</div>
+                        </div>
+                        <div>
+                            <div style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 0.25rem;">This Month</div>
+                            <div class="analytics-value" style="font-size: 1.8rem;">{{ attendance_trend.current_month }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Future Projection -->
+        <div class="timeline-section">
+            <h2 class="section-title">
+                <i class="fas fa-telescope"></i> Road to Black Belt
+            </h2>
+            <div class="analytics-card" style="padding: 2.5rem;">
+                <div class="analytics-label">Estimated Next Promotion</div>
+                <div class="analytics-value">{{ estimated_promotion_date|date:"M d, Y" }}</div>
+                <p style="color: var(--text-muted); margin-top: 1rem;">
+                    Based on current training pace, you're estimated to achieve your next promotion in approximately 
+                    <strong style="color: var(--accent-gold);">{{ estimated_months_to_next }} months</strong>.
+                </p>
+                <div style="margin-top: 2rem; padding-top: 2rem; border-top: 1px solid rgba(255, 215, 0, 0.2);">
+                    <h4 style="color: var(--accent-gold); margin-bottom: 1rem;">Remaining Journey to Black Belt:</h4>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem;">
+                        {% for belt in belt_timeline_data %}
+                            {% if not belt.is_completed %}
+                                <div style="background: rgba(255, 215, 0, 0.05); border: 1px solid rgba(255, 215, 0, 0.15); border-radius: 10px; padding: 1rem; text-align: center;">
+                                    <div style="color: var(--text-muted); font-size: 0.85rem;">{{ belt.display_name }}</div>
+                                    <div class="belt-visual {{ belt.rank }}-belt" style="width: 60px; height: 80px; margin: 0.5rem auto;"></div>
+                                </div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Back Button -->
+        <div style="text-align: center; margin-top: 3rem; margin-bottom: 2rem;">
+            <a href="{% url 'viewMember' member.id %}" class="btn btn-outline-secondary btn-lg">
+                <i class="fas fa-arrow-left me-2"></i> Back to Member Profile
+            </a>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Scroll to Timeline on Page Load
+    document.addEventListener('DOMContentLoaded', function() {
+        // Add hover animations
+        document.querySelectorAll('.stat-card').forEach(card => {
+            card.addEventListener('mouseenter', function() {
+                this.style.transform = 'translateY(-10px)';
+            });
+            card.addEventListener('mouseleave', function() {
+                this.style.transform = 'translateY(0)';
+            });
+        });
+
+        // Smooth scroll for belt progression
+        const beltProgression = document.querySelector('.belt-progression');
+        if (beltProgression) {
+            const scrollToCurrentBelt = () => {
+                const currentBelt = document.querySelector('.belt-item.current');
+                if (currentBelt) {
+                    currentBelt.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'nearest',
+                        inline: 'center'
+                    });
+                }
+            };
+            // Scroll to current belt after a small delay to ensure DOM is ready
+            setTimeout(scrollToCurrentBelt, 500);
+        }
+
+        // Animate progress bars
+        const animateProgressBars = () => {
+            document.querySelectorAll('.progress-bar').forEach(bar => {
+                const targetWidth = bar.style.width;
+                bar.style.width = '0%';
+                setTimeout(() => {
+                    bar.style.width = targetWidth;
+                }, 100);
+            });
+        };
+        setTimeout(animateProgressBars, 500);
+    });
+
+    // Add tooltip initialization if using Bootstrap
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+</script>
+
+{% endblock %}

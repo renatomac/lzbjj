@@ -694,6 +694,247 @@ def deletePromotion(request, promotion_id):
     
 
 
+
+def student_journey(request, member_id):
+    """
+    Display a comprehensive Student Journey page showing BJJ progression.
+    Includes hero section, belt timeline, analytics, and future projections.
+    """
+    member = get_object_or_404(Member, id=member_id)
+    today = timezone.localdate()
+    
+    # --- Basic Member Info ---
+    current_rank = makeRank(member.belt_rank, member.stripes)
+    
+    # --- Training Duration ---
+    # Convert join_date to date if it's a datetime object
+    if member.join_date:
+        join_date = member.join_date.date() if isinstance(member.join_date, datetime) else member.join_date
+    else:
+        join_date = today
+    training_duration = today - join_date
+    years_training = training_duration.days / 365.25
+    
+    # --- Promotions Data ---
+    promotions = BeltPromotion.objects.filter(member=member).select_related('promoted_by').order_by('promotion_date')
+    
+    # Build promotion timeline with enhanced data
+    promotion_timeline = []
+    for i, promo in enumerate(promotions):
+        # Calculate time spent in this rank
+        if i < len(promotions) - 1:
+            next_promo_date = promotions[i + 1].promotion_date
+            time_in_rank = (next_promo_date - promo.promotion_date).days
+        else:
+            # Current rank
+            time_in_rank = (today - promo.promotion_date).days
+        
+        promotion_timeline.append({
+            'promotion': promo,
+            'time_in_rank_days': time_in_rank,
+            'time_in_rank_months': round(time_in_rank / 30.44, 1),
+            'time_in_rank_years': round(time_in_rank / 365.25, 2),
+            'promoted_by_name': f"{promo.promoted_by.first_name} {promo.promoted_by.last_name}" if promo.promoted_by else "Unknown",
+            'old_rank_display': makeRank(promo.old_rank, promo.old_stripes),
+            'new_rank_display': makeRank(promo.new_rank, promo.new_stripes),
+            'is_current': i == len(promotions) - 1,
+        })
+    
+    # --- Attendance Stats ---
+    attendances = SessionAttendance.objects.filter(
+        member=member,
+        present=True,
+        session__is_canceled=False
+    )
+    
+    # Total classes
+    total_classes = attendances.count()
+    
+    # Calculate training hours (estimate 1.5 hours per class)
+    total_training_hours = round(total_classes * 1.5, 1)
+    
+    # Classes since last promotion
+    if promotions.exists():
+        last_promotion_date = promotions.last().promotion_date
+        classes_since_promotion = attendances.filter(
+            session__date__gte=last_promotion_date
+        ).count()
+        days_since_promotion = (today - last_promotion_date).days
+    else:
+        classes_since_promotion = total_classes
+        days_since_promotion = training_duration.days
+    
+    # --- Analytics Data ---
+    current_month_start = date(today.year, today.month, 1)
+    current_month_classes = attendances.filter(
+        session__date__gte=current_month_start
+    ).count()
+    
+    # Monthly attendance for chart (last 12 months)
+    monthly_data = []
+    for i in range(11, -1, -1):
+        month_date = today - timedelta(days=30*i)
+        month_start = date(month_date.year, month_date.month, 1)
+        last_day = calendar.monthrange(month_date.year, month_date.month)[1]
+        month_end = date(month_date.year, month_date.month, last_day)
+        
+        month_count = attendances.filter(
+            session__date__gte=month_start,
+            session__date__lte=month_end
+        ).count()
+        
+        monthly_data.append({
+            'month': month_date.strftime('%b'),
+            'count': month_count,
+            'full_date': month_start
+        })
+    
+    # --- Attendance Trend ---
+    # Last 30 days
+    last_30_days_start = today - timedelta(days=30)
+    last_30_classes = attendances.filter(
+        session__date__gte=last_30_days_start
+    ).count()
+    
+    # Last 90 days
+    last_90_days_start = today - timedelta(days=90)
+    last_90_classes = attendances.filter(
+        session__date__gte=last_90_days_start
+    ).count()
+    
+    attendance_trend = {
+        'last_30': last_30_classes,
+        'last_90': last_90_classes,
+        'current_month': current_month_classes,
+    }
+    
+    # --- Promotion Readiness Score ---
+    # Based on classes attended, consistency, and time in rank
+    readiness_score = 0
+    readiness_notes = []
+    
+    if total_classes >= 50:
+        readiness_score += 25
+        readiness_notes.append("Excellent training volume")
+    elif total_classes >= 25:
+        readiness_score += 15
+        readiness_notes.append("Good training volume")
+    else:
+        readiness_notes.append("Build training consistency")
+    
+    if current_month_classes >= 8:
+        readiness_score += 25
+        readiness_notes.append("Consistent monthly training")
+    elif current_month_classes >= 4:
+        readiness_score += 15
+        readiness_notes.append("Moderate monthly activity")
+    else:
+        readiness_notes.append("Increase monthly attendance")
+    
+    if days_since_promotion >= 180:  # 6 months
+        readiness_score += 25
+        readiness_notes.append("Sufficient time in rank")
+    elif days_since_promotion >= 90:  # 3 months
+        readiness_score += 15
+        readiness_notes.append("Building time in rank")
+    else:
+        readiness_notes.append("Continue training to build rank time")
+    
+    if last_30_classes >= 6:
+        readiness_score += 25
+        readiness_notes.append("Excellent recent consistency")
+    else:
+        readiness_score += 10
+    
+    readiness_score = min(100, readiness_score)
+    readiness_level = "Excellent" if readiness_score >= 80 else "Good" if readiness_score >= 60 else "Building"
+    readiness_color = "success" if readiness_score >= 80 else "warning" if readiness_score >= 60 else "info"
+    
+    # --- Estimated Time to Next Belt ---
+    if promotions.exists():
+        avg_time_per_belt = training_duration.days / len(promotions)
+    else:
+        avg_time_per_belt = 365  # Default 1 year
+    
+    estimated_months_to_next = round(avg_time_per_belt / 30.44)
+    estimated_promotion_date = today + timedelta(days=avg_time_per_belt)
+    
+    # --- Journey Events Feed ---
+    journey_events = []
+    
+    # Joined academy event
+    journey_events.append({
+        'date': join_date,
+        'title': 'Joined Academy',
+        'description': f'Started BJJ journey at the academy',
+        'icon': 'fa-door-open',
+        'type': 'join',
+    })
+    
+    # Promotion events
+    for promo in promotions:
+        old_rank_display = makeRank(promo.old_rank, promo.old_stripes)
+        new_rank_display = makeRank(promo.new_rank, promo.new_stripes)
+        journey_events.append({
+            'date': promo.promotion_date,
+            'title': f'Promoted to {new_rank_display}',
+            'description': f'Promoted by {promo.promoted_by.first_name if promo.promoted_by else "Instructor"}',
+            'icon': 'fa-star',
+            'type': 'promotion',
+            'old_rank': old_rank_display,
+            'new_rank': new_rank_display,
+        })
+    
+    # Sort by date
+    journey_events.sort(key=lambda x: x['date'])
+    
+    # --- Belt Progression Data ---
+    # Adult belt order for timeline
+    belt_order = BeltPromotion.get_belt_order_for_member(member)
+    current_belt_index = belt_order.index(member.belt_rank) if member.belt_rank in belt_order else 0
+    
+    belt_timeline_data = []
+    for i, belt in enumerate(belt_order):
+        is_completed = i < current_belt_index or (i == current_belt_index)
+        promo = next((p for p in promotions if p.new_rank == belt), None)
+        
+        belt_timeline_data.append({
+            'rank': belt,
+            'display_name': belt.replace('-', ' ').title(),
+            'is_completed': is_completed,
+            'is_current': i == current_belt_index,
+            'promotion': promo,
+            'promotion_date': promo.promotion_date if promo else None,
+            'order_index': i,
+        })
+    
+    context = {
+        'member': member,
+        'current_rank': current_rank,
+        'years_training': round(years_training, 1),
+        'training_duration': training_duration,
+        'total_classes': total_classes,
+        'total_training_hours': total_training_hours,
+        'classes_since_promotion': classes_since_promotion,
+        'days_since_promotion': days_since_promotion,
+        'promotion_timeline': promotion_timeline,
+        'journey_events': journey_events,
+        'monthly_data': monthly_data,
+        'attendance_trend': attendance_trend,
+        'readiness_score': readiness_score,
+        'readiness_level': readiness_level,
+        'readiness_color': readiness_color,
+        'readiness_notes': readiness_notes,
+        'estimated_months_to_next': estimated_months_to_next,
+        'estimated_promotion_date': estimated_promotion_date,
+        'belt_timeline_data': belt_timeline_data,
+        'promotions': promotions,
+        'join_date': join_date,
+    }
+    
+    return render(request, 'members/student_journey.html', context)
+
+
 def addClasses(request):
     if request.method == 'POST':
         form = ClassForm(request.POST)
