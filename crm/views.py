@@ -1102,8 +1102,12 @@ def toggleStatus(request, type, member_id):
 
     if instance.is_active:
         instance.is_active = False
+        if hasattr(instance, "lifecycle_status"):
+            instance.lifecycle_status = Member.LifecycleStatus.INACTIVE
     else:
         instance.is_active = True
+        if hasattr(instance, "lifecycle_status") and instance.lifecycle_status == Member.LifecycleStatus.INACTIVE:
+            instance.lifecycle_status = Member.LifecycleStatus.ACTIVE
     instance.save()
     return JsonResponse({"active": instance.is_active})
 
@@ -1935,7 +1939,7 @@ def trial_action(request, member_id, action):
     except (ValueError, Plan.DoesNotExist):
         messages.error(request, "This trial action is no longer available.")
 
-    return redirect(request.POST.get("next") or "waivers")
+    return redirect("waivers")
 
 def member_autocomplete(request):
     q = request.GET.get("q", "").strip()
