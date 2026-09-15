@@ -1,80 +1,632 @@
 {% extends 'layout.html' %}
 
-{% block title %}Running {{ timer.name }}{% endblock %}
+{% block title %}{{ timer.name }} · Timer{% endblock %}
 {% block header_title %}{{ timer.name }}{% endblock %}
 
 {% block extra_head %}
+<!-- High-contrast athletic & digital fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=Oswald:wght@600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+
 <style>
-    .timer-display {
-        font-size: clamp(4rem, 20vw, 15rem);
-        font-family: monospace;
-        font-weight: bold;
-        line-height: 1;
-        transition: color 0.3s ease;
+    /* ==========================================================================
+       Timer Modern Dark & Responsive Design System
+       ========================================================================== */
+    :root {
+        --timer-bg: #0d1117;
+        --timer-card-bg: rgba(22, 27, 34, 0.95);
+        --timer-card-border: rgba(255, 255, 255, 0.08);
+        --color-work: #10b981;
+        --color-work-glow: rgba(16, 185, 129, 0.35);
+        --color-rest: #ef4444;
+        --color-rest-glow: rgba(239, 68, 68, 0.35);
+        --color-paused: #eab308;
+        --color-paused-glow: rgba(234, 179, 8, 0.25);
+        --color-ready: #94a3b8;
+        --color-ready-glow: rgba(148, 163, 184, 0.2);
+        --color-done: #38bdf8;
+        --color-done-glow: rgba(56, 189, 248, 0.35);
     }
-    .state-work { color: #198754; }
-    .state-rest { color: #dc3545; }
-    .state-paused { color: #6c757d; }
-    
-    .status-text {
-        font-size: 2rem;
+
+    /* Outer Wrapper */
+    .timer-app-wrapper {
+        width: 100%;
+        max-width: 1000px;
+        margin: 0 auto;
+        transition: all 0.3s ease;
+    }
+
+    /* Main Timer Box */
+    .timer-card {
+        background: var(--timer-card-bg);
+        border: 1px solid var(--timer-card-border);
+        border-radius: clamp(16px, 2.5vw, 28px);
+        box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.7), 0 0 50px -10px var(--glow-current, rgba(0,0,0,0.2));
+        color: #f1f5f9;
+        overflow: hidden;
+        position: relative;
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        transition: box-shadow 0.4s ease, border-color 0.4s ease;
+    }
+
+    .timer-card.state-work {
+        --glow-current: var(--color-work-glow);
+        border-color: rgba(16, 185, 129, 0.4);
+    }
+    .timer-card.state-rest {
+        --glow-current: var(--color-rest-glow);
+        border-color: rgba(239, 68, 68, 0.4);
+    }
+    .timer-card.state-paused {
+        --glow-current: var(--color-paused-glow);
+        border-color: rgba(234, 179, 8, 0.3);
+    }
+    .timer-card.state-ready {
+        --glow-current: var(--color-ready-glow);
+        border-color: var(--timer-card-border);
+    }
+    .timer-card.state-done {
+        --glow-current: var(--color-done-glow);
+        border-color: rgba(56, 189, 248, 0.4);
+    }
+
+    /* Top Utility Toolbar */
+    .timer-toolbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: clamp(0.75rem, 2vmin, 1.25rem) clamp(1rem, 3vmin, 2rem);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        background: rgba(0, 0, 0, 0.2);
+    }
+
+    .timer-title {
+        font-family: 'Oswald', sans-serif;
+        font-size: clamp(1rem, 2.5vmin, 1.4rem);
         font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 2px;
+        letter-spacing: 0.5px;
+        color: #e2e8f0;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 8px;
     }
-    
-    /* Style the Cast button to match your design */
-    #castButton {
-        background-color: #4285F4;
-        color: white;
-        border: none;
-        padding: 12px 24px;
-        font-size: 1.25rem;
+
+    .toolbar-tools {
+        display: flex;
+        align-items: center;
+        gap: clamp(6px, 1.5vmin, 12px);
+    }
+
+    .tool-btn {
+        background: rgba(255, 255, 255, 0.08);
+        color: #cbd5e1;
+        border: 1px solid rgba(255, 255, 255, 0.12);
         border-radius: 8px;
+        padding: clamp(6px, 1.2vmin, 8px) clamp(10px, 1.8vmin, 14px);
+        font-size: clamp(0.8rem, 1.8vmin, 1rem);
         cursor: pointer;
-        transition: background-color 0.3s;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.2s ease;
+        text-decoration: none;
+        user-select: none;
     }
-    #castButton:hover {
-        background-color: #3367D6;
+    .tool-btn:hover {
+        background: rgba(255, 255, 255, 0.18);
+        color: #fff;
+        border-color: rgba(255, 255, 255, 0.25);
+    }
+    .tool-btn.active {
+        background: rgba(16, 185, 129, 0.25);
+        color: #34d399;
+        border-color: rgba(16, 185, 129, 0.5);
+    }
+    .tool-btn.muted {
+        background: rgba(239, 68, 68, 0.2);
+        color: #f87171;
+        border-color: rgba(239, 68, 68, 0.4);
+    }
+
+    /* Screen Wake Lock Badge */
+    .wakelock-badge {
+        font-size: clamp(0.7rem, 1.4vmin, 0.85rem);
+        padding: 4px 10px;
+        border-radius: 20px;
+        background: rgba(255, 255, 255, 0.06);
+        color: #94a3b8;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.3s ease;
+        cursor: pointer;
+        user-select: none;
+    }
+    .wakelock-badge.active {
+        background: rgba(16, 185, 129, 0.15);
+        color: #10b981;
+        border-color: rgba(16, 185, 129, 0.3);
+    }
+    .wakelock-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background-color: #64748b;
+        transition: background-color 0.3s ease;
+    }
+    .wakelock-badge.active .wakelock-dot {
+        background-color: #10b981;
+        box-shadow: 0 0 8px #10b981;
+        animation: pulseDot 2s infinite ease-in-out;
+    }
+    @keyframes pulseDot {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.5; transform: scale(0.85); }
+    }
+
+    /* Main Display Area */
+    .timer-core-section {
+        padding: clamp(1.5rem, 4vmin, 3.5rem) clamp(1rem, 3vmin, 2.5rem);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+    }
+
+    /* Status & Phase Badge */
+    .phase-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: clamp(6px, 1.2vmin, 10px) clamp(18px, 3vmin, 32px);
+        border-radius: 9999px;
+        font-family: 'Oswald', sans-serif;
+        font-size: clamp(1.2rem, 3.5vmin, 2.2rem);
+        font-weight: 700;
+        letter-spacing: clamp(2px, 0.5vmin, 4px);
+        text-transform: uppercase;
+        margin-bottom: clamp(0.5rem, 1.5vmin, 1rem);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        min-width: clamp(140px, 25vmin, 220px);
+    }
+    .phase-badge.state-work {
+        background: rgba(16, 185, 129, 0.15);
+        color: #10b981;
+        border: 1px solid rgba(16, 185, 129, 0.4);
+        box-shadow: 0 0 20px rgba(16, 185, 129, 0.2);
+    }
+    .phase-badge.state-rest {
+        background: rgba(239, 68, 68, 0.15);
+        color: #ef4444;
+        border: 1px solid rgba(239, 68, 68, 0.4);
+        box-shadow: 0 0 20px rgba(239, 68, 68, 0.2);
+    }
+    .phase-badge.state-paused {
+        background: rgba(234, 179, 8, 0.15);
+        color: #eab308;
+        border: 1px solid rgba(234, 179, 8, 0.4);
+        box-shadow: 0 0 15px rgba(234, 179, 8, 0.15);
+    }
+    .phase-badge.state-ready {
+        background: rgba(148, 163, 184, 0.12);
+        color: #94a3b8;
+        border: 1px solid rgba(148, 163, 184, 0.25);
+    }
+    .phase-badge.state-done {
+        background: rgba(56, 189, 248, 0.15);
+        color: #38bdf8;
+        border: 1px solid rgba(56, 189, 248, 0.4);
+        box-shadow: 0 0 25px rgba(56, 189, 248, 0.25);
+    }
+
+    /* Round Tracker */
+    .round-meta-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        margin-bottom: clamp(0.5rem, 1.5vmin, 1.25rem);
+    }
+    .round-indicator {
+        font-family: 'Chakra Petch', sans-serif;
+        font-size: clamp(1rem, 2.8vmin, 1.75rem);
+        font-weight: 600;
+        color: #94a3b8;
+        letter-spacing: 1px;
+    }
+    .round-pills {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: clamp(4px, 1vmin, 8px);
+        max-width: 90%;
+        margin-top: 4px;
+    }
+    .round-dot {
+        width: clamp(8px, 1.8vmin, 14px);
+        height: clamp(8px, 1.8vmin, 14px);
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.12);
+        transition: all 0.3s ease;
+    }
+    .round-dot.completed {
+        background: #10b981;
+        box-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
+    }
+    .round-dot.current {
+        background: #f1f5f9;
+        transform: scale(1.25);
+        box-shadow: 0 0 8px #ffffff;
+    }
+
+    /* Giant Digital Countdown */
+    .timer-display-wrapper {
+        position: relative;
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin: clamp(0.5rem, 1.5vmin, 1.5rem) 0;
+    }
+    .timer-display {
+        font-family: 'Share Tech Mono', monospace;
+        font-variant-numeric: tabular-nums;
+        font-size: clamp(4.5rem, 22vmin, 16rem);
+        font-weight: 700;
+        line-height: 0.95;
+        letter-spacing: clamp(-2px, -0.4vmin, -8px);
+        color: #ffffff;
+        text-shadow: 0 0 30px rgba(0, 0, 0, 0.8);
+        transition: color 0.3s ease, text-shadow 0.3s ease;
+        user-select: none;
+    }
+    .timer-display.state-work {
+        color: #10b981;
+        text-shadow: 0 0 clamp(20px, 4vmin, 60px) rgba(16, 185, 129, 0.4);
+    }
+    .timer-display.state-rest {
+        color: #ef4444;
+        text-shadow: 0 0 clamp(20px, 4vmin, 60px) rgba(239, 68, 68, 0.4);
+    }
+    .timer-display.state-paused {
+        color: #eab308;
+        text-shadow: 0 0 clamp(15px, 3vmin, 40px) rgba(234, 179, 8, 0.3);
+    }
+    .timer-display.state-ready {
+        color: #cbd5e1;
+    }
+    .timer-display.state-done {
+        color: #38bdf8;
+        text-shadow: 0 0 clamp(25px, 5vmin, 70px) rgba(56, 189, 248, 0.5);
+    }
+
+    /* Interval Progress Bar */
+    .progress-container {
+        width: min(90%, 650px);
+        height: clamp(6px, 1.4vmin, 12px);
+        background: rgba(255, 255, 255, 0.08);
+        border-radius: 9999px;
+        overflow: hidden;
+        margin-top: clamp(0.5rem, 1.5vmin, 1.5rem);
+        box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.4);
+    }
+    .progress-bar-fill {
+        height: 100%;
+        width: 100%;
+        border-radius: 9999px;
+        background: #10b981;
+        transition: width 0.15s linear, background-color 0.4s ease;
+        box-shadow: 0 0 10px currentColor;
+    }
+    .progress-bar-fill.state-work { background: #10b981; }
+    .progress-bar-fill.state-rest { background: #ef4444; }
+    .progress-bar-fill.state-paused { background: #eab308; }
+    .progress-bar-fill.state-ready { background: #64748b; }
+    .progress-bar-fill.state-done { background: #38bdf8; }
+
+    /* Action Control Buttons - Large & Touch Friendly */
+    .controls-wrapper {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        align-items: center;
+        gap: clamp(10px, 2.5vmin, 24px);
+        margin-top: clamp(1.5rem, 3.5vmin, 3rem);
+        width: 100%;
+    }
+
+    .btn-timer {
+        font-family: 'Oswald', sans-serif;
+        font-size: clamp(1.1rem, 2.8vmin, 1.65rem);
+        font-weight: 600;
+        letter-spacing: 1px;
+        padding: clamp(0.75rem, 2vmin, 1.25rem) clamp(1.5rem, 4.5vmin, 3.25rem);
+        border-radius: clamp(12px, 2vmin, 18px);
+        border: none;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: clamp(8px, 1.5vmin, 12px);
+        box-shadow: 0 8px 20px -4px rgba(0, 0, 0, 0.5);
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        min-width: clamp(130px, 24vmin, 200px);
+        user-select: none;
+        outline: none;
+    }
+    .btn-timer:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 12px 25px -4px rgba(0, 0, 0, 0.65);
+    }
+    .btn-timer:active:not(:disabled) {
+        transform: translateY(1px);
+        box-shadow: 0 4px 10px -2px rgba(0, 0, 0, 0.5);
+    }
+    .btn-timer:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+        transform: none;
+    }
+
+    .btn-timer-start {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        color: #ffffff;
+    }
+    .btn-timer-start:hover:not(:disabled) {
+        background: linear-gradient(135deg, #34d399 0%, #10b981 100%);
+    }
+
+    .btn-timer-pause {
+        background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+        color: #ffffff;
+    }
+    .btn-timer-pause:hover:not(:disabled) {
+        background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+    }
+
+    .btn-timer-reset {
+        background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+        color: #ffffff;
+    }
+    .btn-timer-reset:hover:not(:disabled) {
+        background: linear-gradient(135deg, #f87171 0%, #ef4444 100%);
+    }
+
+    /* Google Cast Launcher Integration */
+    google-cast-launcher {
+        --connected-color: #38bdf8;
+        --disconnected-color: #cbd5e1;
+        width: clamp(38px, 6vmin, 52px);
+        height: clamp(38px, 6vmin, 52px);
+        padding: 6px;
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: clamp(10px, 1.8vmin, 14px);
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+    }
+    google-cast-launcher:hover {
+        background: rgba(255, 255, 255, 0.16);
+        border-color: rgba(255, 255, 255, 0.3);
+    }
+
+    /* Bottom Info & Shortcuts hint */
+    .timer-footer {
+        padding: clamp(0.75rem, 1.8vmin, 1.25rem) clamp(1rem, 3vmin, 2rem);
+        background: rgba(0, 0, 0, 0.25);
+        border-top: 1px solid rgba(255, 255, 255, 0.06);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: clamp(0.75rem, 1.6vmin, 0.95rem);
+        color: #64748b;
+    }
+
+    .shortcut-hints {
+        display: flex;
+        gap: 12px;
+    }
+    .shortcut-kbd {
+        background: rgba(255, 255, 255, 0.08);
+        color: #94a3b8;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-family: monospace;
+        font-size: 0.8em;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    /* ==========================================================================
+       Fullscreen Immersion Mode (Native + CSS Fallback for all devices)
+       ========================================================================== */
+    body.timer-in-fullscreen {
+        overflow: hidden !important;
+    }
+
+    :fullscreen .timer-card,
+    :-webkit-full-screen .timer-card,
+    .timer-card:fullscreen,
+    .timer-card:-webkit-full-screen,
+    .timer-card.is-fullscreen {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        max-width: 100vw !important;
+        max-height: 100vh !important;
+        border-radius: 0 !important;
+        border: none !important;
+        z-index: 99999 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: space-between !important;
+        background: #06090e !important;
+        margin: 0 !important;
+    }
+
+    :fullscreen .timer-core-section,
+    :-webkit-full-screen .timer-core-section,
+    .timer-card:fullscreen .timer-core-section,
+    .timer-card:-webkit-full-screen .timer-core-section,
+    .timer-card.is-fullscreen .timer-core-section {
+        flex: 1 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: center !important;
+        padding: clamp(1rem, 3vmin, 2.5rem) !important;
+    }
+
+    :fullscreen .timer-display,
+    :-webkit-full-screen .timer-display,
+    .timer-card:fullscreen .timer-display,
+    .timer-card:-webkit-full-screen .timer-display,
+    .timer-card.is-fullscreen .timer-display {
+        font-size: clamp(6rem, 28vmin, 24rem) !important;
+    }
+
+    /* Mobile landscape optimization */
+    @media (max-height: 520px) and (orientation: landscape) {
+        .timer-toolbar { padding: 4px 16px; }
+        .timer-core-section { padding: 6px 16px; }
+        .phase-badge { margin-bottom: 2px; font-size: 1.1rem; padding: 2px 14px; min-width: auto; }
+        .round-meta-container { margin-bottom: 2px; }
+        .round-indicator { font-size: 0.95rem; }
+        .round-pills { display: none; }
+        .timer-display { font-size: clamp(3.5rem, 22vh, 6rem) !important; margin: 2px 0; }
+        .progress-container { margin-top: 4px; height: 5px; }
+        .controls-wrapper { margin-top: 6px; gap: 8px; }
+        .btn-timer { font-size: 1rem; padding: 6px 18px; min-width: 100px; }
+        .timer-footer { padding: 4px 16px; font-size: 0.75rem; }
+        .shortcut-hints { display: none; }
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-8 col-lg-6">
-        <div class="card shadow text-center py-5">
-            <div class="card-body">
+<!-- Hidden CSRF token element for reliable POST requests -->
+<form id="csrfForm" style="display:none;">{% csrf_token %}</form>
 
-                <div class="mb-4">
-                    <div id="statusText" class="status-text text-muted">READY</div>
-                    <div id="roundText" class="text-muted fs-4">Round 1 / {{ timer.rounds }}</div>
-                </div>
-
-                <div id="timerDisplay" class="timer-display state-paused my-4">
-                    00:00
-                </div>
-
-                <div class="mt-5 d-flex justify-content-center gap-3">
-                    <button id="btnStart" class="btn btn-success btn-lg px-4"><i class="fas fa-play"></i> Start</button>
-                    <button id="btnPause" class="btn btn-warning btn-lg px-4 d-none"><i class="fas fa-pause"></i> Pause</button>
-                    <button id="btnReset" class="btn btn-danger btn-lg px-4"><i class="fas fa-stop"></i> Reset</button>
-                    <google-cast-launcher id="castbutton"></google-cast-launcher>
-                </div>
+<div class="timer-app-wrapper py-2 py-md-4">
+    <div id="timerCard" class="timer-card state-ready">
+        
+        <!-- Header / Controls Bar -->
+        <div class="timer-toolbar">
+            <div class="d-flex align-items-center gap-2">
+                <a href="{% url 'timers:list' %}" class="tool-btn" title="Back to Timers">
+                    <i class="fas fa-arrow-left"></i> <span class="d-none d-sm-inline">Back</span>
+                </a>
+                <h1 class="timer-title mb-0">
+                    <i class="fas fa-stopwatch text-muted"></i>
+                    <span>{{ timer.name }}</span>
+                </h1>
             </div>
-            <div class="card-footer bg-transparent border-0 mt-3">
-                <a href="{% url 'timers:list' %}" class="btn btn-link text-muted text-decoration-none"><i class="fas fa-arrow-left"></i> Back to Timers</a>
+
+            <div class="toolbar-tools">
+                <!-- Screen Wake Lock Status Indicator -->
+                <div id="wakeLockBadge" class="wakelock-badge" title="Tap to toggle screen wake lock (keeps device screen on)">
+                    <span class="wakelock-dot"></span>
+                    <i class="fas fa-sun"></i>
+                    <span class="d-none d-md-inline" id="wakeLockStatusText">Screen Awake</span>
+                </div>
+
+                <!-- Sound Toggle -->
+                <button type="button" id="btnSoundToggle" class="tool-btn" title="Toggle Sound / Audio Chime (M)">
+                    <i id="soundIcon" class="fas fa-volume-up"></i>
+                </button>
+
+                <!-- Fullscreen Toggle Button -->
+                <button type="button" id="btnFullscreenToggle" class="tool-btn" title="Toggle Fullscreen Mode (F)">
+                    <i id="fsIcon" class="fas fa-expand"></i>
+                    <span class="d-none d-sm-inline" id="fsText">Fullscreen</span>
+                </button>
             </div>
         </div>
+
+        <!-- Core Display Stage -->
+        <div class="timer-core-section">
+            
+            <!-- Phase Badge -->
+            <div id="statusBadge" class="phase-badge state-ready">
+                READY
+            </div>
+
+            <!-- Round Meta & Indicators -->
+            <div class="round-meta-container">
+                <div id="roundText" class="round-indicator">
+                    Round 1 of {{ timer.rounds }}
+                </div>
+                <div id="roundPills" class="round-pills">
+                    <!-- Dynamic round dots generated by JS -->
+                </div>
+            </div>
+
+            <!-- Big Countdown Digits -->
+            <div class="timer-display-wrapper">
+                <div id="timerDisplay" class="timer-display state-ready">
+                    00:00
+                </div>
+            </div>
+
+            <!-- Interval Progress Bar -->
+            <div class="progress-container">
+                <div id="progressBar" class="progress-bar-fill state-ready" style="width: 100%;"></div>
+            </div>
+
+            <!-- Action Control Buttons -->
+            <div class="controls-wrapper">
+                <button type="button" id="btnStart" class="btn-timer btn-timer-start" title="Start Timer (Space)">
+                    <i class="fas fa-play"></i> <span>START</span>
+                </button>
+                <button type="button" id="btnPause" class="btn-timer btn-timer-pause d-none" title="Pause Timer (Space)">
+                    <i class="fas fa-pause"></i> <span>PAUSE</span>
+                </button>
+                <button type="button" id="btnReset" class="btn-timer btn-timer-reset" title="Reset Timer (R)">
+                    <i class="fas fa-redo"></i> <span>RESET</span>
+                </button>
+
+                <!-- Google Cast Launcher Web Component -->
+                <google-cast-launcher id="castbutton" title="Cast to TV / Display"></google-cast-launcher>
+            </div>
+
+        </div>
+
+        <!-- Footer Bar with Keyboard Hints -->
+        <div class="timer-footer">
+            <div class="d-flex align-items-center gap-3">
+                <span><i class="fas fa-info-circle me-1"></i> Direction: <strong>{{ timer.get_direction_display }}</strong></span>
+                <span class="d-none d-sm-inline">|</span>
+                <span class="d-none d-sm-inline">Round: <strong>{{ timer.duration }}s</strong></span>
+                <span class="d-none d-sm-inline">|</span>
+                <span class="d-none d-sm-inline">Rest: <strong>{{ timer.interval }}s</strong></span>
+            </div>
+            <div class="shortcut-hints d-none d-md-flex align-items-center">
+                <span><span class="shortcut-kbd">Space</span> Play/Pause</span>
+                <span><span class="shortcut-kbd">R</span> Reset</span>
+                <span><span class="shortcut-kbd">F</span> Fullscreen</span>
+                <span><span class="shortcut-kbd">M</span> Mute</span>
+            </div>
+        </div>
+
     </div>
 </div>
 {% endblock %}
 
 {% block extra_scripts %}
-<!-- Load Google Cast SDK Correctly -->
+<!-- Google Cast SDK -->
 <script type="text/javascript" src="https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1"></script>
 
-<!-- Google Cast Initialization -->
+<!-- Google Cast Logic -->
 <script>
     const CUSTOM_APP_ID = '074DF02E';
     const CUSTOM_NAMESPACE = 'urn:x-cast:com.yourdomain.timer';
@@ -172,12 +724,6 @@
             autoJoinPolicy: chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED
         });
         
-        const castButton = document.getElementById('castButton');
-        if (castButton) {
-            castButton.style.display = 'inline-flex';
-            castButton.addEventListener('click', initiateCast);
-        }
-        
         context.addEventListener(
             cast.framework.CastContextEventType.SESSION_STATE_CHANGED,
             (event) => {
@@ -191,33 +737,15 @@
             }
         );
 
-        // Check if session is already active on load
         castSession = context.getCurrentSession();
         if (castSession) {
             sendTimerUpdate();
         }
     }
     
-    function initiateCast() {
-        // Automatically make the local display full screen for a better 'cast tab' experience
-        const elem = document.documentElement;
-        if (elem.requestFullscreen) {
-            elem.requestFullscreen().catch(err => console.log("Fullscreen error:", err));
-        }
-        
-        // Attempt Cast API session
-        const context = cast.framework.CastContext.getInstance();
-        context.requestSession().then(() => {
-            console.log('Cast session started');
-        }).catch(err => {
-            console.error('Failed to start cast:', err);
-        });
-    }
-    
     function sendTimerUpdate() {
         if (!castSession || !window.localTimerState) return;
         
-        // 1. Calculate values for the old receiver (backwards compatibility)
         const current = getTimerStateAt(window.localTimerState, new Date(Date.now() + (window.timerSkewOffset || 0)));
         
         let displayTime = current.time_remaining;
@@ -239,7 +767,6 @@
             labelText = `${current.current_state} - Round ${current.current_round}/${window.localTimerState.rounds}`;
         }
         
-        // 2. Create the combined hybrid payload
         const payload = Object.assign({}, window.localTimerState, {
             time: timeStr,
             label: labelText,
@@ -258,73 +785,321 @@
 <!-- Main Timer Script -->
 <script>
     document.addEventListener('DOMContentLoaded', () => {
-        // Elements
+        // UI Elements
+        const timerCard = document.getElementById('timerCard');
         const display = document.getElementById('timerDisplay');
-        const statusText = document.getElementById('statusText');
+        const statusBadge = document.getElementById('statusBadge');
         const roundText = document.getElementById('roundText');
+        const roundPills = document.getElementById('roundPills');
+        const progressBar = document.getElementById('progressBar');
         const btnStart = document.getElementById('btnStart');
         const btnPause = document.getElementById('btnPause');
         const btnReset = document.getElementById('btnReset');
+        const btnFullscreenToggle = document.getElementById('btnFullscreenToggle');
+        const fsIcon = document.getElementById('fsIcon');
+        const fsText = document.getElementById('fsText');
+        const btnSoundToggle = document.getElementById('btnSoundToggle');
+        const soundIcon = document.getElementById('soundIcon');
+        const wakeLockBadge = document.getElementById('wakeLockBadge');
+        const wakeLockStatusText = document.getElementById('wakeLockStatusText');
 
         // State variables
         let localTimerState = JSON.parse(document.getElementById('timer-state-data').textContent);
         window.localTimerState = localTimerState;
         let timerInterval = null;
         window.lastRenderedState = null;
+        let soundEnabled = true;
 
-        // Audio Context setup
-        let audioCtx = null;
-        
-        function initAudio() {
-            if (!audioCtx) {
-                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            }
-            if (audioCtx.state === 'suspended') {
-                audioCtx.resume();
+        // =========================================================================
+        // Robust CSRF Helper
+        // =========================================================================
+        function getCsrfToken() {
+            const input = document.querySelector('#csrfForm input[name=csrfmiddlewaretoken]') ||
+                          document.querySelector('input[name=csrfmiddlewaretoken]');
+            if (input && input.value) return input.value;
+            const parts = `; ${document.cookie}`.split('; csrftoken=');
+            if (parts.length === 2) return parts.pop().split(';').shift();
+            return '';
+        }
+
+        // =========================================================================
+        // Screen Wake Lock API Management
+        // =========================================================================
+        let wakeLockSentinel = null;
+
+        async function acquireWakeLock() {
+            if ('wakeLock' in navigator) {
+                try {
+                    if (!wakeLockSentinel) {
+                        wakeLockSentinel = await navigator.wakeLock.request('screen');
+                        updateWakeLockUI(true);
+                        wakeLockSentinel.addEventListener('release', () => {
+                            wakeLockSentinel = null;
+                            updateWakeLockUI(false);
+                        });
+                    }
+                } catch (err) {
+                    console.info('Screen Wake Lock request not permitted or supported:', err.message);
+                    updateWakeLockUI(false);
+                }
+            } else {
+                updateWakeLockUI(false);
             }
         }
 
+        async function releaseWakeLock() {
+            if (wakeLockSentinel) {
+                try {
+                    await wakeLockSentinel.release();
+                    wakeLockSentinel = null;
+                } catch (err) {
+                    console.warn('Error releasing wake lock:', err);
+                }
+            }
+            updateWakeLockUI(false);
+        }
+
+        function updateWakeLockUI(isActive) {
+            if (!wakeLockBadge) return;
+            if (isActive) {
+                wakeLockBadge.classList.add('active');
+                if (wakeLockStatusText) wakeLockStatusText.textContent = 'Screen Awake';
+            } else {
+                wakeLockBadge.classList.remove('active');
+                if (wakeLockStatusText) wakeLockStatusText.textContent = 'Screen Normal';
+            }
+        }
+
+        if (wakeLockBadge) {
+            wakeLockBadge.addEventListener('click', () => {
+                if (wakeLockSentinel) {
+                    releaseWakeLock();
+                } else {
+                    acquireWakeLock();
+                }
+            });
+        }
+
+        // Re-acquire Wake Lock when tab becomes visible again during active timer
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible' && localTimerState && localTimerState.status === 'RUNNING') {
+                acquireWakeLock();
+            }
+        });
+
+        // =========================================================================
+        // Fullscreen Management (Standard API + CSS Overlay Fallback)
+        // =========================================================================
+        function isNativeFullscreen() {
+            return !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement);
+        }
+
+        function isFullscreenActive() {
+            return isNativeFullscreen() || timerCard.classList.contains('is-fullscreen');
+        }
+
+        async function enterFullscreen() {
+            const elem = document.documentElement;
+            try {
+                if (elem.requestFullscreen) {
+                    await elem.requestFullscreen();
+                } else if (elem.webkitRequestFullscreen) {
+                    elem.webkitRequestFullscreen();
+                } else if (elem.mozRequestFullScreen) {
+                    elem.mozRequestFullScreen();
+                } else if (elem.msRequestFullscreen) {
+                    elem.msRequestFullscreen();
+                }
+            } catch (err) {
+                console.info("Native fullscreen unavailable, using immersive CSS view:", err);
+            }
+
+            timerCard.classList.add('is-fullscreen');
+            document.body.classList.add('timer-in-fullscreen');
+            updateFullscreenUI(true);
+        }
+
+        async function exitFullscreen() {
+            try {
+                if (isNativeFullscreen()) {
+                    if (document.exitFullscreen) {
+                        await document.exitFullscreen();
+                    } else if (document.webkitExitFullscreen) {
+                        document.webkitExitFullscreen();
+                    } else if (document.mozCancelFullScreen) {
+                        document.mozCancelFullScreen();
+                    } else if (document.msExitFullscreen) {
+                        document.msExitFullscreen();
+                    }
+                }
+            } catch (err) {
+                console.warn("Exit fullscreen error:", err);
+            }
+
+            timerCard.classList.remove('is-fullscreen');
+            document.body.classList.remove('timer-in-fullscreen');
+            updateFullscreenUI(false);
+        }
+
+        function toggleFullscreen() {
+            if (isFullscreenActive()) {
+                exitFullscreen();
+            } else {
+                enterFullscreen();
+            }
+        }
+
+        function updateFullscreenUI(active) {
+            if (active) {
+                if (fsIcon) fsIcon.className = 'fas fa-compress';
+                if (fsText) fsText.textContent = 'Exit Fullscreen';
+                if (btnFullscreenToggle) btnFullscreenToggle.classList.add('active');
+            } else {
+                if (fsIcon) fsIcon.className = 'fas fa-expand';
+                if (fsText) fsText.textContent = 'Fullscreen';
+                if (btnFullscreenToggle) btnFullscreenToggle.classList.remove('active');
+            }
+        }
+
+        function handleFullscreenChange() {
+            const active = isNativeFullscreen();
+            if (active) {
+                timerCard.classList.add('is-fullscreen');
+                document.body.classList.add('timer-in-fullscreen');
+                updateFullscreenUI(true);
+            } else {
+                timerCard.classList.remove('is-fullscreen');
+                document.body.classList.remove('timer-in-fullscreen');
+                updateFullscreenUI(false);
+            }
+        }
+
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+        document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+        document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+
+        if (btnFullscreenToggle) {
+            btnFullscreenToggle.addEventListener('click', toggleFullscreen);
+        }
+
+        // =========================================================================
+        // Sound & Audio Setup
+        // =========================================================================
+        let audioCtx = null;
+        
+        function initAudio() {
+            try {
+                if (!audioCtx) {
+                    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                    if (AudioContextClass) {
+                        audioCtx = new AudioContextClass();
+                    }
+                }
+                if (audioCtx && audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+            } catch (e) {
+                console.warn('AudioContext initialization note:', e);
+            }
+        }
+
+        function playTestChirp() {
+            if (!soundEnabled) return;
+            initAudio();
+            if (!audioCtx) return;
+            try {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                const now = audioCtx.currentTime;
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(587.33, now); // D5
+                osc.frequency.exponentialRampToValueAtTime(880, now + 0.12); // A5
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start(now);
+                osc.stop(now + 0.12);
+            } catch (e) {
+                console.warn('Audio chirp note:', e);
+            }
+        }
+
+        function toggleSound() {
+            initAudio();
+            soundEnabled = !soundEnabled;
+            if (soundEnabled) {
+                if (soundIcon) soundIcon.className = 'fas fa-volume-up';
+                if (btnSoundToggle) {
+                    btnSoundToggle.classList.remove('muted');
+                    btnSoundToggle.classList.remove('active');
+                    btnSoundToggle.setAttribute('title', 'Sound is ON (Click to Mute)');
+                }
+                playTestChirp();
+            } else {
+                if (soundIcon) soundIcon.className = 'fas fa-volume-mute';
+                if (btnSoundToggle) {
+                    btnSoundToggle.classList.add('muted');
+                    btnSoundToggle.setAttribute('title', 'Sound is MUTED (Click to Unmute)');
+                }
+            }
+        }
+
+        if (btnSoundToggle) {
+            btnSoundToggle.addEventListener('click', toggleSound);
+        }
+
         function playBeep(type) {
+            if (!soundEnabled) return;
+
             if (type === 'end' && localTimerState.sound_file_url) {
                 const audio = new Audio(localTimerState.sound_file_url);
                 audio.play().catch(e => console.error("Error playing custom audio", e));
                 return;
             }
 
+            initAudio();
             if (!audioCtx) return;
-            const oscillator = audioCtx.createOscillator();
-            const gainNode = audioCtx.createGain();
-            
-            let freq = 440;
-            let duration = 0.5;
-            
-            if (type === 'work') {
-                freq = 880;
-                duration = 0.8;
-                oscillator.type = 'square';
-            } else if (type === 'rest') {
-                freq = 330;
-                duration = 0.8;
-                oscillator.type = 'sawtooth';
-            } else if (type === 'end') {
-                freq = 1046;
-                duration = 1.5;
-                oscillator.type = 'sine';
-            } else if (type === 'tick') {
-                freq = 440;
-                duration = 0.1;
-                oscillator.type = 'sine';
-            }
 
-            oscillator.frequency.setValueAtTime(freq, audioCtx.currentTime);
-            gainNode.gain.setValueAtTime(0.5, audioCtx.currentTime);
-            gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
-            
-            oscillator.connect(gainNode);
-            gainNode.connect(audioCtx.destination);
-            
-            oscillator.start();
-            oscillator.stop(audioCtx.currentTime + duration);
+            try {
+                const oscillator = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+                
+                let freq = 440;
+                let duration = 0.5;
+
+                if (type === 'work') {
+                    freq = 880;
+                    duration = 0.8;
+                    oscillator.type = 'square';
+                } else if (type === 'rest') {
+                    freq = 330;
+                    duration = 0.8;
+                    oscillator.type = 'sawtooth';
+                } else if (type === 'end') {
+                    freq = 1046;
+                    duration = 1.2;
+                    oscillator.type = 'sine';
+                } else if (type === 'tick') {
+                    freq = 523.25;
+                    duration = 0.1;
+                    oscillator.type = 'sine';
+                }
+
+                const now = audioCtx.currentTime;
+                oscillator.frequency.setValueAtTime(freq, now);
+                gainNode.gain.setValueAtTime(0.4, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, now + duration);
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                
+                oscillator.start(now);
+                oscillator.stop(now + duration);
+            } catch (err) {
+                console.warn('Audio playback error:', err);
+            }
         }
 
         function formatTime(seconds) {
@@ -333,7 +1108,28 @@
             return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
         }
 
+        // =========================================================================
+        // Render Round Dots & Indicators
+        // =========================================================================
+        function buildRoundDots(totalRounds, currentRound, status) {
+            if (!roundPills) return;
+            roundPills.innerHTML = '';
+            for (let i = 1; i <= totalRounds; i++) {
+                const dot = document.createElement('div');
+                dot.classList.add('round-dot');
+                if (status === 'DONE' || i < currentRound) {
+                    dot.classList.add('completed');
+                } else if (i === currentRound && status !== 'READY') {
+                    dot.classList.add('current');
+                }
+                dot.title = `Round ${i}`;
+                roundPills.appendChild(dot);
+            }
+        }
 
+        // =========================================================================
+        // Timer Engine
+        // =========================================================================
         function updateLocalTimerState(timer) {
             if (timer.server_time) {
                 const serverTime = new Date(timer.server_time);
@@ -347,7 +1143,12 @@
             }
             
             if (timer.status === 'RUNNING') {
+                acquireWakeLock();
                 timerInterval = setInterval(tick, 100);
+            } else {
+                if (timer.status === 'PAUSED' || timer.status === 'DONE' || timer.status === 'READY') {
+                    releaseWakeLock();
+                }
             }
             renderLocalState();
         }
@@ -378,6 +1179,7 @@
                 timerInterval = null;
                 localTimerState.status = 'DONE';
                 localTimerState.time_remaining = 0;
+                releaseWakeLock();
             }
             
             renderLocalStateWithValues(current);
@@ -404,43 +1206,87 @@
                 displayTime = localTimerState.duration - current.time_remaining;
             }
             
-            display.innerText = formatTime(displayTime);
-            roundText.innerText = `Round ${current.current_round} / ${localTimerState.rounds}`;
-            
-            display.className = 'timer-display my-4';
+            if (display) display.innerText = formatTime(displayTime);
+            if (roundText) roundText.innerText = `Round ${current.current_round} of ${localTimerState.rounds}`;
+            buildRoundDots(localTimerState.rounds, current.current_round, current.status);
+
+            // Calculate progress bar fill
+            const totalInterval = (current.current_state === 'WORK') ? localTimerState.duration : localTimerState.interval;
+            let percent = 100;
+            if (totalInterval > 0) {
+                if (localTimerState.direction === 'UP' && current.current_state === 'WORK') {
+                    percent = Math.min(100, Math.max(0, (displayTime / totalInterval) * 100));
+                } else {
+                    percent = Math.min(100, Math.max(0, (current.time_remaining / totalInterval) * 100));
+                }
+            }
+            if (current.status === 'DONE') percent = 100;
+            if (progressBar) progressBar.style.width = `${percent}%`;
+
+            // Reset dynamic state classes
+            const stateClasses = ['state-work', 'state-rest', 'state-paused', 'state-ready', 'state-done'];
+            if (timerCard) timerCard.classList.remove(...stateClasses);
+            if (display) display.classList.remove(...stateClasses);
+            if (statusBadge) statusBadge.classList.remove(...stateClasses);
+            if (progressBar) progressBar.classList.remove(...stateClasses);
+
             if (current.status === 'READY') {
-                statusText.innerText = 'READY';
-                statusText.className = 'status-text text-muted';
-                display.classList.add('state-paused');
-                btnStart.classList.remove('d-none');
-                btnStart.disabled = false;
-                btnPause.classList.add('d-none');
+                if (statusBadge) statusBadge.innerText = 'READY';
+                const cls = 'state-ready';
+                if (timerCard) timerCard.classList.add(cls);
+                if (display) display.classList.add(cls);
+                if (statusBadge) statusBadge.classList.add(cls);
+                if (progressBar) progressBar.classList.add(cls);
+
+                if (btnStart) {
+                    btnStart.classList.remove('d-none');
+                    btnStart.disabled = false;
+                }
+                if (btnPause) btnPause.classList.add('d-none');
             } else if (current.status === 'RUNNING') {
                 if (current.current_state === 'WORK') {
-                    statusText.innerText = 'WORK';
-                    statusText.className = 'status-text text-success';
-                    display.classList.add('state-work');
+                    if (statusBadge) statusBadge.innerText = 'WORK';
+                    const cls = 'state-work';
+                    if (timerCard) timerCard.classList.add(cls);
+                    if (display) display.classList.add(cls);
+                    if (statusBadge) statusBadge.classList.add(cls);
+                    if (progressBar) progressBar.classList.add(cls);
                 } else {
-                    statusText.innerText = 'REST';
-                    statusText.className = 'status-text text-danger';
-                    display.classList.add('state-rest');
+                    if (statusBadge) statusBadge.innerText = 'REST';
+                    const cls = 'state-rest';
+                    if (timerCard) timerCard.classList.add(cls);
+                    if (display) display.classList.add(cls);
+                    if (statusBadge) statusBadge.classList.add(cls);
+                    if (progressBar) progressBar.classList.add(cls);
                 }
-                btnStart.classList.add('d-none');
-                btnPause.classList.remove('d-none');
+                if (btnStart) btnStart.classList.add('d-none');
+                if (btnPause) btnPause.classList.remove('d-none');
             } else if (current.status === 'PAUSED') {
-                statusText.innerText = 'PAUSED';
-                statusText.className = 'status-text text-muted';
-                display.classList.add('state-paused');
-                btnStart.classList.remove('d-none');
-                btnStart.disabled = false;
-                btnPause.classList.add('d-none');
+                if (statusBadge) statusBadge.innerText = 'PAUSED';
+                const cls = 'state-paused';
+                if (timerCard) timerCard.classList.add(cls);
+                if (display) display.classList.add(cls);
+                if (statusBadge) statusBadge.classList.add(cls);
+                if (progressBar) progressBar.classList.add(cls);
+
+                if (btnStart) {
+                    btnStart.classList.remove('d-none');
+                    btnStart.disabled = false;
+                }
+                if (btnPause) btnPause.classList.add('d-none');
             } else if (current.status === 'DONE') {
-                statusText.innerText = 'DONE';
-                statusText.className = 'status-text text-primary';
-                display.classList.add('state-paused');
-                btnStart.classList.remove('d-none');
-                btnStart.disabled = true;
-                btnPause.classList.add('d-none');
+                if (statusBadge) statusBadge.innerText = 'DONE';
+                const cls = 'state-done';
+                if (timerCard) timerCard.classList.add(cls);
+                if (display) display.classList.add(cls);
+                if (statusBadge) statusBadge.classList.add(cls);
+                if (progressBar) progressBar.classList.add(cls);
+
+                if (btnStart) {
+                    btnStart.classList.remove('d-none');
+                    btnStart.disabled = true;
+                }
+                if (btnPause) btnPause.classList.add('d-none');
             }
             
             if (typeof sendTimerUpdate === 'function') {
@@ -450,12 +1296,24 @@
 
         async function sendAction(actionName) {
             initAudio();
+            const token = getCsrfToken();
             try {
-                const res = await csrfFetch(`/timers/${localTimerState.id}/action/`, {
+                const res = await fetch(`/timers/${localTimerState.id}/action/`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': token,
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
                     body: JSON.stringify({ action: actionName })
                 });
+                
+                if (!res.ok) {
+                    const text = await res.text();
+                    console.error(`Action ${actionName} failed (${res.status}):`, text);
+                    return;
+                }
+                
                 const data = await res.json();
                 updateLocalTimerState(data);
             } catch (e) {
@@ -463,12 +1321,37 @@
             }
         }
 
-        // Event Listeners
-        btnStart.addEventListener('click', () => sendAction('start'));
-        btnPause.addEventListener('click', () => sendAction('pause'));
-        btnReset.addEventListener('click', () => sendAction('reset'));
+        // =========================================================================
+        // Event Listeners & Controls
+        // =========================================================================
+        if (btnStart) btnStart.addEventListener('click', () => sendAction('start'));
+        if (btnPause) btnPause.addEventListener('click', () => sendAction('pause'));
+        if (btnReset) btnReset.addEventListener('click', () => sendAction('reset'));
 
-        // Subscribe to Ably for real-time updates on this timer
+        // Keyboard Shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
+
+            if (e.code === 'Space') {
+                e.preventDefault();
+                if (localTimerState.status === 'RUNNING') {
+                    sendAction('pause');
+                } else if (localTimerState.status !== 'DONE') {
+                    sendAction('start');
+                }
+            } else if (e.key === 'r' || e.key === 'R') {
+                e.preventDefault();
+                sendAction('reset');
+            } else if (e.key === 'f' || e.key === 'F') {
+                e.preventDefault();
+                toggleFullscreen();
+            } else if (e.key === 'm' || e.key === 'M') {
+                e.preventDefault();
+                toggleSound();
+            }
+        });
+
+        // Ably Real-time Sync
         if (window.__ablyInstance) {
             const ably = window.__ablyInstance;
             const channel = ably.channels.get("user-{{ request.user.id }}-timer");
@@ -481,8 +1364,6 @@
             });
         }
 
-        // Initialize state
-        updateLocalTimerState(localTimerState);
-    });
+        // Initial setup
 </script>
 {% endblock %}
