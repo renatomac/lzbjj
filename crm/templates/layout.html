@@ -651,20 +651,60 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <a id="globalTimerLink" class="btn btn-sm btn-link p-0 ms-1 text-decoration-none" title="Open Timer"><i class="fas fa-external-link-alt"></i></a>
                 </div>
                 
-                <span class="me-3 text-muted small d-none d-sm-inline">
-                    Hi!, {{ user.username }}
-                </span>
-
                 {# Notification bell dropdown #}
                 {% include 'partials/navbar_bell.html' %}
 
-                <a href="{% url 'change_password' %}" class="ms-3 text-muted text-decoration-none">
-                    <i class="fas fa-key"></i> Change Password
-                </a>
+                
+                {# User account dropdown #}
+                <div class="dropdown ms-3">
+                    <button class="btn btn-link text-muted text-decoration-none p-0 d-flex align-items-center gap-2"
+                            type="button"
+                            id="userMenuDropdown"
+                            data-bs-toggle="dropdown"
+                            aria-expanded="false">
 
-                <a href="{% url 'logout' %}" class="ms-3 text-muted text-decoration-none">
-                    <i class="fas fa-sign-out-alt"></i> Logout
-                </a>
+                        <i class="fas fa-user-circle fs-4"></i>
+
+                        <span class="small d-none d-sm-inline">
+                            Hi!, {{ user.username }}
+                        </span>
+
+                        <i class="fas fa-chevron-down small"></i>
+                    </button>
+
+                    <ul class="dropdown-menu dropdown-menu-end shadow"
+                        aria-labelledby="userMenuDropdown">
+
+                        <li>
+                            <h6 class="dropdown-header">
+                                <i class="fas fa-user me-2"></i>
+                                {{ user.username }}
+                            </h6>
+                        </li>
+
+                        <li>
+                            <hr class="dropdown-divider">
+                        </li>
+
+                        <li>
+                            <a class="dropdown-item" href="{% url 'change_password' %}">
+                                <i class="fas fa-key me-2"></i>
+                                Change Password
+                            </a>
+                        </li>
+
+                        <li>
+                            <hr class="dropdown-divider">
+                        </li>
+
+                        <li>
+                            <a class="dropdown-item text-danger" href="{% url 'logout' %}">
+                                <i class="fas fa-sign-out-alt me-2"></i>
+                                Logout
+                            </a>
+                        </li>
+
+                    </ul>
                 </div>
             </div>
         </header>
