@@ -168,6 +168,27 @@
         50% { opacity: 0.5; transform: scale(0.85); }
     }
 
+    /* Wall Clock — roughly 1/3 the size of the main countdown digits */
+    .wall-clock {
+        font-family: 'Share Tech Mono', monospace;
+        font-size: clamp(1.5rem, 7.3vmin, 5.3rem);
+        font-weight: 700;
+        color: #cbd5e1;
+        letter-spacing: clamp(-1px, -0.15vmin, -2px);
+        display: inline-flex;
+        align-items: center;
+        gap: clamp(6px, 1.5vmin, 14px);
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+        line-height: 1;
+        margin-bottom: clamp(0.5rem, 1.5vmin, 1.25rem);
+        text-shadow: 0 0 20px rgba(0, 0, 0, 0.6);
+    }
+    .wall-clock i {
+        font-size: 0.4em;
+        color: #64748b;
+    }
+
     /* Main Display Area */
     .timer-core-section {
         padding: clamp(1.5rem, 4vmin, 3.5rem) clamp(1rem, 3vmin, 2.5rem);
@@ -418,6 +439,91 @@
         border-color: rgba(255, 255, 255, 0.3);
     }
 
+    /* Spotify Playlist & Playback Controls */
+    .spotify-panel {
+        margin-top: clamp(1.5rem, 3vmin, 2.5rem);
+        width: min(100%, 650px);
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 16px;
+        padding: clamp(0.75rem, 2vmin, 1.25rem);
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+    .spotify-panel-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    .spotify-brand {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-family: 'Oswald', sans-serif;
+        font-weight: 600;
+        color: #1db954;
+        letter-spacing: 0.5px;
+    }
+    .spotify-connect-btn {
+        background: #1db954;
+        color: #fff;
+        border: none;
+        border-radius: 20px;
+        padding: 8px 18px;
+        font-weight: 600;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        text-decoration: none;
+    }
+    .spotify-connect-btn:hover { background: #1ed760; color: #fff; }
+    .spotify-controls-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+    }
+    .spotify-select {
+        flex: 1;
+        min-width: 160px;
+        background: rgba(255, 255, 255, 0.06);
+        color: #e2e8f0;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 10px;
+        padding: 8px 10px;
+        font-size: 0.9rem;
+    }
+    .spotify-select option { color: #111; }
+    .spotify-icon-btn {
+        background: rgba(255, 255, 255, 0.08);
+        color: #cbd5e1;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 50%;
+        width: 42px;
+        height: 42px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    .spotify-icon-btn:hover { background: rgba(29, 185, 84, 0.25); color: #1db954; border-color: #1db954; }
+    .spotify-icon-btn.play {
+        background: #1db954;
+        color: #fff;
+        border-color: #1db954;
+        width: 52px;
+        height: 52px;
+        font-size: 1.2rem;
+    }
+    .spotify-icon-btn.play:hover { background: #1ed760; }
+    .spotify-status-text { font-size: 0.8rem; color: #94a3b8; }
+    .spotify-disconnect-link { color: #94a3b8; font-size: 0.8rem; text-decoration: underline; cursor: pointer; }
+
     /* Bottom Info & Shortcuts hint */
     .timer-footer {
         padding: clamp(0.75rem, 1.8vmin, 1.25rem) clamp(1rem, 3vmin, 2rem);
@@ -495,10 +601,19 @@
         font-size: clamp(6rem, 28vmin, 24rem) !important;
     }
 
+    :fullscreen .wall-clock,
+    :-webkit-full-screen .wall-clock,
+    .timer-card:fullscreen .wall-clock,
+    .timer-card:-webkit-full-screen .wall-clock,
+    .timer-card.is-fullscreen .wall-clock {
+        font-size: clamp(2rem, 9.3vmin, 8rem) !important;
+    }
+
     /* Mobile landscape optimization */
     @media (max-height: 520px) and (orientation: landscape) {
         .timer-toolbar { padding: 4px 16px; }
         .timer-core-section { padding: 6px 16px; }
+        .wall-clock { font-size: clamp(1.2rem, 8vh, 2.2rem) !important; margin-bottom: 2px; }
         .phase-badge { margin-bottom: 2px; font-size: 1.1rem; padding: 2px 14px; min-width: auto; }
         .round-meta-container { margin-bottom: 2px; }
         .round-indicator { font-size: 0.95rem; }
@@ -555,7 +670,13 @@
 
         <!-- Core Display Stage -->
         <div class="timer-core-section">
-            
+
+            <!-- Live Wall Clock -->
+            <div id="wallClock" class="wall-clock" title="Current time">
+                <i class="far fa-clock"></i>
+                <span id="wallClockText">--:--:--</span>
+            </div>
+
             <!-- Phase Badge -->
             <div id="statusBadge" class="phase-badge state-ready">
                 READY
@@ -598,6 +719,45 @@
                 <!-- Google Cast Launcher Web Component -->
                 <google-cast-launcher id="castbutton" title="Cast to TV / Display"></google-cast-launcher>
             </div>
+
+            <!-- Spotify Music Controls -->
+            {% if spotify_configured %}
+            <div class="spotify-panel" id="spotifyPanel">
+                <div class="spotify-panel-header">
+                    <div class="spotify-brand"><i class="fab fa-spotify"></i> Spotify</div>
+                    <div id="spotifyConnectedInfo" class="spotify-status-text d-none">
+                        Connected as <strong id="spotifyDisplayName"></strong> &middot;
+                        <a href="{% url 'timers:spotify_disconnect' %}?next={{ request.path }}" class="spotify-disconnect-link">Disconnect</a>
+                    </div>
+                </div>
+
+                <div id="spotifyDisconnectedState">
+                    <a href="{% url 'timers:spotify_connect' %}?next={{ request.path }}" class="spotify-connect-btn">
+                        <i class="fab fa-spotify"></i> Connect Spotify
+                    </a>
+                    <p class="spotify-status-text mt-2 mb-0">Connect your Spotify Premium account to play a playlist during your workout.</p>
+                </div>
+
+                <div id="spotifyConnectedState" class="d-none">
+                    <div class="spotify-controls-row">
+                        <select id="spotifyPlaylistSelect" class="spotify-select">
+                            <option value="">Loading playlists&hellip;</option>
+                        </select>
+                        <select id="spotifyDeviceSelect" class="spotify-select">
+                            <option value="">Loading devices&hellip;</option>
+                        </select>
+                    </div>
+                    <div class="spotify-controls-row justify-content-center mt-2">
+                        <button type="button" id="btnSpotifyPrev" class="spotify-icon-btn" title="Previous Track"><i class="fas fa-step-backward"></i></button>
+                        <button type="button" id="btnSpotifyPlay" class="spotify-icon-btn play" title="Play"><i class="fas fa-play"></i></button>
+                        <button type="button" id="btnSpotifyPause" class="spotify-icon-btn play d-none" title="Pause"><i class="fas fa-pause"></i></button>
+                        <button type="button" id="btnSpotifyStop" class="spotify-icon-btn" title="Stop"><i class="fas fa-stop"></i></button>
+                        <button type="button" id="btnSpotifyNext" class="spotify-icon-btn" title="Next Track"><i class="fas fa-step-forward"></i></button>
+                    </div>
+                    <p id="spotifyErrorText" class="spotify-status-text text-danger mt-2 mb-0 d-none"></p>
+                </div>
+            </div>
+            {% endif %}
 
         </div>
 
@@ -802,6 +962,7 @@
         const soundIcon = document.getElementById('soundIcon');
         const wakeLockBadge = document.getElementById('wakeLockBadge');
         const wakeLockStatusText = document.getElementById('wakeLockStatusText');
+        const wallClockText = document.getElementById('wallClockText');
 
         // State variables
         let localTimerState = JSON.parse(document.getElementById('timer-state-data').textContent);
@@ -823,9 +984,26 @@
         }
 
         // =========================================================================
+        // Live Wall Clock
+        // =========================================================================
+        function updateWallClock() {
+            if (!wallClockText) return;
+            const now = new Date();
+            let h = now.getHours();
+            const m = now.getMinutes().toString().padStart(2, '0');
+            const s = now.getSeconds().toString().padStart(2, '0');
+            const ampm = h >= 12 ? 'PM' : 'AM';
+            h = h % 12 || 12;
+            wallClockText.textContent = `${h}:${m}:${s} ${ampm}`;
+        }
+        updateWallClock();
+        setInterval(updateWallClock, 1000);
+
+        // =========================================================================
         // Screen Wake Lock API Management
         // =========================================================================
         let wakeLockSentinel = null;
+        let wakeLockUserDisabled = false;
 
         async function acquireWakeLock() {
             if ('wakeLock' in navigator) {
@@ -873,16 +1051,18 @@
         if (wakeLockBadge) {
             wakeLockBadge.addEventListener('click', () => {
                 if (wakeLockSentinel) {
+                    wakeLockUserDisabled = true;
                     releaseWakeLock();
                 } else {
+                    wakeLockUserDisabled = false;
                     acquireWakeLock();
                 }
             });
         }
 
-        // Re-acquire Wake Lock when tab becomes visible again during active timer
+        // Re-acquire Wake Lock when tab becomes visible again (unless user manually turned it off)
         document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'visible' && localTimerState && localTimerState.status === 'RUNNING') {
+            if (document.visibilityState === 'visible' && !wakeLockUserDisabled) {
                 acquireWakeLock();
             }
         });
@@ -1143,12 +1323,11 @@
             }
             
             if (timer.status === 'RUNNING') {
-                acquireWakeLock();
                 timerInterval = setInterval(tick, 100);
-            } else {
-                if (timer.status === 'PAUSED' || timer.status === 'DONE' || timer.status === 'READY') {
-                    releaseWakeLock();
-                }
+            }
+            // Screen stays awake regardless of timer status unless the user manually disables it
+            if (!wakeLockUserDisabled) {
+                acquireWakeLock();
             }
             renderLocalState();
         }
@@ -1179,7 +1358,6 @@
                 timerInterval = null;
                 localTimerState.status = 'DONE';
                 localTimerState.time_remaining = 0;
-                releaseWakeLock();
             }
             
             renderLocalStateWithValues(current);
@@ -1366,6 +1544,170 @@
 
         // Initial setup
         updateLocalTimerState(localTimerState);
+
+        // Auto-activate Fullscreen and Screen Wake Lock as soon as the timer opens.
+        // Browsers often require a user gesture to grant fullscreen, so we also
+        // retry on the very first click/keypress/touch if the initial attempt is blocked.
+        acquireWakeLock();
+        enterFullscreen();
+        if (!isFullscreenActive()) {
+            const autoFullscreenRetry = () => {
+                if (!isFullscreenActive()) enterFullscreen();
+                document.removeEventListener('click', autoFullscreenRetry);
+                document.removeEventListener('keydown', autoFullscreenRetry);
+                document.removeEventListener('touchstart', autoFullscreenRetry);
+            };
+            document.addEventListener('click', autoFullscreenRetry, { once: true });
+            document.addEventListener('keydown', autoFullscreenRetry, { once: true });
+            document.addEventListener('touchstart', autoFullscreenRetry, { once: true });
+        }
     });
 </script>
+
+{% if spotify_configured %}
+<!-- Spotify Playlist & Playback Controls -->
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const panel = document.getElementById('spotifyPanel');
+        if (!panel) return;
+
+        const connectedInfo = document.getElementById('spotifyConnectedInfo');
+        const displayNameEl = document.getElementById('spotifyDisplayName');
+        const disconnectedState = document.getElementById('spotifyDisconnectedState');
+        const connectedState = document.getElementById('spotifyConnectedState');
+        const playlistSelect = document.getElementById('spotifyPlaylistSelect');
+        const deviceSelect = document.getElementById('spotifyDeviceSelect');
+        const btnPlay = document.getElementById('btnSpotifyPlay');
+        const btnPause = document.getElementById('btnSpotifyPause');
+        const btnStop = document.getElementById('btnSpotifyStop');
+        const btnNext = document.getElementById('btnSpotifyNext');
+        const btnPrev = document.getElementById('btnSpotifyPrev');
+        const errorText = document.getElementById('spotifyErrorText');
+
+        function getCsrfTokenForSpotify() {
+            const input = document.querySelector('#csrfForm input[name=csrfmiddlewaretoken]') ||
+                          document.querySelector('input[name=csrfmiddlewaretoken]');
+            if (input && input.value) return input.value;
+            const parts = `; ${document.cookie}`.split('; csrftoken=');
+            if (parts.length === 2) return parts.pop().split(';').shift();
+            return '';
+        }
+
+        function showSpotifyError(message) {
+            if (!errorText) return;
+            errorText.textContent = message;
+            errorText.classList.remove('d-none');
+        }
+
+        function clearSpotifyError() {
+            if (!errorText) return;
+            errorText.classList.add('d-none');
+            errorText.textContent = '';
+        }
+
+        async function loadSpotifyPlaylists(selectedUri) {
+            try {
+                const res = await fetch('{% url "timers:spotify_playlists" %}');
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Failed to load playlists');
+                playlistSelect.innerHTML = '';
+                if (!data.playlists.length) {
+                    playlistSelect.innerHTML = '<option value="">No playlists found</option>';
+                    return;
+                }
+                data.playlists.forEach(pl => {
+                    const opt = document.createElement('option');
+                    opt.value = pl.uri;
+                    opt.textContent = `${pl.name} (${pl.tracks_total ?? 0})`;
+                    if (pl.uri === selectedUri) opt.selected = true;
+                    playlistSelect.appendChild(opt);
+                });
+            } catch (e) {
+                showSpotifyError(e.message);
+            }
+        }
+
+        async function loadSpotifyDevices(selectedId) {
+            try {
+                const res = await fetch('{% url "timers:spotify_devices" %}');
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Failed to load devices');
+                deviceSelect.innerHTML = '';
+                if (!data.devices.length) {
+                    deviceSelect.innerHTML = '<option value="">No active devices \u2014 open Spotify somewhere</option>';
+                    return;
+                }
+                data.devices.forEach(dev => {
+                    const opt = document.createElement('option');
+                    opt.value = dev.id;
+                    opt.textContent = `${dev.name} (${dev.type})${dev.is_active ? ' \u2014 active' : ''}`;
+                    if (dev.id === selectedId || dev.is_active) opt.selected = true;
+                    deviceSelect.appendChild(opt);
+                });
+            } catch (e) {
+                showSpotifyError(e.message);
+            }
+        }
+
+        async function sendSpotifyAction(action) {
+            clearSpotifyError();
+            try {
+                const res = await fetch('{% url "timers:spotify_control" %}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCsrfTokenForSpotify(),
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: JSON.stringify({
+                        action,
+                        playlist_uri: playlistSelect.value || undefined,
+                        device_id: deviceSelect.value || undefined
+                    })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || `Spotify ${action} failed`);
+
+                if (action === 'play') {
+                    btnPlay.classList.add('d-none');
+                    btnPause.classList.remove('d-none');
+                } else if (action === 'pause' || action === 'stop') {
+                    btnPause.classList.add('d-none');
+                    btnPlay.classList.remove('d-none');
+                }
+            } catch (e) {
+                showSpotifyError(e.message);
+            }
+        }
+
+        if (btnPlay) btnPlay.addEventListener('click', () => sendSpotifyAction('play'));
+        if (btnPause) btnPause.addEventListener('click', () => sendSpotifyAction('pause'));
+        if (btnStop) btnStop.addEventListener('click', () => sendSpotifyAction('stop'));
+        if (btnNext) btnNext.addEventListener('click', () => sendSpotifyAction('next'));
+        if (btnPrev) btnPrev.addEventListener('click', () => sendSpotifyAction('previous'));
+
+        (async function initSpotifyPanel() {
+            try {
+                const res = await fetch('{% url "timers:spotify_status" %}');
+                const data = await res.json();
+                if (!data.connected) {
+                    disconnectedState.classList.remove('d-none');
+                    connectedState.classList.add('d-none');
+                    return;
+                }
+                disconnectedState.classList.add('d-none');
+                connectedState.classList.remove('d-none');
+                connectedInfo.classList.remove('d-none');
+                displayNameEl.textContent = data.display_name || 'Spotify user';
+                await Promise.all([
+                    loadSpotifyPlaylists(data.last_playlist_uri),
+                    loadSpotifyDevices(data.last_device_id)
+                ]);
+            } catch (e) {
+                showSpotifyError('Unable to reach Spotify status endpoint.');
+            }
+        })();
+    });
+</script>
+{% endif %}
 {% endblock %}
