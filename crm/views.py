@@ -2159,9 +2159,14 @@ def adult_waiver(request, member_id=None):
             sig.user_agent = request.META.get("HTTP_USER_AGENT", "")
             if member_id:
                 sig.member_id = member_id
-            sig.save()
-            start_trial_from_waiver(sig)
-            return redirect("waiver_success")
+            try:
+                with transaction.atomic():
+                    sig.save()
+                    start_trial_from_waiver(sig)
+            except ValueError as exc:
+                form.add_error(None, str(exc))
+            else:
+                return redirect("waiver_success")
     else:
         form = AdultWaiverForm()
 
@@ -2191,10 +2196,15 @@ def minor_waiver(request, member_id=None):
             sig.user_agent = request.META.get("HTTP_USER_AGENT", "")
             if member_id:
                 sig.member_id = member_id
-            sig.save()
-            start_trial_from_waiver(sig)
-            messages.success(request, "Waiver signed successfully.")
-            return redirect("waiver_success")
+            try:
+                with transaction.atomic():
+                    sig.save()
+                    start_trial_from_waiver(sig)
+            except ValueError as exc:
+                form.add_error(None, str(exc))
+            else:
+                messages.success(request, "Waiver signed successfully.")
+                return redirect("waiver_success")
         else:
             messages.error(request, "There was a problem with the form. Please check the fields below.")
 

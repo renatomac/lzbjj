@@ -300,17 +300,19 @@ class Member(models.Model):
     @property
     def has_valid_waiver(self):
         return self.waivers.filter(
-            agreed=True
+            agreed=True,
+            is_void=False,
+            participant_type=self.required_waiver_type(),
+            waiver_version__waiver_type=self.required_waiver_type(),
         ).exists()
     
     @property
     def has_latest_waiver(self):
-        WaiverVersion = apps.get_model("crm", "WaiverVersion")
-
         latest_version = (
             WaiverVersion.objects
-            .filter(is_active=True)
-            .order_by("-created_at")
+            .filter(is_active=True, waiver_type=self.required_waiver_type(),
+                    effective_date__lte=timezone.localdate())
+            .order_by("-effective_date", "-created_at")
             .first()
         )
 
@@ -319,7 +321,9 @@ class Member(models.Model):
 
         return self.waivers.filter(
             waiver_version=latest_version,
-            agreed=True
+            agreed=True,
+            is_void=False,
+            participant_type=self.required_waiver_type(),
         ).exists()
 
     @property
