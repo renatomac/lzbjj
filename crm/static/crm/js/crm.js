@@ -188,7 +188,7 @@ document.addEventListener("click", function (event) {
     const memberId = button.dataset.id;
     const type = button.dataset.type;
 
-    fetch(`/toggleStatus/${type}/${memberId}`)
+    csrfFetch(`/toggleStatus/${type}/${memberId}`, { method: 'POST' })
         .then(response => response.json())
         .then(data => {
             location.reload();
@@ -458,7 +458,7 @@ document.addEventListener("click", function (event) {
     console.log(attendeeId)
         
     const url = `/toggleAttendance/${attendeeId}`;
-    fetch(url)
+    csrfFetch(url, { method: 'POST' })
         .then(response => response.json())
         .then(data => {
             const span = document.getElementById('span'+attendeeId);
@@ -553,7 +553,6 @@ input.addEventListener("input", () => {
         });
     });
 });
-
 
 
 
