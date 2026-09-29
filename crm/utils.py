@@ -2,7 +2,7 @@ from datetime import datetime, date, timedelta
 from crm.models import ClassSession, Class, Member, SessionAttendance, User
 from django.shortcuts import get_object_or_404
 from django.db import transaction
-from django.db.models import Count
+from django.db.models import Count, Q
 from django.db.models.functions import ExtractDay
 from notifications.models import Notification
 from django.utils import timezone
@@ -32,6 +32,10 @@ def create_future_sessions(days_ahead=30):
         # days_of_week is a list of strings, e.g., ['Monday', 'Wednesday']
         for day_offset in range(days_ahead + 1):
             session_date = today + timedelta(days=day_offset)
+            if session_date < class_template.start_date or (
+                class_template.end_date and session_date > class_template.end_date
+            ):
+                continue
             weekday_code = WEEKDAY_CODES[session_date.weekday()]
             #weekday_name = session_date.strftime('%A')  # 'Monday', 'Tuesday', etc.
             if weekday_code in class_template.days_of_week:
@@ -87,12 +91,23 @@ def dedupe_session_attendance(session):
 def create_attendance_for_session(session):
     dedupe_session_attendance(session)
 
+    if session.is_canceled:
+        return
+
     if session.class_template.type == 'open':
         active_members = Member.objects.filter(is_active = True).order_by('first_name', 'last_name')
     elif session.class_template.type == 'adult':
         active_members = Member.objects.filter(is_active = True, member_type='adult').order_by('first_name', 'last_name')
     elif session.class_template.type == 'kids':
         active_members = Member.objects.filter(is_active = True, member_type='child').order_by('first_name', 'last_name')
+    else:
+        return
+
+    active_members = active_members.filter(
+        Q(membership_start_date__isnull=True) | Q(membership_start_date__lte=session.date),
+        Q(membership_end_date__isnull=True) | Q(membership_end_date__gte=session.date),
+        Q(plan__isnull=False) | Q(trial_expires_on__isnull=True) | Q(trial_expires_on__gt=session.date),
+    )
 
     for member in active_members:
         SessionAttendance.objects.get_or_create(
@@ -161,8 +176,6 @@ def regenerate_future_sessions(class_id):
     # Track which dates already have a session
     existing_dates = {s.date for s in future_sessions}
 
-    fields_to_copy = ["start_time", "end_time", "instructor"]
-
     with transaction.atomic():
         # 1) Remove invalid weekday sessions (keep canceled sessions as-is)
         sessions_to_delete = []
@@ -187,30 +200,24 @@ def regenerate_future_sessions(class_id):
         
         future_sessions = kept
 
-        # 2) Update valid future sessions to match the template
-        # Only update sessions that are still in the database
+        # Session null fields inherit from the template; explicit values are overrides.
         for session in future_sessions:
             if session.is_canceled or not session.id:
                 continue
-            for field in fields_to_copy:
-                setattr(session, field, getattr(template_class, field))
-            session.save(update_fields=fields_to_copy)
             dedupe_session_attendance(session)
 
         # 3) Create missing sessions until end date
         start_date = template_class.start_date or today
-        end_date = template_class.end_date or date(today.year, 12, 30)
+        end_date = min(template_class.end_date or today + timedelta(days=30), today + timedelta(days=30))
 
         current = max(today, start_date)
         new_sessions = []
         while current <= end_date:
             if current.weekday() in target_weekdays and current not in existing_dates:
-                session_data = {f: getattr(template_class, f) for f in fields_to_copy}
                 new_sessions.append(
                     ClassSession(
                         class_template=template_class,
                         date=current,
-                        **session_data,
                     )
                 )
                 existing_dates.add(current)
@@ -218,6 +225,8 @@ def regenerate_future_sessions(class_id):
 
         if new_sessions:
             ClassSession.objects.bulk_create(new_sessions)
+            for session in ClassSession.objects.filter(class_template=template_class, date__in=[s.date for s in new_sessions]):
+                create_attendance_for_session(session)
 
 
 
@@ -227,8 +236,9 @@ def adult_kids_distrib():
     adults = Member.objects.filter(is_active = True, member_type='adult').count()
     children = Member.objects.filter(is_active = True, member_type="child").count()
     distribution={}
-    distribution['adult'] = round((adults / (adults + children)) * 100, 2)
-    distribution['child'] = round((children / (adults + children)) * 100, 2)
+    total = adults + children
+    distribution['adult'] = round((adults / total) * 100, 2) if total else 0
+    distribution['child'] = round((children / total) * 100, 2) if total else 0
     distribution['total_adult'] = adults
     distribution['total_child'] = children
     return distribution

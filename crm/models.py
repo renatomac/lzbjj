@@ -429,9 +429,18 @@ class Member(models.Model):
                 session__date__gte=today,
             )
 
-            removed_count = future_attendance.exclude(
-                session__class_template__type__in=allowed_types
-            ).delete()[0]
+            valid_attendance = future_attendance.filter(
+                session__class_template__type__in=allowed_types,
+                session__is_canceled=False,
+            )
+            if self.membership_start_date:
+                valid_attendance = valid_attendance.filter(session__date__gte=self.membership_start_date)
+            if self.membership_end_date:
+                valid_attendance = valid_attendance.filter(session__date__lte=self.membership_end_date)
+            if self.trial_expires_on and not self.plan_id:
+                valid_attendance = valid_attendance.filter(session__date__lt=self.trial_expires_on)
+            valid_ids = list(valid_attendance.values_list("pk", flat=True))
+            removed_count = future_attendance.exclude(pk__in=valid_ids).delete()[0]
 
             # Add missing attendance
             allowed_sessions = ClassSession.objects.filter(
@@ -449,6 +458,8 @@ class Member(models.Model):
                 allowed_sessions = allowed_sessions.filter(
                     date__lte=self.membership_end_date
                 )
+            if self.trial_expires_on and not self.plan_id:
+                allowed_sessions = allowed_sessions.filter(date__lt=self.trial_expires_on)
 
             created_count = 0
             for session in allowed_sessions:
@@ -836,6 +847,9 @@ class SessionAttendance(models.Model):
     session = models.ForeignKey(ClassSession, on_delete=models.CASCADE)
     member = models.ForeignKey(Member, on_delete=models.CASCADE)
     present = models.BooleanField(default=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["session", "member"], name="unique_session_member_attendance")]
 
 class Technique(models.Model):
     name = models.CharField(max_length=100, null=True, blank=True)
