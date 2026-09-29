@@ -1,7 +1,7 @@
 from datetime import timedelta
 
 from django.contrib.auth import authenticate, get_user_model
-from django.test import TestCase
+from django.test import Client, TestCase
 from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
 
@@ -800,6 +800,23 @@ class WorkflowRegressionTests(TestCase):
         self.client.force_login(self.user)
         self.assertEqual(self.client.get(url).status_code, 405)
         self.assertEqual(self.client.post(url).status_code, 200)
+        row.refresh_from_db()
+        self.assertTrue(row.present)
+
+    def test_roster_checkin_accepts_csrf_protected_post(self):
+        session = ClassSession.objects.create(class_template=self.klass, date=self.today)
+        member = self.member()
+        row = SessionAttendance.objects.get(session=session, member=member)
+        client = Client(enforce_csrf_checks=True)
+        client.force_login(self.user)
+        response = client.get(reverse("attendanceRecord", args=[session.pk]))
+        self.assertEqual(response.status_code, 200)
+        token = response.cookies["csrftoken"].value
+        response = client.post(
+            reverse("toggleAttendance", args=[row.pk]),
+            HTTP_X_CSRFTOKEN=token,
+        )
+        self.assertEqual(response.status_code, 200)
         row.refresh_from_db()
         self.assertTrue(row.present)
 

@@ -458,8 +458,18 @@ document.addEventListener("click", function (event) {
     console.log(attendeeId)
         
     const url = `/toggleAttendance/${attendeeId}`;
-    csrfFetch(url, { method: 'POST' })
-        .then(response => response.json())
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || getCookie('csrftoken');
+    fetch(url, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest' }
+    })
+        .then(response => {
+            if (!response.ok || response.redirected) {
+                throw new Error(`Check-in failed (HTTP ${response.status}). Refresh the page and try again.`);
+            }
+            return response.json();
+        })
         .then(data => {
             const span = document.getElementById('span'+attendeeId);
             const i = document.getElementById('i'+attendeeId);
@@ -501,6 +511,10 @@ document.addEventListener("click", function (event) {
                 btn_i.classList.add("fa-user-check");
             }
             document.getElementById('countChecked').innerHTML = checkedInt
+        })
+        .catch(error => {
+            console.error(error);
+            alert(error.message);
         });
 });
 
@@ -553,7 +567,6 @@ input.addEventListener("input", () => {
         });
     });
 });
-
 
 
 
