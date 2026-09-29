@@ -206,6 +206,11 @@ class UserManagementTests(TestCase):
 
 class MemberListFilterTests(TestCase):
     def setUp(self):
+        staff_user = get_user_model().objects.create_user(
+            username="member-list-staff", email="member-list-staff@example.com",
+            password="test-password", is_staff=True,
+        )
+        self.client.force_login(staff_user)
         common_fields = {
             "date_of_birth": "2000-01-01",
             "address": "123 Main St",
@@ -762,3 +767,121 @@ class TrialLifecycleTests(TestCase):
         member.refresh_from_db()
         self.assertTrue(member.trial_expired_notified)
         self.assertEqual(generate_trial_expiration_notifications(), [])
+
+class WorkflowRegressionTests(TestCase):
+    def setUp(self):
+        self.today = timezone.localdate()
+        self.user = get_user_model().objects.create_user(
+            username="workflow-staff", email="workflow-staff@example.com",
+            password="test-password", is_staff=True,
+        )
+        self.staff = Staff.objects.create(
+            user=self.user, first_name="Coach", last_name="Test",
+            role="Instructor", join_date=self.today,
+        )
+        self.klass = Class.objects.create(
+            name="Adult class", type="adult", instructor=self.staff,
+            days_of_week=["mon"], start_time="18:00", end_time="19:00",
+            start_date=self.today, end_date=self.today + timedelta(days=14),
+        )
+
+    def member(self, **changes):
+        data = dict(first_name="Test", last_name="Member", date_of_birth="2000-01-01",
+                    address="123 Main St", city="Lake Zurich", zip_code="60047")
+        data.update(changes)
+        return Member.objects.create(**data)
+
+    def test_crm_attendance_requires_staff_and_post(self):
+        session = ClassSession.objects.create(class_template=self.klass, date=self.today)
+        member = self.member()
+        row = SessionAttendance.objects.get(session=session, member=member)
+        url = reverse("toggleAttendance", args=[row.pk])
+        self.assertEqual(self.client.get(url).status_code, 302)
+        self.client.force_login(self.user)
+        self.assertEqual(self.client.get(url).status_code, 405)
+        self.assertEqual(self.client.post(url).status_code, 200)
+        row.refresh_from_db()
+        self.assertTrue(row.present)
+
+    def test_minor_waiver_creates_child_and_voided_signature_is_invalid(self):
+        version = WaiverVersion.objects.create(
+            waiver_type=WaiverVersion.MINOR, version="2026-test",
+            content="Minor waiver", effective_date=self.today,
+        )
+        signature = WaiverSignature.objects.create(
+            participant_type=WaiverSignature.MINOR, waiver_version=version,
+            participant_first_name="Child", participant_last_name="Test",
+            participant_dob="2018-01-01", guardian_first_name="Parent",
+            guardian_last_name="Test", signature="Parent Test", agreed=True,
+            ip_address="127.0.0.1",
+        )
+        member = start_trial_from_waiver(signature)
+        self.assertEqual(member.member_type, "child")
+        self.assertEqual(member.lifecycle_status, Member.LifecycleStatus.TRIAL)
+        self.assertTrue(member.has_latest_waiver)
+        signature.is_void = True
+        signature.save(update_fields=["is_void"])
+        self.assertFalse(member.has_valid_waiver)
+        self.assertFalse(member.has_latest_waiver)
+
+    def test_membership_dates_and_cancellation_remove_future_roster(self):
+        date = self.today + timedelta(days=2)
+        session = ClassSession.objects.create(class_template=self.klass, date=date)
+        member = self.member(membership_start_date=date, membership_end_date=date)
+        self.assertTrue(SessionAttendance.objects.filter(session=session, member=member).exists())
+        member.membership_end_date = self.today
+        member.save(update_fields=["membership_end_date"])
+        self.assertFalse(SessionAttendance.objects.filter(session=session, member=member).exists())
+        member.membership_end_date = date
+        member.save(update_fields=["membership_end_date"])
+        session.is_canceled = True
+        session.save(update_fields=["is_canceled"])
+        member.sync_future_sessions()
+        self.assertFalse(SessionAttendance.objects.filter(session=session, member=member).exists())
+
+    def test_dashboard_counts_only_upcoming_expirations(self):
+        self.client.force_login(self.user)
+        self.member(membership_end_date=self.today - timedelta(days=1))
+        self.member(first_name="Upcoming", membership_end_date=self.today + timedelta(days=2))
+        response = self.client.get(reverse("dashboard"))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["summary"]["expiringCount"], 1)
+
+    def test_regeneration_keeps_session_override_and_respects_end_date(self):
+        from datetime import time
+        from .utils import regenerate_future_sessions, create_future_sessions
+
+        session = ClassSession.objects.create(
+            class_template=self.klass, date=self.today, start_time=time(17, 0),
+        )
+        self.klass.start_time = time(19, 0)
+        self.klass.end_date = self.today + timedelta(days=1)
+        self.klass.save(update_fields=["start_time", "end_date"])
+        regenerate_future_sessions(self.klass.id)
+        session.refresh_from_db()
+        self.assertEqual(session.start_time, time(17, 0))
+        create_future_sessions(days_ahead=14)
+        self.assertFalse(ClassSession.objects.filter(
+            class_template=self.klass, date__gt=self.klass.end_date,
+        ).exists())
+
+    def test_paid_member_waiver_does_not_restart_trial(self):
+        plan = Plan.objects.create(
+            name="Paid", description="Monthly", enroll_price=100,
+            membership_price=100, duration_months=1,
+        )
+        member = self.member(plan=plan)
+        version = WaiverVersion.objects.create(
+            waiver_type=WaiverVersion.ADULT, version="paid-renewal",
+            content="Adult waiver", effective_date=self.today,
+        )
+        signature = WaiverSignature.objects.create(
+            participant_type=WaiverSignature.ADULT, waiver_version=version,
+            member=member, participant_first_name=member.first_name,
+            participant_last_name=member.last_name, signature="Test Member",
+            agreed=True, ip_address="127.0.0.1",
+        )
+        start_trial_from_waiver(signature)
+        member.refresh_from_db()
+        self.assertIsNone(member.trial_started_on)
+        self.assertEqual(member.plan_id, plan.pk)
