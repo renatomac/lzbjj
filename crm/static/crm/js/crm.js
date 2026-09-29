@@ -188,7 +188,7 @@ document.addEventListener("click", function (event) {
     const memberId = button.dataset.id;
     const type = button.dataset.type;
 
-    csrfFetch(`/toggleStatus/${type}/${memberId}`, { method: 'POST' })
+    csrfFetch(`/toggleStatus/${type}/${memberId}/`, { method: 'POST' })
         .then(response => response.json())
         .then(data => {
             location.reload();
@@ -457,7 +457,7 @@ document.addEventListener("click", function (event) {
     const attendeeId = btn.dataset.attendeeId; 
     console.log(attendeeId)
         
-    const url = `/toggleAttendance/${attendeeId}`;
+    const url = `/toggleAttendance/${attendeeId}/`;
     const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || getCookie('csrftoken');
     fetch(url, {
         method: 'POST',
@@ -567,7 +567,6 @@ input.addEventListener("input", () => {
         });
     });
 });
-
 
 
 
