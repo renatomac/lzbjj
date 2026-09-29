@@ -23,7 +23,11 @@ SCOPES = " ".join([
 
 
 def is_configured() -> bool:
-    return bool(settings.SPOTIFY_CLIENT_ID and settings.SPOTIFY_CLIENT_SECRET)
+    return bool(
+        getattr(settings, "SPOTIFY_CLIENT_ID", None)
+        and getattr(settings, "SPOTIFY_CLIENT_SECRET", None)
+        and getattr(settings, "SPOTIFY_REDIRECT_URI", None)
+    )
 
 
 def build_authorize_url(state: str) -> str:

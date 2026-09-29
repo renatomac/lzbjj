@@ -523,6 +523,7 @@
     .spotify-icon-btn.play:hover { background: #1ed760; }
     .spotify-status-text { font-size: 0.8rem; color: #94a3b8; }
     .spotify-disconnect-link { color: #94a3b8; font-size: 0.8rem; text-decoration: underline; cursor: pointer; }
+    .spotify-setup-note { color: #cbd5e1; }
 
     /* Bottom Info & Shortcuts hint */
     .timer-footer {
@@ -587,10 +588,13 @@
     .timer-card:-webkit-full-screen .timer-core-section,
     .timer-card.is-fullscreen .timer-core-section {
         flex: 1 !important;
+        min-height: 0 !important;
         display: flex !important;
         flex-direction: column !important;
-        justify-content: center !important;
-        padding: clamp(1rem, 3vmin, 2.5rem) !important;
+        justify-content: flex-start !important;
+        overflow-y: auto !important;
+        overscroll-behavior: contain;
+        padding: clamp(0.5rem, 1.5vmin, 1.25rem) !important;
     }
 
     :fullscreen .timer-display,
@@ -598,7 +602,7 @@
     .timer-card:fullscreen .timer-display,
     .timer-card:-webkit-full-screen .timer-display,
     .timer-card.is-fullscreen .timer-display {
-        font-size: clamp(6rem, 28vmin, 24rem) !important;
+        font-size: clamp(4rem, 16vmin, 11rem) !important;
     }
 
     :fullscreen .wall-clock,
@@ -606,7 +610,7 @@
     .timer-card:fullscreen .wall-clock,
     .timer-card:-webkit-full-screen .wall-clock,
     .timer-card.is-fullscreen .wall-clock {
-        font-size: clamp(2rem, 9.3vmin, 8rem) !important;
+        font-size: clamp(1.5rem, 5vmin, 4rem) !important;
     }
 
     /* Mobile landscape optimization */
@@ -721,16 +725,18 @@
             </div>
 
             <!-- Spotify Music Controls -->
-            {% if spotify_configured %}
             <div class="spotify-panel" id="spotifyPanel">
                 <div class="spotify-panel-header">
                     <div class="spotify-brand"><i class="fab fa-spotify"></i> Spotify</div>
+                    {% if spotify_configured %}
                     <div id="spotifyConnectedInfo" class="spotify-status-text d-none">
                         Connected as <strong id="spotifyDisplayName"></strong> &middot;
                         <a href="{% url 'timers:spotify_disconnect' %}?next={{ request.path }}" class="spotify-disconnect-link">Disconnect</a>
                     </div>
+                    {% endif %}
                 </div>
 
+                {% if spotify_configured %}
                 <div id="spotifyDisconnectedState">
                     <a href="{% url 'timers:spotify_connect' %}?next={{ request.path }}" class="spotify-connect-btn">
                         <i class="fab fa-spotify"></i> Connect Spotify
@@ -756,8 +762,10 @@
                     </div>
                     <p id="spotifyErrorText" class="spotify-status-text text-danger mt-2 mb-0 d-none"></p>
                 </div>
+                {% else %}
+                <p class="spotify-status-text spotify-setup-note mb-0">Spotify controls are unavailable until the app administrator configures the Spotify client ID, client secret, and redirect URI.</p>
+                {% endif %}
             </div>
-            {% endif %}
 
         </div>
 

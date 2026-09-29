@@ -1,4 +1,5 @@
-from django.test import TestCase
+from django.test import TestCase, override_settings
+from django.urls import reverse
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from .models import Timer
@@ -24,6 +25,24 @@ class TimerStateTestCase(TestCase):
         self.assertEqual(self.timer.time_remaining, 180)
         self.assertEqual(self.timer.current_round, 1)
         self.assertEqual(self.timer.current_state, 'WORK')
+
+    @override_settings(SPOTIFY_CLIENT_ID='', SPOTIFY_CLIENT_SECRET='', SPOTIFY_REDIRECT_URI='')
+    def test_timer_explains_unconfigured_spotify(self):
+        self.client.force_login(self.user)
+        response = self.client.get(reverse('timers:run', args=[self.timer.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'spotifyPanel')
+        self.assertContains(response, 'Spotify controls are unavailable')
+        self.assertNotContains(response, 'btnSpotifyPlay')
+
+    @override_settings(SPOTIFY_CLIENT_ID='test-id', SPOTIFY_CLIENT_SECRET='test-secret',
+                       SPOTIFY_REDIRECT_URI='https://example.com/timers/spotify/callback/')
+    def test_timer_shows_spotify_controls_when_configured(self):
+        self.client.force_login(self.user)
+        response = self.client.get(reverse('timers:run', args=[self.timer.pk]))
+        self.assertContains(response, 'btnSpotifyPlay')
+        self.assertContains(response, 'spotifyPlaylistSelect')
+        self.assertContains(response, 'Connect Spotify')
 
     def test_start_timer(self):
         now = timezone.now()
