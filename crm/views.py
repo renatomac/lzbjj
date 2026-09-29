@@ -72,11 +72,16 @@ def index(request):
         inactive=Member.objects.filter(is_active = False).count()
         total=Member.objects.all().count()
         # members enrolled in the last 30 days
-        newMembers=Member.objects.filter(membership_start_date__gte = oneMonthLess).values()
-        newMembersCount=Member.objects.filter(membership_start_date__gte = oneMonthLess).count()
+        new_members_qs = Member.objects.filter(membership_start_date__range=(oneMonthLess, today))
+        newMembers = new_members_qs.values()
+        newMembersCount = new_members_qs.count()
         # membership exping in the next 30 days
-        expiring= Member.objects.filter(membership_start_date__lt = oneMonthMore ).values()
-        expiringCount= Member.objects.filter(membership_start_date__lt = oneMonthMore ).count()
+        expiring_qs = Member.objects.filter(
+            is_active=True, membership_end_date__gte=today,
+            membership_end_date__lte=oneMonthMore,
+        )
+        expiring = expiring_qs.values()
+        expiringCount = expiring_qs.count()
         classesCount = classesThisWeek()
         # members age
         members_age = [
@@ -268,11 +273,16 @@ def dashboard(request):
         inactive=Member.objects.filter(is_active = False).count()
         total=Member.objects.all().count()
         # members enrolled in the last 30 days
-        newMembers=Member.objects.filter(membership_start_date__gte = oneMonthLess).values()
-        newMembersCount=Member.objects.filter(membership_start_date__gte = oneMonthLess).count()
+        new_members_qs = Member.objects.filter(membership_start_date__range=(oneMonthLess, today))
+        newMembers = new_members_qs.values()
+        newMembersCount = new_members_qs.count()
         # membership exping in the next 30 days
-        expiring= Member.objects.filter(membership_end_date__lt = oneMonthMore ).values()
-        expiringCount= Member.objects.filter(membership_end_date__lt = oneMonthMore ).count()
+        expiring_qs = Member.objects.filter(
+            is_active=True, membership_end_date__gte=today,
+            membership_end_date__lte=oneMonthMore,
+        )
+        expiring = expiring_qs.values()
+        expiringCount = expiring_qs.count()
         classesCount = classesThisWeek()
         # members age
         members_age = [
@@ -669,6 +679,7 @@ def getContacts(request, member_id):
     return JsonResponse({"contacts": contacts})
 
 @crm_staff_required
+@transaction.atomic
 def addPromotion(request, member_id):
     # Staff-only check
     if not (request.user.is_authenticated and hasattr(request.user, 'staff') and request.user.staff.is_active):
@@ -714,6 +725,7 @@ def makeRank(belt, stripes):
 
 
 @crm_staff_required
+@transaction.atomic
 def editPromotion(request, promotion_id):
     # Staff-only check
     if not (request.user.is_authenticated and hasattr(request.user, 'staff') and request.user.staff.is_active):
@@ -729,15 +741,12 @@ def editPromotion(request, promotion_id):
     if request.method == "POST":
         form = BeltPromotionForm(request.POST, instance=promotion, member=member)
         if form.is_valid():
-            old_new_rank = promotion.new_rank
-            old_new_stripes = promotion.new_stripes
-            
             promotion = form.save(commit=False)
             promotion.promoted_by = request.user.staff
             promotion.save()
             
             # Update member's current rank to match the most recent promotion
-            latest_promotion = BeltPromotion.objects.filter(member=member).order_by('-promotion_date').first()
+            latest_promotion = BeltPromotion.objects.filter(member=member).order_by('-promotion_date', '-created_at', '-pk').first()
             if latest_promotion:
                 member.belt_rank = latest_promotion.new_rank
                 member.stripes = latest_promotion.new_stripes
@@ -757,6 +766,7 @@ def editPromotion(request, promotion_id):
 
 
 @crm_staff_required
+@transaction.atomic
 def deletePromotion(request, promotion_id):
     # Staff-only check
     if not (request.user.is_authenticated and hasattr(request.user, 'staff') and request.user.staff.is_active):
@@ -766,17 +776,17 @@ def deletePromotion(request, promotion_id):
     member = promotion.member
     
     if request.method == "POST":
+        original_rank, original_stripes = promotion.old_rank, promotion.old_stripes
         promotion.delete()
         
         # Reset member's rank to the most recent remaining promotion
-        latest_promotion = BeltPromotion.objects.filter(member=member).order_by('-promotion_date').first()
+        latest_promotion = BeltPromotion.objects.filter(member=member).order_by('-promotion_date', '-created_at', '-pk').first()
         if latest_promotion:
             member.belt_rank = latest_promotion.new_rank
             member.stripes = latest_promotion.new_stripes
         else:
-            # No promotions left, reset to white belt
-            member.belt_rank = BeltRank.WHITE
-            member.stripes = 0
+            member.belt_rank = original_rank
+            member.stripes = original_stripes
         member.save()
         
         return redirect("members")
@@ -1418,9 +1428,10 @@ def getStudents(request, class_id):
     classType = get_object_or_404(Class, id=class_id)
 
     attending_ids = set(
-        Attendance.objects.filter(
-            Class=classType,
-            date=date
+        SessionAttendance.objects.filter(
+            session__class_template=classType,
+            session__date=date,
+            present=True,
         ).values_list("member_id", flat=True)
     )
 
@@ -1428,9 +1439,9 @@ def getStudents(request, class_id):
         print('open')
         members = Member.objects.filter(is_active = True)
     elif classType.type == 'adult':
-        members = Member.objects.filter(member_type='adult')
+        members = Member.objects.filter(member_type='adult', is_active=True)
     else:
-        members = Member.objects.filter(member_type='child')
+        members = Member.objects.filter(member_type='child', is_active=True)
     data = []
     for m in members:
         data.append({
@@ -1823,7 +1834,7 @@ def deletePlan(request, plan_id):
     return HttpResponseRedirect(reverse("plan"))
 
 def calculateAge(birthDate):
-    today = date.today()
+    today = timezone.localdate()
     age = today.year - birthDate.year - ((today.month, today.day) < (birthDate.month, birthDate.day))
     return age
 
@@ -1832,7 +1843,7 @@ def classesThisWeek():
     classesCount = 0
     shortWeekday = today.strftime("%a").lower()[:3]
     if today.weekday() <= 6:
-        for i in range (today.weekday(), 6):
+        for i in range(today.weekday(), 7):
             classesCount = classesCount + Class.objects.filter(days_of_week__contains = shortWeekday).values().count()
             today = today+timedelta(days=1)
             shortWeekday = today.strftime("%a").lower()[:3]
@@ -1895,9 +1906,13 @@ def sessions(request):
     if filter_class:
         sessions_qs = sessions_qs.filter(class_template__name=filter_class)
     if filter_instructor:
-        sessions_qs = sessions_qs.filter(instructor_id=int(filter_instructor))
+        sessions_qs = sessions_qs.annotate(
+            effective_instructor_id=Coalesce("instructor_id", "class_template__instructor_id")
+        ).filter(effective_instructor_id=int(filter_instructor))
 
-    sessions_qs = sessions_qs.order_by("date", "start_time")
+    sessions_qs = sessions_qs.annotate(
+        effective_start_time_db=Coalesce("start_time", "class_template__start_time")
+    ).order_by("date", "effective_start_time_db")
 
     # ---- Dropdowns ----
     years = ClassSession.objects.annotate(year=ExtractYear("date")).values_list("year", flat=True).distinct().order_by("-year")
