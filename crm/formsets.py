@@ -32,7 +32,9 @@ class ContactFormSet(BaseInlineFormSet):
             return  # Skip validation if other errors exist
 
         member = self.instance
-        is_child = (member.member_type == "child")
+        is_child = member.member_type == "child" or (
+            member.member_type == Member.TRANSITIONING and member.age is not None and member.age < 18
+        )
 
         has_responsible_email = False
 
@@ -54,4 +56,3 @@ class ContactFormSet(BaseInlineFormSet):
             raise ValidationError(
                 "Child members require at least one responsible contact with an email."
             )
-

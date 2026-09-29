@@ -902,3 +902,33 @@ class WorkflowRegressionTests(TestCase):
         member.refresh_from_db()
         self.assertIsNone(member.trial_started_on)
         self.assertEqual(member.plan_id, plan.pk)
+
+    def test_transitioning_member_appears_in_kids_and_adult_rosters(self):
+        from .utils import create_attendance_for_period
+
+        kids_class = Class.objects.create(
+            name="Kids class", type="kids", instructor=self.staff,
+            days_of_week=["mon"], start_time="17:00", end_time="18:00",
+            start_date=self.today,
+        )
+        adult_session = ClassSession.objects.create(class_template=self.klass, date=self.today)
+        kids_session = ClassSession.objects.create(class_template=kids_class, date=self.today)
+        member = self.member(member_type=Member.TRANSITIONING, date_of_birth="2012-01-01")
+        member.refresh_from_db()
+
+        self.assertEqual(Member.TRANSITIONING, "transition")
+        self.assertEqual(member.get_member_type_display(), "Transitioning")
+        self.assertEqual(member.required_waiver_type(), WaiverSignature.MINOR)
+        self.assertEqual(
+            set(SessionAttendance.objects.filter(member=member).values_list("session_id", flat=True)),
+            {adult_session.id, kids_session.id},
+        )
+        create_attendance_for_period(days_ahead=0)
+        self.assertEqual(SessionAttendance.objects.filter(member=member).count(), 2)
+
+        member.member_type = "adult"
+        member.save(update_fields=["member_type"])
+        self.assertEqual(
+            set(SessionAttendance.objects.filter(member=member).values_list("session_id", flat=True)),
+            {adult_session.id},
+        )

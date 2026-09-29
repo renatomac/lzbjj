@@ -17,18 +17,18 @@ def start_trial_from_waiver(signature):
     member_type = "child" if signature.participant_type == signature.MINOR else "adult"
     if signature.member_id:
         member = signature.member
-        if member.member_type != member_type:
+        if member.required_waiver_type() != signature.participant_type:
             raise ValueError("Waiver participant type does not match the member.")
     else:
-        matches = Member.objects.filter(
+        candidates = Member.objects.filter(
             first_name__iexact=signature.participant_first_name,
             last_name__iexact=signature.participant_last_name,
             date_of_birth=signature.participant_dob,
-            member_type=member_type,
         ) if signature.participant_dob else Member.objects.none()
-        if matches.count() > 1:
+        matches = [member for member in candidates if member.required_waiver_type() == signature.participant_type]
+        if len(matches) > 1:
             raise ValueError("Multiple members match this waiver; link the member manually.")
-        member = matches.first()
+        member = matches[0] if matches else None
         if member is None:
             member = Member.objects.create(
                 first_name=signature.participant_first_name,

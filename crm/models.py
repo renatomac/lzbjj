@@ -145,6 +145,7 @@ class Contact(models.Model):
 
 
 class Member(models.Model):
+    TRANSITIONING = "transition"  # Fits the existing 10-character database column.
     class LifecycleStatus(models.TextChoices):
         LEAD = "lead", "Lead"
         TRIAL = "trial", "Trial"
@@ -159,6 +160,7 @@ class Member(models.Model):
     MEMBER_TYPE = [
         ('adult', 'Adult'),
         ('child', 'Child'),
+        (TRANSITIONING, 'Transitioning'),
     ]
 
     #user = models.ForeignKey( settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="members" )
@@ -248,7 +250,9 @@ class Member(models.Model):
         """
         return (
             WaiverSignature.MINOR
-            if self.member_type == "child"
+            if self.member_type == "child" or (
+                self.member_type == self.TRANSITIONING and self.age is not None and self.age < 18
+            )
             else WaiverSignature.ADULT
         )
     
@@ -264,7 +268,9 @@ class Member(models.Model):
         # ----------------------------
         # 1) CHILD MEMBER VALIDATION
         # ----------------------------
-        if self.member_type == 'child':
+        if self.member_type == 'child' or (
+            self.member_type == self.TRANSITIONING and self.age is not None and self.age < 18
+        ):
             has_responsible_contact_email = self.contacts.filter(
                 contact_type='responsible',
                 email__isnull=False
@@ -281,7 +287,9 @@ class Member(models.Model):
         # ----------------------------
         # 2) ADULT MEMBER VALIDATION
         # ----------------------------
-        if self.member_type == 'adult':
+        if self.member_type == 'adult' or (
+            self.member_type == self.TRANSITIONING and self.age is not None and self.age >= 18
+        ):
             has_user_email = bool(self.user and self.user.email)
             has_member_email = bool(self.email)
 
@@ -419,6 +427,8 @@ class Member(models.Model):
         # Determine allowed class types
         if self.member_type == "child":
             allowed_types = ["kids"]
+        elif self.member_type == self.TRANSITIONING:
+            allowed_types = ["kids", "adult", "open"]
         else:
             allowed_types = ["adult", "open"]
 

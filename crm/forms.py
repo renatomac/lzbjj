@@ -215,7 +215,9 @@ class MemberForm(forms.ModelForm):
 
         selected_user = self.cleaned_data.get("user")
 
-        if member.member_type == "adult":
+        if member.member_type == "adult" or (
+            member.member_type == Member.TRANSITIONING and member.age is not None and member.age >= 18
+        ):
             member.user = selected_user
         else:
             member.user = None

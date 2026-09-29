@@ -97,9 +97,9 @@ def create_attendance_for_session(session):
     if session.class_template.type == 'open':
         active_members = Member.objects.filter(is_active = True).order_by('first_name', 'last_name')
     elif session.class_template.type == 'adult':
-        active_members = Member.objects.filter(is_active = True, member_type='adult').order_by('first_name', 'last_name')
+        active_members = Member.objects.filter(is_active=True, member_type__in=['adult', Member.TRANSITIONING]).order_by('first_name', 'last_name')
     elif session.class_template.type == 'kids':
-        active_members = Member.objects.filter(is_active = True, member_type='child').order_by('first_name', 'last_name')
+        active_members = Member.objects.filter(is_active=True, member_type__in=['child', Member.TRANSITIONING]).order_by('first_name', 'last_name')
     else:
         return
 
@@ -235,12 +235,15 @@ def regenerate_future_sessions(class_id):
 def adult_kids_distrib():
     adults = Member.objects.filter(is_active = True, member_type='adult').count()
     children = Member.objects.filter(is_active = True, member_type="child").count()
+    transitioning = Member.objects.filter(is_active=True, member_type=Member.TRANSITIONING).count()
     distribution={}
-    total = adults + children
+    total = adults + children + transitioning
     distribution['adult'] = round((adults / total) * 100, 2) if total else 0
     distribution['child'] = round((children / total) * 100, 2) if total else 0
+    distribution['transitioning'] = round((transitioning / total) * 100, 2) if total else 0
     distribution['total_adult'] = adults
     distribution['total_child'] = children
+    distribution['total_transitioning'] = transitioning
     return distribution
 
 

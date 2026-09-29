@@ -343,7 +343,7 @@ def members(request):
     elif status == "inactive":
         all_members = all_members.filter(is_active=False)
 
-    if member_type in {"adult", "child"}:
+    if member_type in {"adult", "child", Member.TRANSITIONING}:
         all_members = all_members.filter(member_type=member_type)
 
     # Filter by search query
@@ -1439,9 +1439,9 @@ def getStudents(request, class_id):
         print('open')
         members = Member.objects.filter(is_active = True)
     elif classType.type == 'adult':
-        members = Member.objects.filter(member_type='adult', is_active=True)
+        members = Member.objects.filter(member_type__in=['adult', Member.TRANSITIONING], is_active=True)
     else:
-        members = Member.objects.filter(member_type='child', is_active=True)
+        members = Member.objects.filter(member_type__in=['child', Member.TRANSITIONING], is_active=True)
     data = []
     for m in members:
         data.append({
@@ -2385,7 +2385,8 @@ def attendance_report(request):
         ).order_by('date', 'start_time')
 
         # 2. Get all active members of that type
-        members = Member.objects.filter(member_type=member_type, is_active=True).order_by('first_name')
+        member_types = [member_type, Member.TRANSITIONING] if member_type in ('adult', 'child') else [member_type]
+        members = Member.objects.filter(member_type__in=member_types, is_active=True).order_by('first_name')
 
         # 3. Group sessions by day and build attendance map
         # We prefetch SessionAttendance to avoid N+1 queries
