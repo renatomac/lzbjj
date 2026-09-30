@@ -18,5 +18,6 @@ urlpatterns = [
     path('spotify/status/', views.spotify_status, name='spotify_status'),
     path('spotify/playlists/', views.spotify_playlists, name='spotify_playlists'),
     path('spotify/devices/', views.spotify_devices, name='spotify_devices'),
+    path('spotify/playback-state/', views.spotify_playback_state, name='spotify_playback_state'),
     path('spotify/control/', views.spotify_control, name='spotify_control'),
 ]

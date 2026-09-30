@@ -215,7 +215,9 @@ class MemberForm(forms.ModelForm):
 
         selected_user = self.cleaned_data.get("user")
 
-        if member.member_type == "adult":
+        if member.member_type == "adult" or (
+            member.member_type == Member.TRANSITIONING and member.age is not None and member.age >= 18
+        ):
             member.user = selected_user
         else:
             member.user = None
@@ -375,15 +377,19 @@ class BeltPromotionForm(forms.ModelForm):
         # ----------------------------
         # Prefill old values
         # ----------------------------
-        self.fields["old_rank"].initial = member.belt_rank
-        self.fields["old_stripes"].initial = member.stripes
-        self.fields["new_rank"].initial = member.belt_rank
-        self.fields["new_stripes"].initial = member.stripes
+        starting_rank = self.instance.old_rank if self.instance.pk else member.belt_rank
+        starting_stripes = self.instance.old_stripes if self.instance.pk else member.stripes
+        self.fields["old_rank"].initial = starting_rank
+        self.fields["old_stripes"].initial = starting_stripes
+        if not self.instance.pk:
+            self.fields["new_rank"].initial = member.belt_rank
+            self.fields["new_stripes"].initial = member.stripes
 
         # ----------------------------
         # Prefill promotion date
         # ----------------------------
-        self.fields["promotion_date"].initial = timezone.localdate()
+        if not self.instance.pk:
+            self.fields["promotion_date"].initial = timezone.localdate()
 
         # ----------------------------
         # Make old values read-only
@@ -402,9 +408,11 @@ class BeltPromotionForm(forms.ModelForm):
         
         # Use KID_BELT_ORDER for members under 16, ADULT_BELT_ORDER for 16 and older
         belt_order = KID_BELT_ORDER if age is not None and age < 16 else ADULT_BELT_ORDER
+        if starting_rank not in belt_order:
+            belt_order = KID_BELT_ORDER if starting_rank in KID_BELT_ORDER else ADULT_BELT_ORDER
         
         try:
-            current_index = belt_order.index(member.belt_rank)
+            current_index = belt_order.index(starting_rank)
         except ValueError:
             current_index = 0
 
@@ -442,11 +450,13 @@ class BeltPromotionForm(forms.ModelForm):
         
         # Use appropriate belt order based on age (under 16 = kid belt order)
         belt_order = KID_BELT_ORDER if age is not None and age < 16 else ADULT_BELT_ORDER
+        if old_rank not in belt_order:
+            belt_order = KID_BELT_ORDER if old_rank in KID_BELT_ORDER else ADULT_BELT_ORDER
 
         # ----------------------------
         # Prevent demotion
         # ----------------------------
-        if belt_order.index(new_rank) < belt_order.index(old_rank):
+        if old_rank in belt_order and new_rank in belt_order and belt_order.index(new_rank) < belt_order.index(old_rank):
             self.add_error("new_rank", "You cannot demote a belt.")
 
         # ----------------------------
@@ -692,4 +702,3 @@ class WaiverEditForm(forms.ModelForm):
                 self._name_mismatch = True
 
         return member
-

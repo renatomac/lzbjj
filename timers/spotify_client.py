@@ -184,3 +184,51 @@ def _raise_for_playback_error(response: requests.Response) -> None:
 
 class SpotifyPlaybackError(Exception):
     pass
+
+
+def get_playback_state(account) -> Dict[str, Any]:
+    response = requests.get(f"{API_BASE_URL}/me/player", headers=_auth_headers(account), timeout=15)
+    response.raise_for_status()
+    if response.status_code == 204:
+        return {"active": False}
+    body = response.json()
+    item = body.get("item") or {}
+    return {
+        "active": bool(item), "is_playing": body.get("is_playing", False),
+        "progress_ms": body.get("progress_ms") or 0,
+        "duration_ms": item.get("duration_ms") or 0,
+        "track_name": item.get("name", ""),
+        "artists": ", ".join(a.get("name", "") for a in item.get("artists", [])),
+        "shuffle_state": body.get("shuffle_state", False),
+        "repeat_state": body.get("repeat_state", "off"),
+        "context_uri": (body.get("context") or {}).get("uri"),
+        "device_id": (body.get("device") or {}).get("id"),
+        "disallows": (body.get("actions") or {}).get("disallows", {}),
+    }
+
+
+def set_shuffle(account, state: bool, device_id: Optional[str] = None) -> None:
+    params = {"state": str(state).lower()}
+    if device_id:
+        params["device_id"] = device_id
+    response = requests.put(f"{API_BASE_URL}/me/player/shuffle", params=params,
+                            headers=_auth_headers(account), timeout=15)
+    _raise_for_playback_error(response)
+
+
+def set_repeat(account, state: str, device_id: Optional[str] = None) -> None:
+    params = {"state": state}
+    if device_id:
+        params["device_id"] = device_id
+    response = requests.put(f"{API_BASE_URL}/me/player/repeat", params=params,
+                            headers=_auth_headers(account), timeout=15)
+    _raise_for_playback_error(response)
+
+
+def seek_playback(account, position_ms: int, device_id: Optional[str] = None) -> None:
+    params = {"position_ms": position_ms}
+    if device_id:
+        params["device_id"] = device_id
+    response = requests.put(f"{API_BASE_URL}/me/player/seek", params=params,
+                            headers=_auth_headers(account), timeout=15)
+    _raise_for_playback_error(response)

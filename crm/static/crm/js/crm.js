@@ -188,7 +188,7 @@ document.addEventListener("click", function (event) {
     const memberId = button.dataset.id;
     const type = button.dataset.type;
 
-    fetch(`/toggleStatus/${type}/${memberId}`)
+    csrfFetch(`/toggleStatus/${type}/${memberId}/`, { method: 'POST' })
         .then(response => response.json())
         .then(data => {
             location.reload();
@@ -457,9 +457,19 @@ document.addEventListener("click", function (event) {
     const attendeeId = btn.dataset.attendeeId; 
     console.log(attendeeId)
         
-    const url = `/toggleAttendance/${attendeeId}`;
-    fetch(url)
-        .then(response => response.json())
+    const url = `/toggleAttendance/${attendeeId}/`;
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || getCookie('csrftoken');
+    fetch(url, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest' }
+    })
+        .then(response => {
+            if (!response.ok || response.redirected) {
+                throw new Error(`Check-in failed (HTTP ${response.status}). Refresh the page and try again.`);
+            }
+            return response.json();
+        })
         .then(data => {
             const span = document.getElementById('span'+attendeeId);
             const i = document.getElementById('i'+attendeeId);
@@ -501,6 +511,10 @@ document.addEventListener("click", function (event) {
                 btn_i.classList.add("fa-user-check");
             }
             document.getElementById('countChecked').innerHTML = checkedInt
+        })
+        .catch(error => {
+            console.error(error);
+            alert(error.message);
         });
 });
 
@@ -553,9 +567,6 @@ input.addEventListener("input", () => {
         });
     });
 });
-
-
-
 
 
 

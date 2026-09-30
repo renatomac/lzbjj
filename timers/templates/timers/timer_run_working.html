@@ -441,7 +441,6 @@
 
     /* Spotify Playlist & Playback Controls */
     .spotify-panel {
-        flex-shrink: 0;
         margin-top: clamp(1.5rem, 3vmin, 2.5rem);
         width: min(100%, 650px);
         background: rgba(255, 255, 255, 0.04);
@@ -591,12 +590,10 @@
     .timer-card:fullscreen .timer-core-section,
     .timer-card:-webkit-full-screen .timer-core-section,
     .timer-card.is-fullscreen .timer-core-section {
-        flex: 1 1 0 !important;
-        min-height: 0 !important;
-        overflow-y: auto !important;
+        flex: 1 !important;
         display: flex !important;
         flex-direction: column !important;
-        justify-content: flex-start !important;
+        justify-content: center !important;
         padding: clamp(1rem, 3vmin, 2.5rem) !important;
     }
 
@@ -614,58 +611,6 @@
     .timer-card:-webkit-full-screen .wall-clock,
     .timer-card.is-fullscreen .wall-clock {
         font-size: clamp(2rem, 9.3vmin, 8rem) !important;
-    }
-
-    .timer-card.is-fullscreen .timer-core-section > * { flex-shrink: 0; }
-    .timer-toolbar, .timer-footer { flex-shrink: 0; }
-
-    /* Timer and music share the fullscreen card, with independent columns. */
-    .timer-app-wrapper { max-width: 1440px; }
-    .timer-player-layout {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) minmax(290px, 360px);
-        align-items: center;
-        gap: 20px;
-        padding: 16px;
-        min-height: 0;
-    }
-    .timer-player-layout .timer-core-section { min-width: 0; padding: 12px; }
-    .timer-player-layout .spotify-panel { margin: 0; width: 100%; min-width: 0; }
-    .spotify-selectors { flex-direction: column; align-items: stretch; }
-    .spotify-selectors .spotify-select { width: 100%; min-width: 0; }
-    .spotify-panel .spotify-controls-row { gap: 8px; }
-    .spotify-panel .spotify-icon-btn { flex-shrink: 0; }
-    .timer-card.is-fullscreen .timer-player-layout,
-    .timer-card:fullscreen .timer-player-layout,
-    .timer-card:-webkit-full-screen .timer-player-layout {
-        flex: 1 1 0;
-        overflow-y: auto;
-        align-items: center;
-    }
-    .timer-card.is-fullscreen .timer-player-layout .timer-core-section,
-    .timer-card:fullscreen .timer-player-layout .timer-core-section,
-    .timer-card:-webkit-full-screen .timer-player-layout .timer-core-section {
-        overflow: visible !important;
-        padding: 12px !important;
-    }
-    .timer-card.is-fullscreen .timer-display,
-    .timer-card:fullscreen .timer-display,
-    .timer-card:-webkit-full-screen .timer-display { font-size: clamp(4rem, 20vmin, 18rem) !important; }
-    .timer-card.is-fullscreen .wall-clock,
-    .timer-card:fullscreen .wall-clock,
-    .timer-card:-webkit-full-screen .wall-clock { font-size: clamp(1.5rem, 5vmin, 4rem) !important; }
-    @media (max-width: 900px) {
-        .timer-player-layout { grid-template-columns: minmax(0, 1fr); }
-        .timer-player-layout .spotify-panel { max-width: 650px; justify-self: center; }
-    }
-    @media (max-height: 700px) and (min-width: 901px) {
-        .timer-player-layout { padding: 8px; gap: 12px; }
-        .timer-card.is-fullscreen .timer-display,
-        .timer-card:fullscreen .timer-display,
-        .timer-card:-webkit-full-screen .timer-display { font-size: clamp(4rem, 17vh, 10rem) !important; }
-        .timer-player-layout .wall-clock { margin-bottom: 8px; }
-        .timer-player-layout .phase-badge, .timer-player-layout .round-meta-container { margin-bottom: 8px; }
-        .timer-player-layout .controls-wrapper { margin-top: 12px; }
     }
 
     /* Mobile landscape optimization */
@@ -727,7 +672,6 @@
             </div>
         </div>
 
-        <div id="timerPlayerLayout" class="timer-player-layout" style="display:grid; grid-template-columns:minmax(0,1fr) 340px; align-items:center; gap:20px; padding:16px; min-height:0;" data-layout-version="spotify-side-v2">
         <!-- Core Display Stage -->
         <div class="timer-core-section">
 
@@ -780,9 +724,8 @@
                 <google-cast-launcher id="castbutton" title="Cast to TV / Display"></google-cast-launcher>
             </div>
 
-        </div>
-
             <!-- Spotify Music Controls -->
+            {% if spotify_configured %}
             <div class="spotify-panel" id="spotifyPanel">
                 <div class="spotify-panel-header">
                     <div class="spotify-brand"><i class="fab fa-spotify"></i> Spotify</div>
@@ -793,7 +736,6 @@
                 </div>
 
                 <div id="spotifyDisconnectedState">
-                    <p id="spotifyConnectionStatus" class="spotify-status-text">Checking Spotify connection…</p>
                     <a href="{% url 'timers:spotify_connect' %}?next={{ request.path }}" class="spotify-connect-btn">
                         <i class="fab fa-spotify"></i> Connect Spotify
                     </a>
@@ -801,11 +743,11 @@
                 </div>
 
                 <div id="spotifyConnectedState" class="d-none">
-                    <div class="spotify-controls-row spotify-selectors" style="display:grid; grid-template-columns:minmax(0,1fr); gap:10px; width:100%;">
-                        <select id="spotifyPlaylistSelect" class="spotify-select" style="width:100%; min-width:0; display:block;" aria-label="Playlist">
+                    <div class="spotify-controls-row">
+                        <select id="spotifyPlaylistSelect" class="spotify-select">
                             <option value="">Loading playlists&hellip;</option>
                         </select>
-                        <select id="spotifyDeviceSelect" class="spotify-select" style="width:100%; min-width:0; display:block;" aria-label="Playback device">
+                        <select id="spotifyDeviceSelect" class="spotify-select">
                             <option value="">Loading devices&hellip;</option>
                         </select>
                     </div>
@@ -814,6 +756,7 @@
                         <button type="button" id="btnSpotifyShuffle" class="spotify-icon-btn" title="Shuffle" aria-label="Shuffle" aria-pressed="false"><i class="fas fa-random"></i></button>
                         <button type="button" id="btnSpotifyPrev" class="spotify-icon-btn" title="Previous Track" aria-label="Previous track"><i class="fas fa-step-backward"></i></button>
                         <button type="button" id="btnSpotifyPlay" class="spotify-icon-btn play" title="Play" aria-label="Play"><i class="fas fa-play"></i></button>
+                        <button type="button" id="btnSpotifyPause" class="spotify-icon-btn play d-none" title="Pause" aria-label="Pause"><i class="fas fa-pause"></i></button>
                         <button type="button" id="btnSpotifyNext" class="spotify-icon-btn" title="Next Track" aria-label="Next track"><i class="fas fa-step-forward"></i></button>
                         <button type="button" id="btnSpotifyRepeat" class="spotify-icon-btn" title="Repeat off" aria-label="Repeat off" aria-pressed="false"><i class="fas fa-redo"></i><small id="spotifyRepeatOne" class="d-none">1</small></button>
                     </div>
@@ -822,9 +765,10 @@
                         <input id="spotifySeek" type="range" min="0" max="0" value="0" step="1000" aria-label="Song position" disabled>
                         <span id="spotifyDuration">0:00</span>
                     </div>
+                    <p id="spotifyErrorText" class="spotify-status-text text-danger mt-2 mb-0 d-none"></p>
                 </div>
-                <p id="spotifyErrorText" role="alert" class="spotify-status-text text-danger mt-2 mb-0 d-none"></p>
             </div>
+            {% endif %}
 
         </div>
 
@@ -1631,52 +1575,12 @@
     });
 </script>
 
+{% if spotify_configured %}
 <!-- Spotify Playlist & Playback Controls -->
 <script>
     document.addEventListener('DOMContentLoaded', () => {
         const panel = document.getElementById('spotifyPanel');
         if (!panel) return;
-
-        const layout = document.getElementById('timerPlayerLayout');
-        const stage = layout.querySelector('.timer-core-section');
-        function applyMusicLayout() {
-            const wide = window.innerWidth >= 900;
-            const card = document.getElementById('timerCard');
-            const fullscreen = card.classList.contains('is-fullscreen') ||
-                document.fullscreenElement === card || document.webkitFullscreenElement === card;
-            layout.style.setProperty('display', 'grid', 'important');
-            layout.style.setProperty('grid-template-columns', wide ? 'minmax(0, 1fr) 340px' : 'minmax(0, 1fr)', 'important');
-            layout.style.setProperty('align-items', 'center', 'important');
-            layout.style.setProperty('width', '100%', 'important');
-            layout.style.setProperty('box-sizing', 'border-box', 'important');
-            layout.style.setProperty('min-height', '0', 'important');
-            layout.style.setProperty('overflow-y', fullscreen ? 'auto' : 'visible', 'important');
-            layout.style.setProperty('flex', '1 1 0', 'important');
-            panel.style.setProperty('margin', '0', 'important');
-            panel.style.setProperty('width', '100%', 'important');
-            panel.style.setProperty('box-sizing', 'border-box', 'important');
-            panel.style.setProperty('grid-column', wide ? '2' : '1', 'important');
-            panel.style.setProperty('grid-row', wide ? '1' : '2', 'important');
-            stage.style.setProperty('grid-column', '1', 'important');
-            stage.style.setProperty('grid-row', '1', 'important');
-            stage.style.setProperty('min-width', '0', 'important');
-            stage.style.setProperty('overflow', 'visible', 'important');
-            if (fullscreen) {
-                const display = document.getElementById('timerDisplay');
-                display.style.setProperty('font-size', wide ? 'clamp(4rem, 17vmin, 16rem)' : 'clamp(3.5rem, 16vmin, 8rem)', 'important');
-                document.getElementById('wallClock').style.setProperty('font-size', 'clamp(1.5rem, 5vmin, 4rem)', 'important');
-            } else {
-                document.getElementById('timerDisplay').style.removeProperty('font-size');
-                document.getElementById('wallClock').style.removeProperty('font-size');
-            }
-        }
-        applyMusicLayout();
-        window.addEventListener('resize', applyMusicLayout);
-        document.addEventListener('fullscreenchange', applyMusicLayout);
-        document.addEventListener('webkitfullscreenchange', applyMusicLayout);
-        new MutationObserver(applyMusicLayout).observe(document.getElementById('timerCard'), {
-            attributes: true, attributeFilter: ['class']
-        });
 
         const connectedInfo = document.getElementById('spotifyConnectedInfo');
         const displayNameEl = document.getElementById('spotifyDisplayName');
@@ -1685,6 +1589,7 @@
         const playlistSelect = document.getElementById('spotifyPlaylistSelect');
         const deviceSelect = document.getElementById('spotifyDeviceSelect');
         const btnPlay = document.getElementById('btnSpotifyPlay');
+        const btnPause = document.getElementById('btnSpotifyPause');
         const btnShuffle = document.getElementById('btnSpotifyShuffle');
         const btnRepeat = document.getElementById('btnSpotifyRepeat');
         const seek = document.getElementById('spotifySeek');
@@ -1767,21 +1672,14 @@
         let busy = false;
         let polling = false;
         let connected = false;
-        let commandRevision = 0;
-        let settleUntil = 0;
-        const buttons = [btnPlay, btnNext, btnPrev, btnShuffle, btnRepeat];
+        const buttons = [btnPlay, btnPause, btnNext, btnPrev, btnShuffle, btnRepeat];
         const formatMusicTime = ms => {
-            const seconds = Math.floor(Math.max(0, Number(ms) || 0) / 1000);
+            const seconds = Math.floor(Math.max(0, ms) / 1000);
             return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
         };
         function renderPlayback() {
-            const playing = playback.is_playing === true;
-            const label = playing ? 'Pause' : 'Play';
-            if (btnPlay.getAttribute('aria-label') !== label) {
-                btnPlay.innerHTML = playing ? '<i class="fas fa-pause"></i>' : '<i class="fas fa-play"></i>';
-                btnPlay.title = label;
-                btnPlay.setAttribute('aria-label', label);
-            }
+            btnPlay.classList.toggle('d-none', playback.is_playing);
+            btnPause.classList.toggle('d-none', !playback.is_playing);
             btnShuffle.classList.toggle('active', !!playback.shuffle_state);
             btnShuffle.setAttribute('aria-pressed', String(!!playback.shuffle_state));
             const repeat = playback.repeat_state || 'off';
@@ -1791,7 +1689,7 @@
             document.getElementById('spotifyRepeatOne').classList.toggle('d-none', repeat !== 'track');
             trackInfo.textContent = playback.active ? `${playback.track_name} — ${playback.artists}` : 'Open Spotify on your selected device to start listening.';
             const disallows = playback.disallows || {};
-            const restrictions = [playing ? 'pausing' : 'resuming', 'skipping_next', 'skipping_prev', 'toggling_shuffle', 'toggling_repeat_context'];
+            const restrictions = ['resuming', 'pausing', 'skipping_next', 'skipping_prev', 'toggling_shuffle', 'toggling_repeat_context'];
             buttons.forEach((button, index) => { button.disabled = busy || !!disallows[restrictions[index]]; });
             seek.disabled = busy || !playback.duration_ms || !!disallows.seeking;
             duration.textContent = formatMusicTime(playback.duration_ms);
@@ -1804,21 +1702,11 @@
         async function refreshPlayback() {
             if (polling || busy || !connected || document.hidden) return;
             polling = true;
-            const revision = commandRevision;
             try {
                 const res = await fetch('{% url "timers:spotify_playback_state" %}', { cache: 'no-store' });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || 'Unable to read playback');
-                if (revision !== commandRevision || performance.now() < settleUntil) return;
-                playback = {
-                    ...data,
-                    active: data.active === true,
-                    is_playing: data.is_playing === true,
-                    progress_ms: Math.max(0, Number(data.progress_ms) || 0),
-                    duration_ms: Math.max(0, Number(data.duration_ms) || 0),
-                    shuffle_state: data.shuffle_state === true,
-                    repeat_state: data.repeat_state || 'off'
-                };
+                playback = data;
                 sampledAt = performance.now();
                 renderPlayback();
             } catch (e) { showSpotifyError(e.message); }
@@ -1829,7 +1717,6 @@
             if (busy) return;
             const requestAction = action === 'play' && playback.active && !playlistChanged ? 'resume' : action;
             busy = true;
-            commandRevision++;
             renderPlayback();
             clearSpotifyError();
             try {
@@ -1845,17 +1732,13 @@
                 });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || `Spotify ${action} failed`);
-                if (action === 'play') { playlistChanged = false; playback.active = true; playback.is_playing = true; }
+                if (action === 'play') { playlistChanged = false; playback.is_playing = true; }
                 if (action === 'pause') playback.is_playing = false;
-                if (action === 'shuffle') playback.shuffle_state = extra.state;
-                if (action === 'repeat') playback.repeat_state = extra.state;
-                if (action === 'seek') playback.progress_ms = extra.position_ms;
-                sampledAt = performance.now();
-                settleUntil = performance.now() + 1500;
             } catch (e) { showSpotifyError(e.message); }
             finally { busy = false; renderPlayback(); await refreshPlayback(); }
         }
-        btnPlay.addEventListener('click', () => sendSpotifyAction(playback.is_playing ? 'pause' : 'play'));
+        btnPlay.addEventListener('click', () => sendSpotifyAction('play'));
+        btnPause.addEventListener('click', () => sendSpotifyAction('pause'));
         btnNext.addEventListener('click', () => sendSpotifyAction('next'));
         btnPrev.addEventListener('click', () => sendSpotifyAction('previous'));
         btnShuffle.addEventListener('click', () => sendSpotifyAction('shuffle', { state: !playback.shuffle_state }));
@@ -1877,10 +1760,6 @@
             try {
                 const res = await fetch('{% url "timers:spotify_status" %}');
                 const data = await res.json();
-                if (!res.ok) throw new Error(data.error || `Status request failed (${res.status})`);
-                document.getElementById('spotifyConnectionStatus').textContent = data.configured === false
-                    ? 'Spotify is not configured on this server. Set the client ID and client secret, then restart Django.'
-                    : 'Connect Spotify to enable the music controls.';
                 if (!data.connected) {
                     disconnectedState.classList.remove('d-none');
                     connectedState.classList.add('d-none');
@@ -1897,9 +1776,10 @@
                 ]);
                 await refreshPlayback();
             } catch (e) {
-                showSpotifyError(`Unable to check Spotify connection: ${e.message}`);
+                showSpotifyError('Unable to reach Spotify status endpoint.');
             }
         })();
     });
 </script>
+{% endif %}
 {% endblock %}

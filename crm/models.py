@@ -145,6 +145,7 @@ class Contact(models.Model):
 
 
 class Member(models.Model):
+    TRANSITIONING = "transition"  # Fits the existing 10-character database column.
     class LifecycleStatus(models.TextChoices):
         LEAD = "lead", "Lead"
         TRIAL = "trial", "Trial"
@@ -159,6 +160,7 @@ class Member(models.Model):
     MEMBER_TYPE = [
         ('adult', 'Adult'),
         ('child', 'Child'),
+        (TRANSITIONING, 'Transitioning'),
     ]
 
     #user = models.ForeignKey( settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="members" )
@@ -248,7 +250,9 @@ class Member(models.Model):
         """
         return (
             WaiverSignature.MINOR
-            if self.member_type == "child"
+            if self.member_type == "child" or (
+                self.member_type == self.TRANSITIONING and self.age is not None and self.age < 18
+            )
             else WaiverSignature.ADULT
         )
     
@@ -264,7 +268,9 @@ class Member(models.Model):
         # ----------------------------
         # 1) CHILD MEMBER VALIDATION
         # ----------------------------
-        if self.member_type == 'child':
+        if self.member_type == 'child' or (
+            self.member_type == self.TRANSITIONING and self.age is not None and self.age < 18
+        ):
             has_responsible_contact_email = self.contacts.filter(
                 contact_type='responsible',
                 email__isnull=False
@@ -281,7 +287,9 @@ class Member(models.Model):
         # ----------------------------
         # 2) ADULT MEMBER VALIDATION
         # ----------------------------
-        if self.member_type == 'adult':
+        if self.member_type == 'adult' or (
+            self.member_type == self.TRANSITIONING and self.age is not None and self.age >= 18
+        ):
             has_user_email = bool(self.user and self.user.email)
             has_member_email = bool(self.email)
 
@@ -300,17 +308,19 @@ class Member(models.Model):
     @property
     def has_valid_waiver(self):
         return self.waivers.filter(
-            agreed=True
+            agreed=True,
+            is_void=False,
+            participant_type=self.required_waiver_type(),
+            waiver_version__waiver_type=self.required_waiver_type(),
         ).exists()
     
     @property
     def has_latest_waiver(self):
-        WaiverVersion = apps.get_model("crm", "WaiverVersion")
-
         latest_version = (
             WaiverVersion.objects
-            .filter(is_active=True)
-            .order_by("-created_at")
+            .filter(is_active=True, waiver_type=self.required_waiver_type(),
+                    effective_date__lte=timezone.localdate())
+            .order_by("-effective_date", "-created_at")
             .first()
         )
 
@@ -319,7 +329,9 @@ class Member(models.Model):
 
         return self.waivers.filter(
             waiver_version=latest_version,
-            agreed=True
+            agreed=True,
+            is_void=False,
+            participant_type=self.required_waiver_type(),
         ).exists()
 
     @property
@@ -415,6 +427,8 @@ class Member(models.Model):
         # Determine allowed class types
         if self.member_type == "child":
             allowed_types = ["kids"]
+        elif self.member_type == self.TRANSITIONING:
+            allowed_types = ["kids", "adult", "open"]
         else:
             allowed_types = ["adult", "open"]
 
@@ -425,9 +439,18 @@ class Member(models.Model):
                 session__date__gte=today,
             )
 
-            removed_count = future_attendance.exclude(
-                session__class_template__type__in=allowed_types
-            ).delete()[0]
+            valid_attendance = future_attendance.filter(
+                session__class_template__type__in=allowed_types,
+                session__is_canceled=False,
+            )
+            if self.membership_start_date:
+                valid_attendance = valid_attendance.filter(session__date__gte=self.membership_start_date)
+            if self.membership_end_date:
+                valid_attendance = valid_attendance.filter(session__date__lte=self.membership_end_date)
+            if self.trial_expires_on and not self.plan_id:
+                valid_attendance = valid_attendance.filter(session__date__lt=self.trial_expires_on)
+            valid_ids = list(valid_attendance.values_list("pk", flat=True))
+            removed_count = future_attendance.exclude(pk__in=valid_ids).delete()[0]
 
             # Add missing attendance
             allowed_sessions = ClassSession.objects.filter(
@@ -445,6 +468,8 @@ class Member(models.Model):
                 allowed_sessions = allowed_sessions.filter(
                     date__lte=self.membership_end_date
                 )
+            if self.trial_expires_on and not self.plan_id:
+                allowed_sessions = allowed_sessions.filter(date__lt=self.trial_expires_on)
 
             created_count = 0
             for session in allowed_sessions:
@@ -832,6 +857,9 @@ class SessionAttendance(models.Model):
     session = models.ForeignKey(ClassSession, on_delete=models.CASCADE)
     member = models.ForeignKey(Member, on_delete=models.CASCADE)
     present = models.BooleanField(default=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["session", "member"], name="unique_session_member_attendance")]
 
 class Technique(models.Model):
     name = models.CharField(max_length=100, null=True, blank=True)

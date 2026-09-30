@@ -5,6 +5,7 @@ import re
 from decimal import Decimal, InvalidOperation
 from django.contrib.auth import authenticate, login, logout, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import user_passes_test
 from django.contrib import messages
 from django.db import transaction
 from django.db.models import Count, Q, F, Sum
@@ -36,8 +37,17 @@ from crm.services.trials import convert_trial_to_membership, deactivate_trial, e
 logger = logging.getLogger(__name__)
 
 
+def crm_staff_required(view):
+    return user_passes_test(
+        lambda user: user.is_authenticated and (
+            user.is_staff or user.is_superuser or user.is_coach
+        ), login_url="login"
+    )(view)
+
+
 WEEKDAY_CODES = ['mon','tue','wed','thu','fri','sat','sun']
 
+@crm_staff_required
 def index(request):
 # Authenticated users view the Dashboard
     if request.user.is_authenticated:
@@ -62,11 +72,16 @@ def index(request):
         inactive=Member.objects.filter(is_active = False).count()
         total=Member.objects.all().count()
         # members enrolled in the last 30 days
-        newMembers=Member.objects.filter(membership_start_date__gte = oneMonthLess).values()
-        newMembersCount=Member.objects.filter(membership_start_date__gte = oneMonthLess).count()
+        new_members_qs = Member.objects.filter(membership_start_date__range=(oneMonthLess, today))
+        newMembers = new_members_qs.values()
+        newMembersCount = new_members_qs.count()
         # membership exping in the next 30 days
-        expiring= Member.objects.filter(membership_start_date__lt = oneMonthMore ).values()
-        expiringCount= Member.objects.filter(membership_start_date__lt = oneMonthMore ).count()
+        expiring_qs = Member.objects.filter(
+            is_active=True, membership_end_date__gte=today,
+            membership_end_date__lte=oneMonthMore,
+        )
+        expiring = expiring_qs.values()
+        expiringCount = expiring_qs.count()
         classesCount = classesThisWeek()
         # members age
         members_age = [
@@ -233,6 +248,7 @@ def resetUserPassword(request, user_id):
         )
     return HttpResponseRedirect(reverse("users"))
 
+@crm_staff_required
 def dashboard(request):
     # Authenticated users view the Dashboard
     if request.user.is_authenticated:
@@ -257,11 +273,16 @@ def dashboard(request):
         inactive=Member.objects.filter(is_active = False).count()
         total=Member.objects.all().count()
         # members enrolled in the last 30 days
-        newMembers=Member.objects.filter(membership_start_date__gte = oneMonthLess).values()
-        newMembersCount=Member.objects.filter(membership_start_date__gte = oneMonthLess).count()
+        new_members_qs = Member.objects.filter(membership_start_date__range=(oneMonthLess, today))
+        newMembers = new_members_qs.values()
+        newMembersCount = new_members_qs.count()
         # membership exping in the next 30 days
-        expiring= Member.objects.filter(membership_end_date__lt = oneMonthMore ).values()
-        expiringCount= Member.objects.filter(membership_end_date__lt = oneMonthMore ).count()
+        expiring_qs = Member.objects.filter(
+            is_active=True, membership_end_date__gte=today,
+            membership_end_date__lte=oneMonthMore,
+        )
+        expiring = expiring_qs.values()
+        expiringCount = expiring_qs.count()
         classesCount = classesThisWeek()
         # members age
         members_age = [
@@ -302,10 +323,12 @@ def dashboard(request):
     else:
         return HttpResponseRedirect(reverse("login"))
 
+@crm_staff_required
 def view_session(request):
     return render(request, "classes/index.html")
 
 
+@crm_staff_required
 def members(request):
     query = request.GET.get("query", "")
     status = request.GET.get("status", "active")
@@ -320,7 +343,7 @@ def members(request):
     elif status == "inactive":
         all_members = all_members.filter(is_active=False)
 
-    if member_type in {"adult", "child"}:
+    if member_type in {"adult", "child", Member.TRANSITIONING}:
         all_members = all_members.filter(member_type=member_type)
 
     # Filter by search query
@@ -425,6 +448,7 @@ def members(request):
     
 
 @transaction.atomic
+@crm_staff_required
 def addMember(request):
     if request.method == 'POST':
         form = MemberForm(request.POST)
@@ -455,6 +479,7 @@ def addMember(request):
         "action_url": "addMember"
         })
 
+@crm_staff_required
 def editMember(request, member_id):
     member = get_object_or_404(Member, pk=member_id)
     ContactFormSet = inlineformset_factory(
@@ -495,6 +520,7 @@ def editMember(request, member_id):
         "action_url": "editMember",
         })
 
+@crm_staff_required
 def deleteMember(request, member_id):
     if request.method == 'POST':
         plan = get_object_or_404(Member, id=member_id)
@@ -503,13 +529,16 @@ def deleteMember(request, member_id):
         print("Form is invalid.")
     return HttpResponseRedirect(reverse("members"))
 
+@crm_staff_required
 def recordPayment(request, member_id):
     return render(request, "members/add.html")
 
 
+@crm_staff_required
 def exportMembers(request):
     return render(request, "members/export.html")
 
+@crm_staff_required
 def viewMember(request, member_id):
     instance = get_object_or_404(Member, pk=member_id)
     responsible = instance.contacts.filter(contact_type="responsible").values()
@@ -633,6 +662,7 @@ def viewMember(request, member_id):
         "payments_ytd_total": payments_ytd_total,
     })
 
+@crm_staff_required
 def getContacts(request, member_id):
     filter = request.GET.get("filter")
     instance = get_object_or_404(Member, pk=member_id)
@@ -648,6 +678,8 @@ def getContacts(request, member_id):
     print(contacts)
     return JsonResponse({"contacts": contacts})
 
+@crm_staff_required
+@transaction.atomic
 def addPromotion(request, member_id):
     # Staff-only check
     if not (request.user.is_authenticated and hasattr(request.user, 'staff') and request.user.staff.is_active):
@@ -692,6 +724,8 @@ def makeRank(belt, stripes):
     return belt
 
 
+@crm_staff_required
+@transaction.atomic
 def editPromotion(request, promotion_id):
     # Staff-only check
     if not (request.user.is_authenticated and hasattr(request.user, 'staff') and request.user.staff.is_active):
@@ -707,15 +741,12 @@ def editPromotion(request, promotion_id):
     if request.method == "POST":
         form = BeltPromotionForm(request.POST, instance=promotion, member=member)
         if form.is_valid():
-            old_new_rank = promotion.new_rank
-            old_new_stripes = promotion.new_stripes
-            
             promotion = form.save(commit=False)
             promotion.promoted_by = request.user.staff
             promotion.save()
             
             # Update member's current rank to match the most recent promotion
-            latest_promotion = BeltPromotion.objects.filter(member=member).order_by('-promotion_date').first()
+            latest_promotion = BeltPromotion.objects.filter(member=member).order_by('-promotion_date', '-created_at', '-pk').first()
             if latest_promotion:
                 member.belt_rank = latest_promotion.new_rank
                 member.stripes = latest_promotion.new_stripes
@@ -734,6 +765,8 @@ def editPromotion(request, promotion_id):
         })
 
 
+@crm_staff_required
+@transaction.atomic
 def deletePromotion(request, promotion_id):
     # Staff-only check
     if not (request.user.is_authenticated and hasattr(request.user, 'staff') and request.user.staff.is_active):
@@ -743,17 +776,17 @@ def deletePromotion(request, promotion_id):
     member = promotion.member
     
     if request.method == "POST":
+        original_rank, original_stripes = promotion.old_rank, promotion.old_stripes
         promotion.delete()
         
         # Reset member's rank to the most recent remaining promotion
-        latest_promotion = BeltPromotion.objects.filter(member=member).order_by('-promotion_date').first()
+        latest_promotion = BeltPromotion.objects.filter(member=member).order_by('-promotion_date', '-created_at', '-pk').first()
         if latest_promotion:
             member.belt_rank = latest_promotion.new_rank
             member.stripes = latest_promotion.new_stripes
         else:
-            # No promotions left, reset to white belt
-            member.belt_rank = BeltRank.WHITE
-            member.stripes = 0
+            member.belt_rank = original_rank
+            member.stripes = original_stripes
         member.save()
         
         return redirect("members")
@@ -766,6 +799,7 @@ def deletePromotion(request, promotion_id):
 
 
 
+@crm_staff_required
 def student_journey(request, member_id):
     """
     Display a comprehensive Student Journey page showing BJJ progression.
@@ -1006,6 +1040,7 @@ def student_journey(request, member_id):
     return render(request, 'members/student_journey.html', context)
 
 
+@crm_staff_required
 def addClasses(request):
     if request.method == 'POST':
         form = ClassForm(request.POST)
@@ -1027,6 +1062,7 @@ def addClasses(request):
         "action_url": "addClass"
         })
 
+@crm_staff_required
 def editClass(request, class_id):
     if not class_id:
         return redirect('classes')
@@ -1057,6 +1093,7 @@ def editClass(request, class_id):
         "class": instance
     })
 
+@crm_staff_required
 def deleteClass(request, class_id):
     if request.method == 'POST':
         class_instance = get_object_or_404(Class, id=class_id)
@@ -1065,13 +1102,16 @@ def deleteClass(request, class_id):
         print("class id is invalid.")
     return HttpResponseRedirect(reverse("classes"))
 
+@crm_staff_required
 def exportSchedule(request):
     return render(request, "classes/index.html")
 
 
+@crm_staff_required
 def typesClasses(request):
     return render(request, "classes/types.html")
 
+@crm_staff_required
 def attendance(request):
     today = timezone.localdate().weekday()
     todayDate = timezone.localdate()
@@ -1095,6 +1135,7 @@ def attendance(request):
         "today":today,
     })
 
+@crm_staff_required
 def attendanceRecord(request, session_id):
     today = timezone.localdate()
     btnFilter = request.GET.get("filter")
@@ -1140,6 +1181,7 @@ def attendanceRecord(request, session_id):
 
 
 @login_required
+@crm_staff_required
 def attendance_enroll(request, member_id):
     member = get_object_or_404(Member, pk=member_id)
     if request.method == "POST":
@@ -1175,6 +1217,7 @@ def attendance_enroll(request, member_id):
 
 
 @login_required
+@crm_staff_required
 def attendance_bulk(request):
     if not request.user.is_staff:
         return HttpResponse("Staff access only", status=403)
@@ -1338,6 +1381,7 @@ def attendance_member_checkin(request):
     })
 
 
+@crm_staff_required
 def getSessionsByDate(request, date):
     sessions = ClassSession.objects.filter(date=date).values(
         "id",
@@ -1350,6 +1394,8 @@ def getSessionsByDate(request, date):
     )
     return JsonResponse(list(sessions), safe=False)
 
+@crm_staff_required
+@require_POST
 def toggleAttendance(request, attendance_id):
     attendance = get_object_or_404(SessionAttendance, pk=attendance_id)
     if attendance.present == True:
@@ -1362,6 +1408,7 @@ def toggleAttendance(request, attendance_id):
 
     return JsonResponse({"status": status})
 
+@crm_staff_required
 def getClasses(request, strDate):
     date = datetime.fromisoformat(strDate)
     shortWeekday = date.strftime("%a").lower()[:3]
@@ -1369,6 +1416,7 @@ def getClasses(request, strDate):
     dateClasses = Class.objects.filter(days_of_week__contains = shortWeekday).values()
     return JsonResponse(list(dateClasses), safe=False)
 
+@crm_staff_required
 def getStudents(request, class_id):
 
     strDate = request.GET.get("classDate")
@@ -1380,9 +1428,10 @@ def getStudents(request, class_id):
     classType = get_object_or_404(Class, id=class_id)
 
     attending_ids = set(
-        Attendance.objects.filter(
-            Class=classType,
-            date=date
+        SessionAttendance.objects.filter(
+            session__class_template=classType,
+            session__date=date,
+            present=True,
         ).values_list("member_id", flat=True)
     )
 
@@ -1390,9 +1439,9 @@ def getStudents(request, class_id):
         print('open')
         members = Member.objects.filter(is_active = True)
     elif classType.type == 'adult':
-        members = Member.objects.filter(member_type='adult')
+        members = Member.objects.filter(member_type__in=['adult', Member.TRANSITIONING], is_active=True)
     else:
-        members = Member.objects.filter(member_type='child')
+        members = Member.objects.filter(member_type__in=['child', Member.TRANSITIONING], is_active=True)
     data = []
     for m in members:
         data.append({
@@ -1406,6 +1455,8 @@ def getStudents(request, class_id):
         })
     return JsonResponse(list(data), safe=False)
 
+@crm_staff_required
+@require_POST
 def toggleStatus(request, type, member_id):
     if type == 'Staff':
         instance = get_object_or_404(Staff, pk=member_id)
@@ -1425,6 +1476,7 @@ def toggleStatus(request, type, member_id):
     instance.save()
     return JsonResponse({"active": instance.is_active})
 
+@crm_staff_required
 def classes(request):
     query = request.GET.get("query", "")
     classType = request.GET.get("filterClassType", "")
@@ -1782,7 +1834,7 @@ def deletePlan(request, plan_id):
     return HttpResponseRedirect(reverse("plan"))
 
 def calculateAge(birthDate):
-    today = date.today()
+    today = timezone.localdate()
     age = today.year - birthDate.year - ((today.month, today.day) < (birthDate.month, birthDate.day))
     return age
 
@@ -1791,12 +1843,13 @@ def classesThisWeek():
     classesCount = 0
     shortWeekday = today.strftime("%a").lower()[:3]
     if today.weekday() <= 6:
-        for i in range (today.weekday(), 6):
+        for i in range(today.weekday(), 7):
             classesCount = classesCount + Class.objects.filter(days_of_week__contains = shortWeekday).values().count()
             today = today+timedelta(days=1)
             shortWeekday = today.strftime("%a").lower()[:3]
     return classesCount
 
+@crm_staff_required
 def saveTechnique(request):
     if request.method != "POST":
         return JsonResponse({"error": "Invalid method"}, status=405)
@@ -1825,11 +1878,14 @@ def saveTechnique(request):
     return JsonResponse({"success": True})
 
 
+@crm_staff_required
+@require_POST
 def create_sessions(request):
     create_future_sessions(days_ahead=30)
     return HttpResponseRedirect(reverse("classes"))
 
 
+@crm_staff_required
 def sessions(request):
     today = timezone.localdate()
     sessions_qs = ClassSession.objects.select_related("class_template", "instructor")
@@ -1850,9 +1906,13 @@ def sessions(request):
     if filter_class:
         sessions_qs = sessions_qs.filter(class_template__name=filter_class)
     if filter_instructor:
-        sessions_qs = sessions_qs.filter(instructor_id=int(filter_instructor))
+        sessions_qs = sessions_qs.annotate(
+            effective_instructor_id=Coalesce("instructor_id", "class_template__instructor_id")
+        ).filter(effective_instructor_id=int(filter_instructor))
 
-    sessions_qs = sessions_qs.order_by("date", "start_time")
+    sessions_qs = sessions_qs.annotate(
+        effective_start_time_db=Coalesce("start_time", "class_template__start_time")
+    ).order_by("date", "effective_start_time_db")
 
     # ---- Dropdowns ----
     years = ClassSession.objects.annotate(year=ExtractYear("date")).values_list("year", flat=True).distinct().order_by("-year")
@@ -1994,6 +2054,7 @@ def _dedupe_session_attendance(session):
             SessionAttendance.objects.filter(id__in=delete_ids).delete()
 
 
+@crm_staff_required
 def session_edit(request, session_id):
     session = get_object_or_404(ClassSession, id=session_id)
     _dedupe_session_attendance(session)
@@ -2028,6 +2089,7 @@ def session_edit(request, session_id):
     )
 
 @require_POST
+@crm_staff_required
 def session_delete(request, session_id ):
     session = get_object_or_404(ClassSession, id=session_id)
     classDate = session.date
@@ -2050,6 +2112,7 @@ def session_delete(request, session_id ):
     return HttpResponseRedirect(reverse("attendance"))
 
 @require_POST
+@crm_staff_required
 def session_cancel(request, session_id ):
     session = get_object_or_404(ClassSession, id=session_id)
     if session.is_canceled == False:
@@ -2058,6 +2121,7 @@ def session_cancel(request, session_id ):
     return redirect("attendanceRecord", session_id=session_id)
 
 @require_POST
+@crm_staff_required
 def session_activate(request, session_id ):
     session = get_object_or_404(ClassSession, id=session_id)
     if session.is_canceled == True:
@@ -2068,6 +2132,7 @@ def session_activate(request, session_id ):
 
 '''WAIVER VIEWS'''
 
+@crm_staff_required
 def waivers(request):
     show_voided = request.GET.get("voided") == "1"
 
@@ -2109,9 +2174,14 @@ def adult_waiver(request, member_id=None):
             sig.user_agent = request.META.get("HTTP_USER_AGENT", "")
             if member_id:
                 sig.member_id = member_id
-            sig.save()
-            start_trial_from_waiver(sig)
-            return redirect("waiver_success")
+            try:
+                with transaction.atomic():
+                    sig.save()
+                    start_trial_from_waiver(sig)
+            except ValueError as exc:
+                form.add_error(None, str(exc))
+            else:
+                return redirect("waiver_success")
     else:
         form = AdultWaiverForm()
 
@@ -2141,10 +2211,15 @@ def minor_waiver(request, member_id=None):
             sig.user_agent = request.META.get("HTTP_USER_AGENT", "")
             if member_id:
                 sig.member_id = member_id
-            sig.save()
-            start_trial_from_waiver(sig)
-            messages.success(request, "Waiver signed successfully.")
-            return redirect("waiver_success")
+            try:
+                with transaction.atomic():
+                    sig.save()
+                    start_trial_from_waiver(sig)
+            except ValueError as exc:
+                form.add_error(None, str(exc))
+            else:
+                messages.success(request, "Waiver signed successfully.")
+                return redirect("waiver_success")
         else:
             messages.error(request, "There was a problem with the form. Please check the fields below.")
 
@@ -2159,6 +2234,7 @@ def minor_waiver(request, member_id=None):
 def waiver_success(request):
     return render(request, "waiver/success.html")
 
+@crm_staff_required
 def waiver_detail(request, pk):
     signature = get_object_or_404(
         WaiverSignature.objects.select_related("waiver_version"),
@@ -2170,6 +2246,7 @@ def waiver_detail(request, pk):
         "waiver": signature.waiver_version,
     })
 
+@crm_staff_required
 def waiver_pdf(request, pk):
     signature = get_object_or_404(
         WaiverSignature.objects.select_related("waiver_version"),
@@ -2182,6 +2259,7 @@ def waiver_pdf(request, pk):
     })
 
 
+@crm_staff_required
 def waiver_edit(request, pk):
     waiver = get_object_or_404(WaiverSignature, pk=pk, is_void=False)
 
@@ -2211,6 +2289,7 @@ def waiver_edit(request, pk):
     return render(request, "waiver/edit.html", {"waiver": waiver, "form": form})
 
 
+@crm_staff_required
 def waiver_delete(request, pk):
     waiver = get_object_or_404(WaiverSignature, pk=pk, is_void=False)
 
@@ -2306,7 +2385,8 @@ def attendance_report(request):
         ).order_by('date', 'start_time')
 
         # 2. Get all active members of that type
-        members = Member.objects.filter(member_type=member_type, is_active=True).order_by('first_name')
+        member_types = [member_type, Member.TRANSITIONING] if member_type in ('adult', 'child') else [member_type]
+        members = Member.objects.filter(member_type__in=member_types, is_active=True).order_by('first_name')
 
         # 3. Group sessions by day and build attendance map
         # We prefetch SessionAttendance to avoid N+1 queries

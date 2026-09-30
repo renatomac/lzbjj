@@ -62,6 +62,7 @@ Members <span class="badge bg-primary ms-2">{{ members.paginator.count }}</span>
                                 <option value="" {% if not member_type %}selected{% endif %}>All Types</option>
                                 <option value="adult" {% if member_type == "adult" %}selected{% endif %}>Adults</option>
                                 <option value="child" {% if member_type == "child" %}selected{% endif %}>Children</option>
+                                <option value="transition" {% if member_type == "transition" %}selected{% endif %}>Transitioning</option>
                             </select>
                         </div>
 
