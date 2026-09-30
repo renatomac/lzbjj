@@ -280,8 +280,17 @@ def spotify_control(request):
     playlist_uri = data.get('playlist_uri')
     device_id = data.get('device_id')
 
-    if action not in ('play', 'pause', 'stop', 'next', 'previous'):
+    if action not in ('play', 'resume', 'pause', 'stop', 'next', 'previous', 'shuffle', 'repeat', 'seek'):
         return JsonResponse({'error': 'Invalid or missing action'}, status=400)
+
+    if action == 'shuffle' and not isinstance(data.get('state'), bool):
+        return JsonResponse({'error': 'Shuffle state must be a boolean'}, status=400)
+    if action == 'repeat' and data.get('state') not in ('off', 'context', 'track'):
+        return JsonResponse({'error': 'Invalid repeat mode'}, status=400)
+    if action == 'seek':
+        position = data.get('position_ms')
+        if isinstance(position, bool) or not isinstance(position, int) or position < 0:
+            return JsonResponse({'error': 'Seek position must be a nonnegative integer'}, status=400)
 
     if playlist_uri:
         account.last_playlist_uri = playlist_uri
@@ -295,15 +304,35 @@ def spotify_control(request):
     try:
         if action == 'play':
             spotify_client.start_playback(account, playlist_uri=playlist_uri or account.last_playlist_uri, device_id=device_id)
+        elif action == 'resume':
+            # Omit context_uri so Spotify retains the current track and position.
+            spotify_client.start_playback(account, device_id=device_id)
         elif action in ('pause', 'stop'):
             spotify_client.pause_playback(account, device_id=device_id)
         elif action == 'next':
             spotify_client.next_track(account, device_id=device_id)
         elif action == 'previous':
             spotify_client.previous_track(account, device_id=device_id)
+        elif action == 'shuffle':
+            spotify_client.set_shuffle(account, data['state'], device_id=device_id)
+        elif action == 'repeat':
+            spotify_client.set_repeat(account, data['state'], device_id=device_id)
+        elif action == 'seek':
+            spotify_client.seek_playback(account, data['position_ms'], device_id=device_id)
     except SpotifyPlaybackError as exc:
         return JsonResponse({'error': str(exc)}, status=409)
     except Exception as exc:
         return JsonResponse({'error': str(exc)}, status=502)
 
     return JsonResponse({'status': 'ok', 'action': action})
+
+
+@login_required
+def spotify_playback_state(request):
+    account = SpotifyAccount.objects.filter(user=request.user).first()
+    if not account:
+        return JsonResponse({'error': 'Spotify account not connected'}, status=400)
+    try:
+        return JsonResponse(spotify_client.get_playback_state(account))
+    except Exception as exc:
+        return JsonResponse({'error': str(exc)}, status=502)
