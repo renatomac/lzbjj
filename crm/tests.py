@@ -768,6 +768,69 @@ class TrialLifecycleTests(TestCase):
         self.assertTrue(member.trial_expired_notified)
         self.assertEqual(generate_trial_expiration_notifications(), [])
 
+class MemberMapDataTests(TestCase):
+    def setUp(self):
+        staff_user = get_user_model().objects.create_user(
+            username="map-staff", email="map-staff@example.com",
+            password="test-password", is_staff=True,
+        )
+        self.client.force_login(staff_user)
+
+    def make_member(self, first_name, *, is_active=True, latitude=42.2, longitude=-88.1,
+                    member_type="adult", address="123 Main St"):
+        return Member.objects.create(
+            first_name=first_name, last_name="MapTest", date_of_birth="2000-01-01",
+            address=address, city="Lake Zurich", zip_code="60047", member_type=member_type,
+            is_active=is_active, latitude=latitude, longitude=longitude,
+        )
+
+    def get_member_groups(self):
+        response = self.client.get(reverse("member_map_data"))
+        self.assertEqual(response.status_code, 200)
+        return [
+            feature
+            for feature in response.json()["features"]
+            if feature["properties"]["kind"] == "members"
+        ]
+
+    def group_for_member(self, member_id):
+        return next(
+            feature for feature in self.get_member_groups()
+            if any(member["id"] == member_id for member in feature["properties"]["members"])
+        )
+
+    def test_map_data_tracks_member_status_creation_and_address_coordinates(self):
+        member = self.make_member("First")
+        group = self.group_for_member(member.id)
+        self.assertIsNone(group["properties"]["color"])
+
+        member.is_active = False
+        member.save()
+        group = self.group_for_member(member.id)
+        self.assertEqual(group["properties"]["color"], "#dc3545")
+
+        new_member = self.make_member("Second", latitude=42.3, longitude=-88.2, address="456 Oak St")
+        group = self.group_for_member(new_member.id)
+        self.assertEqual(group["properties"]["address"], "456 Oak St, Lake Zurich, IL, 60047")
+
+        new_member.latitude = 42.4
+        new_member.longitude = -88.3
+        new_member.save()
+        group = self.group_for_member(new_member.id)
+        self.assertEqual(group["geometry"]["coordinates"], [-88.3, 42.4])
+        self.assertEqual(group["properties"]["members"][0]["name"], "Second MapTest")
+
+        child = self.make_member(
+            "Third", latitude=42.4, longitude=-88.3, member_type="child", address="456 Oak St",
+        )
+        group = self.group_for_member(child.id)
+        self.assertEqual(
+            [member["member_type"] for member in group["properties"]["members"]],
+            ["Adult", "Child"],
+        )
+        self.assertEqual(group["properties"]["members"][0]["id"], new_member.id)
+
+
 class WorkflowRegressionTests(TestCase):
     def setUp(self):
         self.today = timezone.localdate()

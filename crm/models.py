@@ -194,6 +194,8 @@ class Member(models.Model):
     city = models.CharField(max_length=64)
     state = USStateField(blank=True, null=True, default='IL')
     zip_code = models.CharField(max_length=10)
+    latitude = models.FloatField(null=True, blank=True)
+    longitude = models.FloatField(null=True, blank=True)
 
     belt_rank = models.CharField(max_length=50, choices=BeltRank.choices, default=BeltRank.WHITE)
     stripes = models.SmallIntegerField(validators=[MinValueValidator(0), MaxValueValidator(12)], default=0)
