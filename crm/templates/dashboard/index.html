@@ -4,6 +4,7 @@
 {% block header_title %}Dashboard{% endblock %}
 
 {% block content %}
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.15.0/mapbox-gl.css" rel="stylesheet">
 <div class="row g-4 mb-4">
     <div class="col-12 col-md-6 col-lg-3">
         <div class="card shadow-sm p-3">
@@ -279,5 +280,142 @@
 
     </div>
 </div>
+
+<div class="card shadow-sm mb-4"><div class="card-header bg-white d-flex justify-content-between align-items-center"><div><h3 class="h5 fw-semibold text-dark mb-0">Member Distribution</h3><small class="text-muted">Active and inactive member addresses, plus the gym</small></div><span class="badge text-bg-light" id="member-map-count"></span></div><div class="card-body p-0">{% if mapbox_access_token %}<div id="member-map" data-url="{% url 'member_map_data' %}" style="height:460px;width:100%;"></div>{% else %}<div class="alert alert-warning m-3">MAPBOX_ACCESS_TOKEN is not configured.</div>{% endif %}</div></div>
+
+{{ member_map_geojson|json_script:"member-map-data" }}
+{% if mapbox_access_token %}<script src="https://api.mapbox.com/mapbox-gl-js/v3.15.0/mapbox-gl.js"></script><script>
+document.addEventListener("DOMContentLoaded",()=>{
+    const el=document.getElementById("member-map");
+    const dataElement=document.getElementById("member-map-data");
+    if(!el||!dataElement)return;
+    let features=JSON.parse(dataElement.textContent).features||[];
+    const count=document.getElementById("member-map-count");
+    const markers=new Map();
+    mapboxgl.accessToken="{{ mapbox_access_token|escapejs }}";
+    const map=new mapboxgl.Map({container:"member-map",style:"mapbox://styles/mapbox/streets-v12",center:[-88.112702,42.206237],zoom:10});
+    map.addControl(new mapboxgl.NavigationControl(),"top-right");
+
+    const popupFor=feature=>{
+        const box=document.createElement("div");
+        const title=document.createElement("strong");
+        const meta=document.createElement("div");
+        if(feature.properties.kind==="members"){
+            title.textContent=`${feature.properties.members.length} members at this address`;
+            meta.textContent=feature.properties.address;
+            box.append(title,meta);
+            feature.properties.members.forEach(member=>{
+                const row=document.createElement("div");
+                const name=document.createElement("strong");
+                const details=document.createElement("div");
+                const link=document.createElement("a");
+                row.className="border-top mt-1 pt-1";
+                name.textContent=member.name;
+                details.textContent=`${member.member_type} - ${member.is_active?"Active":"Inactive"}`;
+                link.href=member.url;
+                link.textContent="View member";
+                row.append(name,details,link);
+                box.append(row);
+            });
+        }else{
+            title.textContent=feature.properties.name;
+            meta.textContent=feature.properties.location||"";
+            box.append(title,meta);
+        }
+        return new mapboxgl.Popup({offset:25,closeButton:false,closeOnClick:false}).setDOMContent(box);
+    };
+
+    const setPopup=(record,feature)=>{
+        record.popup?.remove();
+        const popup=popupFor(feature);
+        let hoverBound=false;
+        popup.on("open",()=>{
+            if(hoverBound)return;
+            hoverBound=true;
+            const popupElement=popup.getElement();
+            popupElement.addEventListener("mouseenter",()=>window.clearTimeout(record.hideTimer));
+            popupElement.addEventListener("mouseleave",()=>schedulePopupClose(record));
+        });
+        record.popup=popup;
+    };
+
+    const schedulePopupClose=record=>{
+        window.clearTimeout(record.hideTimer);
+        record.hideTimer=window.setTimeout(()=>{
+            if(!record.marker.getElement().matches(":hover")&&!record.popup?.getElement()?.matches(":hover")){
+                record.popup?.remove();
+            }
+        },120);
+    };
+
+    const createMarkerRecord=(feature,color)=>{
+        const marker=new mapboxgl.Marker({color}).setLngLat(feature.geometry.coordinates).addTo(map);
+        const record={marker,popup:null,hideTimer:null};
+        const markerElement=marker.getElement();
+        markerElement.addEventListener("mouseenter",()=>{
+            window.clearTimeout(record.hideTimer);
+            record.popup?.setLngLat(marker.getLngLat()).addTo(map);
+        });
+        markerElement.addEventListener("mouseleave",()=>schedulePopupClose(record));
+        setPopup(record,feature);
+        return record;
+    };
+
+    const syncMarkers=()=>{
+        const currentKeys=new Set();
+        let refit=markers.size===0;
+        features.forEach(feature=>{
+            const key=feature.properties.kind==="gym"?"gym":`address-${feature.properties.id}`;
+            const coordinates=feature.geometry.coordinates;
+            const color=feature.properties.color||"#3FB1CE";
+            currentKeys.add(key);
+            let record=markers.get(key);
+            if(record){
+                const marker=record.marker;
+                const previous=marker.getLngLat();
+                if(previous.lng!==coordinates[0]||previous.lat!==coordinates[1])refit=true;
+                marker.setLngLat(coordinates);
+                marker.setColor(color);
+                setPopup(record,feature);
+            }else{
+                record=createMarkerRecord(feature,color);
+                markers.set(key,record);
+                refit=true;
+            }
+        });
+        for(const [key,record] of markers){
+            if(!currentKeys.has(key)){
+                record.popup?.remove();
+                record.marker.remove();
+                markers.delete(key);
+                refit=true;
+            }
+        }
+        const memberCount=features.filter(feature=>feature.properties.kind==="members").reduce((total,feature)=>total+feature.properties.members.length,0);
+        count.textContent=`${memberCount} members mapped`;
+        if(refit&&features.length){
+            const bounds=new mapboxgl.LngLatBounds();
+            features.forEach(feature=>bounds.extend(feature.geometry.coordinates));
+            map.fitBounds(bounds,{padding:55,maxZoom:13,duration:0});
+        }
+    };
+
+    const refresh=async()=>{
+        try{
+            const response=await fetch(el.dataset.url,{headers:{Accept:"application/json"}});
+            if(!response.ok)return;
+            const data=await response.json();
+            features=data.features||[];
+            syncMarkers();
+        }catch{}
+    };
+
+    map.on("load",()=>{
+        syncMarkers();
+        window.setInterval(refresh,15000);
+        window.addEventListener("focus",refresh);
+    });
+});
+</script>{% endif %}
 
 {% endblock %}

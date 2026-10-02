@@ -488,12 +488,6 @@
         gap: 10px;
         align-items: center;
     }
-    .spotify-device-row {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        width: 100%;
-    }
     .spotify-select {
         flex: 1;
         min-width: 160px;
@@ -517,11 +511,6 @@
         justify-content: center;
         cursor: pointer;
         transition: all 0.2s ease;
-    }
-    .spotify-refresh-btn {
-        flex: 0 0 38px;
-        width: 38px;
-        height: 38px;
     }
     .spotify-icon-btn:hover { background: rgba(29, 185, 84, 0.25); color: #1db954; border-color: #1db954; }
     .spotify-icon-btn.play {
@@ -816,14 +805,10 @@
                         <select id="spotifyPlaylistSelect" class="spotify-select" style="width:100%; min-width:0; display:block;" aria-label="Playlist">
                             <option value="">Loading playlists&hellip;</option>
                         </select>
-                        <div class="spotify-device-row">
-                            <select id="spotifyDeviceSelect" class="spotify-select" style="width:100%; min-width:0; display:block;" aria-label="Playback device">
-                                <option value="">Loading devices&hellip;</option>
-                            </select>
-                            <button type="button" id="btnSpotifyRefreshDevices" class="spotify-icon-btn spotify-refresh-btn" title="Refresh Spotify devices" aria-label="Refresh Spotify devices"><i class="fas fa-sync-alt" aria-hidden="true"></i></button>
-                        </div>
+                        <select id="spotifyDeviceSelect" class="spotify-select" style="width:100%; min-width:0; display:block;" aria-label="Playback device">
+                            <option value="">Loading devices&hellip;</option>
+                        </select>
                     </div>
-                    <p class="spotify-status-text mt-2 mb-0">Missing your phone or tablet? Open Spotify there with the connected account, play a song on that device, then refresh.</p>
                     <p id="spotifyTrackInfo" class="spotify-status-text text-center mt-3 mb-2" aria-live="polite"></p>
                     <div class="spotify-controls-row justify-content-center mt-2">
                         <button type="button" id="btnSpotifyShuffle" class="spotify-icon-btn" title="Shuffle" aria-label="Shuffle" aria-pressed="false"><i class="fas fa-random"></i></button>
@@ -1753,43 +1738,27 @@
             }
         }
 
-        let refreshingDevices = false;
-        const refreshDevicesButton = document.getElementById('btnSpotifyRefreshDevices');
         async function loadSpotifyDevices(selectedId) {
-            if (refreshingDevices) return;
-            refreshingDevices = true;
-            refreshDevicesButton.disabled = true;
-            const preferredId = selectedId || deviceSelect.value;
             try {
-                const res = await fetch('{% url "timers:spotify_devices" %}', { cache: 'no-store' });
+                const res = await fetch('{% url "timers:spotify_devices" %}');
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || 'Failed to load devices');
-                const devices = data.devices || [];
                 deviceSelect.innerHTML = '';
-                if (!devices.length) {
-                    deviceSelect.innerHTML = '<option value="">No devices — open Spotify, then refresh</option>';
+                if (!data.devices.length) {
+                    deviceSelect.innerHTML = '<option value="">No active devices \u2014 open Spotify somewhere</option>';
                     return;
                 }
-                const selectable = devices.filter(dev => dev.id && !dev.is_restricted);
-                const chosen = selectable.find(dev => dev.id === preferredId) ||
-                               selectable.find(dev => dev.is_active) || selectable[0];
-                devices.forEach(dev => {
+                data.devices.forEach(dev => {
                     const opt = document.createElement('option');
-                    opt.value = dev.id || '';
-                    opt.disabled = !dev.id || !!dev.is_restricted;
-                    opt.textContent = `${dev.name} (${dev.type})${dev.is_active ? ' — active' : ''}${opt.disabled ? ' — unavailable for control' : ''}`;
-                    opt.selected = !!chosen && dev.id === chosen.id;
+                    opt.value = dev.id;
+                    opt.textContent = `${dev.name} (${dev.type})${dev.is_active ? ' \u2014 active' : ''}`;
+                    if (dev.id === selectedId || dev.is_active) opt.selected = true;
                     deviceSelect.appendChild(opt);
                 });
-                if (!chosen) deviceSelect.value = '';
             } catch (e) {
                 showSpotifyError(e.message);
-            } finally {
-                refreshingDevices = false;
-                refreshDevicesButton.disabled = false;
             }
         }
-        refreshDevicesButton.addEventListener('click', () => { clearSpotifyError(); loadSpotifyDevices(); });
 
         let playback = { active: false, is_playing: false, progress_ms: 0, duration_ms: 0 };
         let sampledAt = performance.now();
@@ -1822,13 +1791,8 @@
             document.getElementById('spotifyRepeatOne').classList.toggle('d-none', repeat !== 'track');
             trackInfo.textContent = playback.active ? `${playback.track_name} — ${playback.artists}` : 'Open Spotify on your selected device to start listening.';
             const disallows = playback.disallows || {};
-            const restrictions = [playing ? 'pausing' : 'resuming', 'skipping_next', 'skipping_prev', 'toggling_shuffle', ['toggling_repeat_context', 'toggling_repeat_track']];
-            buttons.forEach((button, index) => {
-                const restriction = restrictions[index];
-                button.disabled = busy || (Array.isArray(restriction)
-                    ? restriction.some(action => disallows[action])
-                    : !!disallows[restriction]);
-            });
+            const restrictions = [playing ? 'pausing' : 'resuming', 'skipping_next', 'skipping_prev', 'toggling_shuffle', 'toggling_repeat_context'];
+            buttons.forEach((button, index) => { button.disabled = busy || !!disallows[restrictions[index]]; });
             seek.disabled = busy || !playback.duration_ms || !!disallows.seeking;
             duration.textContent = formatMusicTime(playback.duration_ms);
             if (!dragging) {
@@ -1907,9 +1871,7 @@
         });
         setInterval(() => { if (connected && !document.hidden) renderPlayback(); }, 250);
         setInterval(refreshPlayback, 5000);
-        document.addEventListener('visibilitychange', () => {
-            if (!document.hidden && connected) { refreshPlayback(); loadSpotifyDevices(); }
-        });
+        document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshPlayback(); });
 
         (async function initSpotifyPanel() {
             try {

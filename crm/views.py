@@ -3,6 +3,7 @@ import io
 import json
 import re
 from decimal import Decimal, InvalidOperation
+from django.conf import settings
 from django.contrib.auth import authenticate, login, logout, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.decorators import user_passes_test
@@ -33,6 +34,7 @@ from crm.transaction_dashboard import transaction_dashboard_metrics
 from crm.services.attendance import get_session_attendance, record_member_attendance
 from crm.services.billing import get_billing_summary
 from crm.services.trials import convert_trial_to_membership, deactivate_trial, extend_trial, start_trial_from_waiver
+from crm.services.geocoding import geocode_member
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +48,59 @@ def crm_staff_required(view):
 
 
 WEEKDAY_CODES = ['mon','tue','wed','thu','fri','sat','sun']
+
+def member_map_context():
+    mapped_members = Member.objects.filter(latitude__isnull=False, longitude__isnull=False).only(
+        "id", "first_name", "last_name", "member_type", "city", "state", "address", "zip_code",
+        "latitude", "longitude", "is_active"
+    )
+    member_groups = {}
+    for member in mapped_members:
+        address = ", ".join(
+            str(value).strip() for value in (member.address, member.city, member.state, member.zip_code) if value
+        )
+        address_key = " ".join(address.casefold().split())
+        group = member_groups.setdefault(address_key, {
+            "address": address,
+            "coordinates": [member.longitude, member.latitude],
+            "members": [],
+        })
+        group["members"].append({
+            "id": member.id,
+            "name": f"{member.first_name} {member.last_name}",
+            "member_type": member.get_member_type_display(),
+            "is_active": member.is_active,
+            "url": reverse("viewMember", args=[member.id]),
+        })
+
+    features = []
+    for address_key, group in member_groups.items():
+        group["members"].sort(key=lambda item: (item["member_type"] != "Adult", item["name"].casefold()))
+        features.append({
+            "type": "Feature",
+            "geometry": {"type": "Point", "coordinates": group["coordinates"]},
+            "properties": {
+                "id": address_key,
+                "address": group["address"],
+                "members": group["members"],
+                "kind": "members",
+                "color": "#dc3545" if all(not item["is_active"] for item in group["members"]) else None,
+            },
+        })
+    features.append({
+        "type": "Feature",
+        "geometry": {"type": "Point", "coordinates": [settings.GYM_LONGITUDE, settings.GYM_LATITUDE]},
+        "properties": {
+            "name": "Lake Zurich Brazilian Jiu-Jitsu",
+            "location": settings.GYM_ADDRESS,
+            "kind": "gym",
+            "color": "#000000",
+        },
+    })
+    return {
+        "mapbox_access_token": getattr(settings, "MAPBOX_ACCESS_TOKEN", ""),
+        "member_map_geojson": {"type": "FeatureCollection", "features": features},
+    }
 
 @crm_staff_required
 def index(request):
@@ -117,6 +172,7 @@ def index(request):
         return render(request, "dashboard/index.html", {
             "summary" : summary,
             "belt_distribution":belt_distribution(),
+            **member_map_context(),
 
             })
         # Everyone else is prompted to sign in
@@ -317,11 +373,17 @@ def dashboard(request):
         return render(request, "dashboard/index.html", {
             "summary" : summary,
             "belt_distribution":belt_distribution(),
+            **member_map_context(),
 
             })
         # Everyone else is prompted to sign in
     else:
         return HttpResponseRedirect(reverse("login"))
+
+@crm_staff_required
+def member_map_data(request):
+    return JsonResponse(member_map_context()["member_map_geojson"])
+
 
 @crm_staff_required
 def view_session(request):
@@ -455,6 +517,7 @@ def addMember(request):
         contact_formset = ContactFormSet(request.POST)
         if form.is_valid() and contact_formset.is_valid():
             member = form.save()
+            geocode_member(member)
             contact_formset.instance = member
             contact_formset.save()
             return redirect("members")
@@ -488,10 +551,14 @@ def editMember(request, member_id):
     #contact_formset = ContactFormSet(instance=member, prefix="contacts")
 
     if request.method == 'POST':
+        old_address = (member.address, member.city, member.state, member.zip_code)
         form = MemberForm(request.POST, instance=member)
         contact_formset = ContactFormSet(request.POST, instance=member, prefix="contacts")
         if form.is_valid() and contact_formset.is_valid():
-            form.save()
+            member = form.save()
+            new_address = (member.address, member.city, member.state, member.zip_code)
+            if old_address != new_address or member.latitude is None or member.longitude is None:
+                geocode_member(member)
             contact_formset.instance = member
             contact_formset.save()
             return redirect('members')

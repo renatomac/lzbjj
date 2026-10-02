@@ -8,6 +8,7 @@ urlpatterns = [
     path("logout", views.logout_view, name="logout"),
     path("change-password", views.change_password, name="change_password"),
     path("dashboard", views.dashboard, name="dashboard"),
+    path("dashboard/map-data/", views.member_map_data, name="member_map_data"),
     path("session/<int:session_id>/", views.view_session, name="view_session"),
     path("session/<int:session_id>/edit/", views.session_edit, name="session_edit"),
     path("session/<int:session_id>/delete/", views.session_delete, name="session_delete"),
