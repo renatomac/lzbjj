@@ -199,6 +199,8 @@ class Member(models.Model):
 
     belt_rank = models.CharField(max_length=50, choices=BeltRank.choices, default=BeltRank.WHITE)
     stripes = models.SmallIntegerField(validators=[MinValueValidator(0), MaxValueValidator(12)], default=0)
+    current_belt_started_on = models.DateField(null=True, blank=True, help_text="Verified date the current belt was awarded; do not use enrollment date for transferred students.")
+    ibjjf_rank_registered_on = models.DateField(null=True, blank=True, help_text="IBJJF registration date for the CURRENT belt. Clear/update when the belt changes.")
     photo = models.URLField(max_length=1000, null=True, blank=True)
     face_image_s3_key = models.CharField(max_length=255, null=True, blank=True)
     rekognition_face_id = models.CharField(max_length=128, null=True, blank=True)
@@ -220,6 +222,14 @@ class Member(models.Model):
         return f"{self.first_name} {self.last_name} ({self.belt_rank})"
 
     def save(self, *args, **kwargs):
+        if self.pk:
+            previous = type(self).objects.filter(pk=self.pk).values('belt_rank').first()
+            if previous and previous['belt_rank'] != self.belt_rank:
+                self.ibjjf_rank_registered_on = None
+                self.current_belt_started_on = None
+                if kwargs.get('update_fields') is not None:
+                    kwargs['update_fields'] = set(kwargs['update_fields']) | {
+                        'ibjjf_rank_registered_on', 'current_belt_started_on'}
         if self.lifecycle_status == self.LifecycleStatus.INACTIVE:
             self.is_active = False
         elif self.is_active is False:

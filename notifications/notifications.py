@@ -141,96 +141,61 @@ def generate_birthday_notifications():
 # ============================================================================
 
 def generate_promotion_milestone_notifications():
-    """
-    Generate notifications for members who have completed 30 classes since
-    their last promotion (or since joining if not yet promoted).
-    
-    This indicates they may be ready for a belt rank evaluation.
-    
-    Returns:
-        list: List of created notifications
-    """
+    """Attendance plus age/time eligibility; suggestions require instructor review."""
+    from django.conf import settings
+    from .models import Notification
+    from .promotion_rules import evaluation
+
+    today = timezone.localdate()
     notifications = []
-    
-    # Get all active members
-    active_members = Member.objects.filter(is_active=True)
-    
-    for member in active_members:
-        # Get the reference date: either last promotion date or join date
-        last_promotion = member.belt_promotions.order_by('-promotion_date').first()
-        
-        if last_promotion:
-            reference_date = last_promotion.promotion_date
-            time_descriptor = "since your last promotion"
-        else:
-            # If no promotion yet, use join date
-            reference_date = member.join_date.date()
-            time_descriptor = "since joining"
-        
-        # Count classes attended since reference date
-        classes_attended = SessionAttendance.objects.filter(
-            member=member,
-            present=True,
-            session__date__gte=reference_date,
-            session__date__lte=timezone.localdate(),
-            session__is_canceled=False,
-        ).count()
-        
-        # Alternative: count using Attendance model if SessionAttendance is not used
-        if classes_attended == 0:
-            classes_attended = Attendance.objects.filter(
-                member=member,
-                date__gte=reference_date, date__lte=timezone.localdate()
-            ).count()
-        
-        # Check if member has reached 30 classes milestone
-        if classes_attended >= 30:
-            # Check if notification already sent recently (within last 7 days)
-            from .models import Notification
-            recent_notification = Notification.objects.filter(
-                message__icontains=f"Promotion Ready: {member.first_name} {member.last_name} ",
-                created_at__gte=timezone.now() - timedelta(days=7)
-            ).exists()
-            
-            if not recent_notification:
-                message = (
-                    f"🥋 {member.first_name}, congratulations! You've completed "
-                    f"{classes_attended} classes {time_descriptor} and may be ready for "
-                    f"belt promotion evaluation. Talk to your instructor!"
-                )
-                
-                if member.user:
-                    notification = create_notification(
-                        user=member.user,
-                        notification_type="PROMOTION_MILESTONE",
-                        message=message,
-                        data={
-                            "member_id": member.id,
-                            "member_name": f"{member.first_name} {member.last_name}",
-                            "classes_attended": classes_attended,
-                            "belt_rank": member.belt_rank,
-                            "reference_date": reference_date.isoformat(),
-                        }
-                    )
-                    notifications.append(notification)
-                
-                # Also notify coaches about this milestone
-                coach_message = (
-                    f"Promotion Ready: {member.first_name} {member.last_name} "
-                    f"({member.belt_rank}) has completed {classes_attended} classes "
-                    f"and may be ready for belt promotion evaluation."
-                )
-                coach_notifications = notify_coaches_about_member_event(
-                    member,
-                    "MEMBER_PROMOTION_READY",
-                    coach_message,
-                    {
-                        "classes_attended": classes_attended,
-                        "time_descriptor": time_descriptor,
-                    }
-                )
-                notifications.extend(coach_notifications)
-    
+    for member in Member.objects.filter(is_active=True).prefetch_related('belt_promotions'):
+        history = sorted(
+            (p for p in member.belt_promotions.all() if p.promotion_date <= today),
+            key=lambda p: (p.promotion_date, p.pk), reverse=True)
+        # A newer different-rank record means the profile/history disagree.
+        if history and history[0].new_rank != member.belt_rank:
+            continue
+        belt_change = next((p for p in history if p.new_rank == member.belt_rank
+                            and p.old_rank != p.new_rank), None)
+        belt_since = belt_change.promotion_date if belt_change else member.current_belt_started_on
+        if not belt_since:
+            continue
+        last = history[0] if history else None
+        stripe_since = last.promotion_date if last else belt_since
+        suggestion = evaluation(
+            member, today, belt_since, stripe_since,
+            kids_system=getattr(settings, 'PROMOTION_KIDS_DEGREE_SYSTEM', 'quarterly'),
+            adult_stripe_months=getattr(settings, 'PROMOTION_ADULT_STRIPE_MONTHS', 3),
+            white_belt_months=getattr(settings, 'PROMOTION_WHITE_BELT_MONTHS', 12))
+        if not suggestion:
+            continue
+        classes = SessionAttendance.objects.filter(
+            member=member, present=True, session__date__gte=stripe_since,
+            session__date__lte=today, session__is_canceled=False).count()
+        if classes == 0:
+            classes = Attendance.objects.filter(member=member, date__gte=stripe_since,
+                                                date__lte=today).count()
+        if classes < getattr(settings, 'PROMOTION_MIN_CLASSES', 30):
+            continue
+        message = (f"Promotion review: {member.first_name} {member.last_name} "
+                   f"({member.belt_rank}) - {suggestion['kind']} {suggestion['target']}; "
+                   f"{classes} classes. Instructor evaluation required.")
+        recipients = list(get_coaches_for_member(member))
+        if member.user_id and member.user not in recipients:
+            recipients.append(member.user)
+        for recipient in recipients:
+            if Notification.objects.filter(user=recipient, message=message,
+                    created_at__gte=timezone.now() - timedelta(days=7)).exists():
+                continue
+            # Stable prefix deduplicates despite changing attendance counts.
+            prefix = message.split(';')[0] + ';'
+            if Notification.objects.filter(user=recipient, message__startswith=prefix,
+                    created_at__gte=timezone.now() - timedelta(days=7)).exists():
+                continue
+            notifications.append(create_notification(
+                user=recipient, notification_type='PROMOTION_MILESTONE', message=message,
+                data={'member_id': member.pk, 'promotion_kind': suggestion['kind'],
+                      'target': suggestion['target'], 'eligible_on': suggestion['due'].isoformat()}))
     return notifications
 
 

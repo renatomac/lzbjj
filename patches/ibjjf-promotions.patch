@@ -1,0 +1,490 @@
+diff --git a/crm/forms.py b/crm/forms.py
+index 9eeee38..28ec975 100644
+--- a/crm/forms.py
++++ b/crm/forms.py
+@@ -129,6 +129,8 @@ class MemberForm(forms.ModelForm):
+             "belt_rank",
+             "stripes",
+             "photo",
++            "current_belt_started_on",
++            "ibjjf_rank_registered_on",
+             "membership_start_date",
+             "membership_end_date",
+             "plan",
+@@ -140,6 +142,8 @@ class MemberForm(forms.ModelForm):
+             "lifecycle_status": forms.Select(attrs={"class": "form-control"}),
+             "state": USStateSelect(attrs={"class": "form-control"}),
+             "date_of_birth": forms.DateInput(attrs={"type": "date"}),
++            "current_belt_started_on": forms.DateInput(attrs={"type": "date"}),
++            "ibjjf_rank_registered_on": forms.DateInput(attrs={"type": "date"}),
+             "membership_start_date": forms.DateInput(attrs={"type": "date"}),
+             "membership_end_date": forms.DateInput(attrs={"type": "date"}),
+             "is_active": forms.HiddenInput(),
+diff --git a/crm/models.py b/crm/models.py
+index c87ddd3..8f121bb 100644
+--- a/crm/models.py
++++ b/crm/models.py
+@@ -199,6 +199,8 @@ class Member(models.Model):
+ 
+     belt_rank = models.CharField(max_length=50, choices=BeltRank.choices, default=BeltRank.WHITE)
+     stripes = models.SmallIntegerField(validators=[MinValueValidator(0), MaxValueValidator(12)], default=0)
++    current_belt_started_on = models.DateField(null=True, blank=True, help_text="Verified date the current belt was awarded; do not use enrollment date for transferred students.")
++    ibjjf_rank_registered_on = models.DateField(null=True, blank=True, help_text="IBJJF registration date for the CURRENT belt. Clear/update when the belt changes.")
+     photo = models.URLField(max_length=1000, null=True, blank=True)
+     face_image_s3_key = models.CharField(max_length=255, null=True, blank=True)
+     rekognition_face_id = models.CharField(max_length=128, null=True, blank=True)
+@@ -220,6 +222,14 @@ class Member(models.Model):
+         return f"{self.first_name} {self.last_name} ({self.belt_rank})"
+ 
+     def save(self, *args, **kwargs):
++        if self.pk:
++            previous = type(self).objects.filter(pk=self.pk).values('belt_rank').first()
++            if previous and previous['belt_rank'] != self.belt_rank:
++                self.ibjjf_rank_registered_on = None
++                self.current_belt_started_on = None
++                if kwargs.get('update_fields') is not None:
++                    kwargs['update_fields'] = set(kwargs['update_fields']) | {
++                        'ibjjf_rank_registered_on', 'current_belt_started_on'}
+         if self.lifecycle_status == self.LifecycleStatus.INACTIVE:
+             self.is_active = False
+         elif self.is_active is False:
+diff --git a/notifications/IBJJF_PROMOTIONS.md b/notifications/IBJJF_PROMOTIONS.md
+new file mode 100644
+index 0000000..f85323c
+--- /dev/null
++++ b/notifications/IBJJF_PROMOTIONS.md
+@@ -0,0 +1,62 @@
++# Promotion notification policy (IBJJF June 2026)
++
++Suggestions are for instructor evaluation only. Attendance alone is insufficient.
++Age means current calendar year minus birth year, independent of class/member type.
++
++Standard adult belt minimums: blue 24 calendar months, purple 18, brown 12.
++Juvenile blue (16–17) has no mandatory minimum; brown requires 18 and black
++requires 19 by default. Championship and registered juvenile/child history
++exceptions are deliberately not inferred; review supporting records manually.
++Black/coral/red degree suggestions are disabled: elapsed calendar time alone
++cannot prove IBJJF activity or certification.
++
++Enter **Current belt started on** for existing/transferred members. Rank-changing
++promotion history supplies that date when available; stripe records never reset it.
++Enter **IBJJF rank registered on** for the current colored adult belt; IBJJF
++Article 3.2.1 counts permanence from registration, not enrollment. Unknown dates
++suppress belt suggestions. Registration dates earlier than the belt award or in
++the future are rejected by the evaluator. Changing the member's belt clears both
++stored dates; record the new registration after the belt change.
++
++Kids have no mandatory time minimum. Optional Annex I schedules are supported:
++- quarterly: 3 degrees, next belt after 12 months (default);
++- triannual: 2 degrees, next belt after 12 months;
++- monthly: 11 degrees, next belt after 12 months;
++- monthly white/gray-white: 5 degrees, next belt after 6 months.
++Age limits: gray 4, yellow 7, orange 10, green 13. At 16, youth colored belts
++transition to blue; green may transition to blue or purple by instructor decision.
++Under-four students receive no automated IBJJF promotion suggestions.
++
++Settings (academy choices, not mandatory IBJJF stripe intervals):
++```python
++PROMOTION_KIDS_DEGREE_SYSTEM = 'quarterly'  # or 'triannual', 'monthly'
++PROMOTION_ADULT_STRIPE_MONTHS = 3           # None disables adult stripe suggestions
++PROMOTION_WHITE_BELT_MONTHS = 12            # academy evaluation schedule, not IBJJF minimum
++PROMOTION_MIN_CLASSES = 30                 # since the last promotion/evaluation period
++```
++Adult white–brown have a maximum of four suggested stripes. Black belt degrees
++are separate. Stripe dates satisfy both cumulative time and time since the latest
++promotion; a run suggests only one evaluation, without granting any promotion.
++No requirement to have every stripe before a belt evaluation is imposed.
++
++## Install locally
++
++Back up your database. Apply from the project root:
++```bash
++git apply ibjjf-promotions.patch
++python manage.py makemigrations crm
++python manage.py migrate
++python manage.py test notifications.test_promotion_rules notifications.test_promotion_notifications
++```
++Migration files and production settings are absent from the repository, so generate
++the additive migration against your local migration history. Do not fake migrations.
++The two new nullable dates are intentionally not backfilled from enrollment.
++Add settings as desired, populate verified dates, and restart the app/scheduled job.
++
++Old attendance-only notifications already stored will remain in the notification
++center; delete those obsolete suggestions there. Subsequent generation uses the
++new evaluator. No running server or user database was modified by this patch.
++
++Sources: attached 20260611_IBJJF_Graduacao_EN.pdf, Articles 2–4 and Annex I;
++monthly-system handout corroborates the monthly suggestions. Competition rules
++and prohibited techniques do not set promotion eligibility.
+diff --git a/notifications/notifications.py b/notifications/notifications.py
+index 1419511..571d76d 100644
+--- a/notifications/notifications.py
++++ b/notifications/notifications.py
+@@ -141,96 +141,61 @@ def generate_birthday_notifications():
+ # ============================================================================
+ 
+ def generate_promotion_milestone_notifications():
+-    """
+-    Generate notifications for members who have completed 30 classes since
+-    their last promotion (or since joining if not yet promoted).
+-    
+-    This indicates they may be ready for a belt rank evaluation.
+-    
+-    Returns:
+-        list: List of created notifications
+-    """
++    """Attendance plus age/time eligibility; suggestions require instructor review."""
++    from django.conf import settings
++    from .models import Notification
++    from .promotion_rules import evaluation
++
++    today = timezone.localdate()
+     notifications = []
+-    
+-    # Get all active members
+-    active_members = Member.objects.filter(is_active=True)
+-    
+-    for member in active_members:
+-        # Get the reference date: either last promotion date or join date
+-        last_promotion = member.belt_promotions.order_by('-promotion_date').first()
+-        
+-        if last_promotion:
+-            reference_date = last_promotion.promotion_date
+-            time_descriptor = "since your last promotion"
+-        else:
+-            # If no promotion yet, use join date
+-            reference_date = member.join_date.date()
+-            time_descriptor = "since joining"
+-        
+-        # Count classes attended since reference date
+-        classes_attended = SessionAttendance.objects.filter(
+-            member=member,
+-            present=True,
+-            session__date__gte=reference_date,
+-            session__date__lte=timezone.localdate(),
+-            session__is_canceled=False,
+-        ).count()
+-        
+-        # Alternative: count using Attendance model if SessionAttendance is not used
+-        if classes_attended == 0:
+-            classes_attended = Attendance.objects.filter(
+-                member=member,
+-                date__gte=reference_date, date__lte=timezone.localdate()
+-            ).count()
+-        
+-        # Check if member has reached 30 classes milestone
+-        if classes_attended >= 30:
+-            # Check if notification already sent recently (within last 7 days)
+-            from .models import Notification
+-            recent_notification = Notification.objects.filter(
+-                message__icontains=f"Promotion Ready: {member.first_name} {member.last_name} ",
+-                created_at__gte=timezone.now() - timedelta(days=7)
+-            ).exists()
+-            
+-            if not recent_notification:
+-                message = (
+-                    f"🥋 {member.first_name}, congratulations! You've completed "
+-                    f"{classes_attended} classes {time_descriptor} and may be ready for "
+-                    f"belt promotion evaluation. Talk to your instructor!"
+-                )
+-                
+-                if member.user:
+-                    notification = create_notification(
+-                        user=member.user,
+-                        notification_type="PROMOTION_MILESTONE",
+-                        message=message,
+-                        data={
+-                            "member_id": member.id,
+-                            "member_name": f"{member.first_name} {member.last_name}",
+-                            "classes_attended": classes_attended,
+-                            "belt_rank": member.belt_rank,
+-                            "reference_date": reference_date.isoformat(),
+-                        }
+-                    )
+-                    notifications.append(notification)
+-                
+-                # Also notify coaches about this milestone
+-                coach_message = (
+-                    f"Promotion Ready: {member.first_name} {member.last_name} "
+-                    f"({member.belt_rank}) has completed {classes_attended} classes "
+-                    f"and may be ready for belt promotion evaluation."
+-                )
+-                coach_notifications = notify_coaches_about_member_event(
+-                    member,
+-                    "MEMBER_PROMOTION_READY",
+-                    coach_message,
+-                    {
+-                        "classes_attended": classes_attended,
+-                        "time_descriptor": time_descriptor,
+-                    }
+-                )
+-                notifications.extend(coach_notifications)
+-    
++    for member in Member.objects.filter(is_active=True).prefetch_related('belt_promotions'):
++        history = sorted(
++            (p for p in member.belt_promotions.all() if p.promotion_date <= today),
++            key=lambda p: (p.promotion_date, p.pk), reverse=True)
++        # A newer different-rank record means the profile/history disagree.
++        if history and history[0].new_rank != member.belt_rank:
++            continue
++        belt_change = next((p for p in history if p.new_rank == member.belt_rank
++                            and p.old_rank != p.new_rank), None)
++        belt_since = belt_change.promotion_date if belt_change else member.current_belt_started_on
++        if not belt_since:
++            continue
++        last = history[0] if history else None
++        stripe_since = last.promotion_date if last else belt_since
++        suggestion = evaluation(
++            member, today, belt_since, stripe_since,
++            kids_system=getattr(settings, 'PROMOTION_KIDS_DEGREE_SYSTEM', 'quarterly'),
++            adult_stripe_months=getattr(settings, 'PROMOTION_ADULT_STRIPE_MONTHS', 3),
++            white_belt_months=getattr(settings, 'PROMOTION_WHITE_BELT_MONTHS', 12))
++        if not suggestion:
++            continue
++        classes = SessionAttendance.objects.filter(
++            member=member, present=True, session__date__gte=stripe_since,
++            session__date__lte=today, session__is_canceled=False).count()
++        if classes == 0:
++            classes = Attendance.objects.filter(member=member, date__gte=stripe_since,
++                                                date__lte=today).count()
++        if classes < getattr(settings, 'PROMOTION_MIN_CLASSES', 30):
++            continue
++        message = (f"Promotion review: {member.first_name} {member.last_name} "
++                   f"({member.belt_rank}) - {suggestion['kind']} {suggestion['target']}; "
++                   f"{classes} classes. Instructor evaluation required.")
++        recipients = list(get_coaches_for_member(member))
++        if member.user_id and member.user not in recipients:
++            recipients.append(member.user)
++        for recipient in recipients:
++            if Notification.objects.filter(user=recipient, message=message,
++                    created_at__gte=timezone.now() - timedelta(days=7)).exists():
++                continue
++            # Stable prefix deduplicates despite changing attendance counts.
++            prefix = message.split(';')[0] + ';'
++            if Notification.objects.filter(user=recipient, message__startswith=prefix,
++                    created_at__gte=timezone.now() - timedelta(days=7)).exists():
++                continue
++            notifications.append(create_notification(
++                user=recipient, notification_type='PROMOTION_MILESTONE', message=message,
++                data={'member_id': member.pk, 'promotion_kind': suggestion['kind'],
++                      'target': suggestion['target'], 'eligible_on': suggestion['due'].isoformat()}))
+     return notifications
+ 
+ 
+diff --git a/notifications/promotion_rules.py b/notifications/promotion_rules.py
+new file mode 100644
+index 0000000..0c56416
+--- /dev/null
++++ b/notifications/promotion_rules.py
+@@ -0,0 +1,82 @@
++"""June 2026 IBJJF graduation rules; academy stripe schedules are optional.
++
++No exceptions are inferred from local belt history: IBJJF registration and
++championship evidence must be reviewed by the instructor separately.
++"""
++from calendar import monthrange
++from datetime import date
++
++KIDS = ['white', 'gray-white', 'gray', 'gray-black', 'yellow-white',
++        'yellow', 'yellow-black', 'orange-white', 'orange', 'orange-black',
++        'green-white', 'green', 'green-black']
++ADULTS = ['white', 'blue', 'purple', 'brown', 'black']
++
++
++def add_months(value, months):
++    index = value.year * 12 + value.month - 1 + months
++    year, month = divmod(index, 12)
++    month += 1
++    return date(year, month, min(value.day, monthrange(year, month)[1]))
++
++
++def evaluation(member, today, belt_since, stripe_since, *, kids_system='quarterly',
++               adult_stripe_months=None, white_belt_months=12):
++    """Return one instructor evaluation suggestion, or None. Never auto-promote.
++
++    belt_since is a verified local rank date for children's optional schedule;
++    adult colored belts require current-rank IBJJF registration date separately.
++    Black belt degrees require proven activity/certification, so are manual only.
++    """
++    if not member.date_of_birth or member.date_of_birth > today:
++        return None
++    age = today.year - member.date_of_birth.year
++    rank, stripes = member.belt_rank, member.stripes
++    if stripes < 0 or not belt_since or belt_since > today:
++        return None
++    eligible_date = None
++    if age < 16:
++        if age < 4 or rank not in KIDS:
++            return None
++        schedule = {'quarterly': (3, 3, 12), 'triannual': (4, 2, 12),
++                    'monthly': (1, 11, 12)}
++        if kids_system not in schedule:
++            raise ValueError('Unknown IBJJF kids degree system')
++        interval, maximum, belt_months = schedule[kids_system]
++        if kids_system == 'monthly' and rank in ('white', 'gray-white'):
++            maximum, belt_months = 5, 6
++        index = KIDS.index(rank)
++        target = KIDS[index + 1] if index + 1 < len(KIDS) else None
++        minimum_age = (4 if target and target.startswith('gray') else
++                       7 if target and target.startswith('yellow') else
++                       10 if target and target.startswith('orange') else 13)
++        if target and age >= minimum_age:
++            eligible_date = add_months(belt_since, belt_months)
++    elif rank in KIDS and rank != 'white':
++        # Article 2.2.3: at 16, gray/yellow/orange become blue; green
++        # may become blue or purple by professor decision.
++        target = 'blue or purple' if rank.startswith('green') else 'blue'
++        return {'kind': 'belt transition', 'target': target, 'due': date(today.year, 1, 1)}
++    elif rank in ADULTS[:-1]:
++        interval, maximum = adult_stripe_months, 4
++        target = ADULTS[ADULTS.index(rank) + 1]
++        if rank == 'white':
++            eligible_date = add_months(belt_since, white_belt_months)
++        else:
++            registered = getattr(member, 'ibjjf_rank_registered_on', None)
++            # Local promotion/join dates cannot establish IBJJF permanence.
++            if registered and belt_since <= registered <= today:
++                months = {'blue': 0 if age < 18 else 24, 'purple': 18, 'brown': 12}[rank]
++                eligible_date = add_months(registered, months)
++        if age < {'blue': 16, 'purple': 16, 'brown': 18, 'black': 19}[target]:
++            eligible_date = None
++    else:
++        return None
++    if eligible_date and today >= eligible_date:
++        return {'kind': 'belt', 'target': target, 'due': eligible_date}
++    if interval and interval > 0 and 0 <= stripes < maximum and stripe_since and stripe_since <= today:
++        # Both cumulative schedule and latest stripe date must be satisfied.
++        due = max(add_months(belt_since, interval * (stripes + 1)),
++                  add_months(stripe_since, interval))
++        if today >= due:
++            return {'kind': 'stripe', 'target': str(stripes + 1), 'due': due}
++    return None
+diff --git a/notifications/test_promotion_notifications.py b/notifications/test_promotion_notifications.py
+new file mode 100644
+index 0000000..fc13021
+--- /dev/null
++++ b/notifications/test_promotion_notifications.py
+@@ -0,0 +1,45 @@
++from datetime import date
++from unittest.mock import patch
++from django.test import TestCase
++from django.contrib.auth import get_user_model
++from crm.models import Member
++from .models import Notification
++from .notifications import generate_promotion_milestone_notifications
++
++class PromotionNotificationTests(TestCase):
++    def setUp(self):
++        self.coach = get_user_model().objects.create_user(username='coach',email='coach@example.com',is_staff=True)
++        self.member = Member.objects.create(first_name='Test',last_name='Student',date_of_birth=date(1990,1,1),belt_rank='blue',stripes=4,current_belt_started_on=date(2024,10,4),ibjjf_rank_registered_on=date(2024,10,4))
++
++    def generate(self,today):
++        with patch('notifications.notifications.timezone.localdate',return_value=today), patch('notifications.notifications.SessionAttendance.objects.filter') as count:
++            count.return_value.count.return_value=30
++            return generate_promotion_milestone_notifications()
++
++    def test_belt_boundary_and_duplicates(self):
++        self.assertEqual(self.generate(date(2026,10,3)),[])
++        self.assertEqual(len(self.generate(date(2026,10,4))),1)
++        self.assertEqual(self.generate(date(2026,10,4)),[])
++        self.assertTrue(Notification.objects.filter(user=self.coach,message__contains='belt purple').exists())
++
++    def test_unknown_dates_block_suggestion(self):
++        self.member.ibjjf_rank_registered_on=None
++        self.member.save()
++        self.assertEqual(self.generate(date(2026,10,4)),[])
++
++    def test_belt_change_clears_registration(self):
++        self.member.belt_rank='purple'
++        self.member.save(update_fields=['belt_rank'])
++        self.member.refresh_from_db()
++        self.assertIsNone(self.member.ibjjf_rank_registered_on)
++        self.assertIsNone(self.member.current_belt_started_on)
++
++    def test_stripe_message_before_belt_minimum(self):
++        self.member.stripes=0
++        self.member.current_belt_started_on=date(2026,1,1)
++        self.member.ibjjf_rank_registered_on=date(2026,1,1)
++        self.member.save()
++        results=self.generate(date(2026,4,1))
++        self.assertEqual(len(results),1)
++        self.assertIn('stripe 1',results[0].message)
++        self.assertNotIn('belt purple',results[0].message)
+diff --git a/notifications/test_promotion_rules.py b/notifications/test_promotion_rules.py
+new file mode 100644
+index 0000000..2b2fe96
+--- /dev/null
++++ b/notifications/test_promotion_rules.py
+@@ -0,0 +1,72 @@
++from datetime import date
++from types import SimpleNamespace
++from unittest import TestCase
++from .promotion_rules import evaluation, add_months
++
++class PromotionRuleTests(TestCase):
++    def member(self, rank='blue', birth=1990, stripes=4, registered=date(2024, 10, 4)):
++        return SimpleNamespace(belt_rank=rank, stripes=stripes,
++                               date_of_birth=date(birth, 12, 31),
++                               ibjjf_rank_registered_on=registered)
++
++    def test_adult_minimum_boundaries(self):
++        for rank, start in [('blue', date(2024,10,4)), ('purple', date(2025,4,4)), ('brown',date(2025,10,4))]:
++            with self.subTest(rank=rank):
++                m=self.member(rank=rank, registered=start)
++                self.assertIsNone(evaluation(m,date(2026,10,3),start,start))
++                self.assertEqual(evaluation(m,date(2026,10,4),start,start)['kind'],'belt')
++
++    def test_stripe_does_not_reset_belt_clock(self):
++        m=self.member()
++        self.assertEqual(evaluation(m,date(2026,10,4),date(2024,10,4),date(2026,10,1))['kind'],'belt')
++
++    def test_unknown_or_stale_registration_blocks_belt(self):
++        for registered in [None,date(2024,1,1),date(2027,1,1)]:
++            m=self.member(registered=registered)
++            self.assertIsNone(evaluation(m,date(2026,10,4),date(2024,10,4),date(2024,10,4)))
++
++    def test_adult_stripes_are_optional_academy_policy(self):
++        m=self.member(stripes=0,registered=None)
++        start=date(2026,1,1)
++        self.assertIsNone(evaluation(m,date(2026,4,1),start,start))
++        self.assertEqual(evaluation(m,date(2026,4,1),start,start,adult_stripe_months=3)['kind'],'stripe')
++        self.assertIsNone(evaluation(m,date(2026,3,31),start,start,adult_stripe_months=3))
++
++    def test_kids_schedules(self):
++        for system, interval, maximum in [('quarterly',3,3),('triannual',4,2),('monthly',1,11)]:
++            with self.subTest(system=system):
++                m=self.member(rank='gray',birth=2018,stripes=0)
++                start=date(2026,1,1)
++                self.assertEqual(evaluation(m,add_months(start,interval),start,start,kids_system=system)['target'],'1')
++                m.stripes=maximum
++                self.assertIsNone(evaluation(m,date(2026,11,30),start,start,kids_system=system))
++                self.assertEqual(evaluation(m,date(2027,1,1),start,start,kids_system=system)['kind'],'belt')
++
++    def test_monthly_white_and_gray_white_six_months(self):
++        for rank in ['white','gray-white']:
++            m=self.member(rank=rank,birth=2020,stripes=5)
++            start=date(2026,1,1)
++            self.assertIsNone(evaluation(m,date(2026,6,30),start,start,kids_system='monthly'))
++            self.assertEqual(evaluation(m,date(2026,7,1),start,start,kids_system='monthly')['kind'],'belt')
++
++    def test_age_limits_by_birth_year(self):
++        m=self.member(rank='gray-black',birth=2020,stripes=3)
++        self.assertIsNone(evaluation(m,date(2026,10,4),date(2024,1,1),date(2024,1,1)))
++        m.date_of_birth=date(2019,12,31)
++        self.assertEqual(evaluation(m,date(2026,1,1),date(2024,1,1),date(2024,1,1))['target'],'yellow-white')
++
++    def test_juvenile_transition_and_purple_brown_age(self):
++        m=self.member(rank='green-black',birth=2010)
++        self.assertEqual(evaluation(m,date(2026,1,1),date(2025,1,1),date(2025,1,1))['target'],'blue or purple')
++        m=self.member(rank='purple',birth=2009,registered=date(2024,1,1))
++        self.assertIsNone(evaluation(m,date(2026,10,4),date(2024,1,1),date(2024,1,1)))
++
++    def test_black_degrees_not_ordinary_stripes(self):
++        self.assertIsNone(evaluation(self.member(rank='black'),date(2026,10,4),date(1990,1,1),date(1990,1,1),adult_stripe_months=3))
++
++    def test_missing_and_future_rank_dates(self):
++        for start in [None,date(2027,1,1)]:
++            self.assertIsNone(evaluation(self.member(),date(2026,10,4),start,start))
++
++    def test_calendar_month_end(self):
++        self.assertEqual(add_months(date(2024,2,29),24),date(2026,2,28))
