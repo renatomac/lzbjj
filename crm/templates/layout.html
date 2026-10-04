@@ -651,20 +651,22 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <a id="globalTimerLink" class="btn btn-sm btn-link p-0 ms-1 text-decoration-none" title="Open Timer"><i class="fas fa-external-link-alt"></i></a>
                 </div>
                 
-                <span class="me-3 text-muted small d-none d-sm-inline">
-                    Hi!, {{ user.username }}
-                </span>
-
                 {# Notification bell dropdown #}
                 {% include 'partials/navbar_bell.html' %}
 
-                <a href="{% url 'change_password' %}" class="ms-3 text-muted text-decoration-none">
-                    <i class="fas fa-key"></i> Change Password
-                </a>
-
-                <a href="{% url 'logout' %}" class="ms-3 text-muted text-decoration-none">
-                    <i class="fas fa-sign-out-alt"></i> Logout
-                </a>
+                {% if user.is_authenticated %}
+                <div class="dropdown ms-2">
+                  <button class="btn btn-light dropdown-toggle d-flex align-items-center gap-2" type="button" id="userMenu" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="fas fa-user-circle" aria-hidden="true"></i>
+                    <span class="text-truncate" style="max-width: 180px;">{{ user.username }}</span>
+                  </button>
+                  <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userMenu">
+                    <li><a class="dropdown-item" href="{% url 'change_password' %}"><i class="fas fa-key me-2" aria-hidden="true"></i>Change Password</a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item" href="{% url 'logout' %}"><i class="fas fa-sign-out-alt me-2" aria-hidden="true"></i>Logout</a></li>
+                  </ul>
+                </div>
+                {% endif %}
                 </div>
             </div>
         </header>
