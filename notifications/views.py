@@ -1,5 +1,8 @@
 from django.contrib.auth.decorators import login_required
-from django.http import JsonResponse, HttpResponseForbidden
+from django.http import JsonResponse
+from django.core.paginator import Paginator
+from django.views.decorators.http import require_POST
+from django.views.decorators.csrf import ensure_csrf_cookie
 from django.shortcuts import render, get_object_or_404
 from django.conf import settings
 from ably import AblyRest
@@ -7,31 +10,30 @@ from .models import Notification
 from asgiref.sync import async_to_sync   
 import json
 
-try:
-    from notifications.utils import create_notification
-    NOTIFICATIONS_AVAILABLE = True
-except ImportError:
-    NOTIFICATIONS_AVAILABLE = False
-    # Fallback function if notifications aren't available
-    def create_notification(user, notification_type, message, data=None):
-        print(f"NOTIFICATION ({notification_type}): {message}")  # For debugging
-        return None
-
-
 @login_required
+@ensure_csrf_cookie
 def notification_list(request):
-    qs = Notification.objects.filter(user=request.user).order_by('-created_at')
-    return render(request, 'notifications/list.html', {'notifications': qs})
-
-@login_required
-
+    qs = Notification.objects.filter(user=request.user).order_by('-created_at', '-pk')
+    total = qs.count()
+    unread = qs.filter(is_read=False).count()
+    status = request.GET.get('status', 'all')
+    if status in ('read', 'unread'):
+        qs = qs.filter(is_read=status == 'read')
+    query = request.GET.get('q', '').strip()[:200]
+    if query:
+        qs = qs.filter(message__icontains=query)
+    page = Paginator(qs, 20).get_page(request.GET.get('page'))
+    return render(request, 'notifications/list.html', {
+        'notifications': page, 'page_obj': page, 'total': total,
+        'unread': unread, 'status_filter': status, 'query': query,
+    })
 
 @login_required
 def ably_token(request):
-    if not settings.ABLY_API_KEY:
+    if not getattr(settings, "ABLY_API_KEY", ""):
         return JsonResponse({"error": "ABLY_API_KEY not configured"}, status=500)
 
-    client = AblyRest(settings.ABLY_API_KEY)
+    client = AblyRest(getattr(settings, "ABLY_API_KEY", ""))
 
     # Some Ably SDK versions expose async methods; wrap with async_to_sync
     try:
@@ -58,14 +60,10 @@ def ably_token(request):
 
 
 @login_required
+@require_POST
 def mark_notification_read(request, pk):
-    if request.method not in ("POST", "GET"):  # allow GET for quick dev; switch to POST if you prefer
-        return JsonResponse({"error": "Method not allowed"}, status=405)
 
-    n = get_object_or_404(Notification, pk=pk)
-    # Only owner or staff can mark read
-    if n.user != request.user and not request.user.is_staff:
-        return HttpResponseForbidden("Not allowed")
+    n = get_object_or_404(Notification, pk=pk, user=request.user)
 
     if not n.is_read:
         n.is_read = True
@@ -76,15 +74,11 @@ def mark_notification_read(request, pk):
     return JsonResponse({"status": "ok", "id": n.id, "unread": unread})
 
 @login_required
+@require_POST
 def delete_notification(request, pk):
     """Delete a notification permanently"""
-    if request.method not in ("POST", "GET"):
-        return JsonResponse({"error": "Method not allowed"}, status=405)
 
-    n = get_object_or_404(Notification, pk=pk)
-    # Only owner or staff can delete
-    if n.user != request.user and not request.user.is_staff:
-        return HttpResponseForbidden("Not allowed")
+    n = get_object_or_404(Notification, pk=pk, user=request.user)
 
     notification_id = n.id
     n.delete()
@@ -94,26 +88,25 @@ def delete_notification(request, pk):
     return JsonResponse({"status": "ok", "id": notification_id, "unread": unread})
 
 @login_required
+@require_POST
 def mark_all_read(request):
-    if request.method not in ("POST", "GET"):
-        return JsonResponse({"error": "Method not allowed"}, status=405)
 
     Notification.objects.filter(user=request.user, is_read=False).update(is_read=True)
     return JsonResponse({"status": "ok", "unread": 0})
 
 @login_required
+@require_POST
 def delete_all_notifications(request):
     """Delete all notifications for the user"""
-    if request.method not in ("POST", "GET"):
-        return JsonResponse({"error": "Method not allowed"}, status=405)
 
     Notification.objects.filter(user=request.user).delete()
     return JsonResponse({"status": "ok", "unread": 0})
 
 # Optional: JSON for the 5 most recent (for repopulating dropdown if you want)
 @login_required
+@ensure_csrf_cookie
 def recent_notifications_api(request):
-    qs = Notification.objects.filter(user=request.user).order_by('-created_at')[:5]
+    qs = Notification.objects.filter(user=request.user).order_by('-created_at')[:10]
     data = [
         {
             "id": n.id,

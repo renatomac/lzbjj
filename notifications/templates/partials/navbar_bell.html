@@ -1,75 +1,11 @@
-
-{% load static %}
-
-<style>
-  .bell-wrapper {
-    position: relative;
-    display: inline-block;
-    margin-right: 1rem;
-    cursor: pointer;
-  }
-  .bell-badge {
-    position: absolute;
-    top: -6px;
-    right: -6px;
-    background: #dc3545; /* bootstrap danger */
-    color: white;
-    border-radius: 999px;
-    padding: 0 6px;
-    font-size: 0.70rem;
-    line-height: 1.2;
-    min-width: 18px;
-    text-align: center;
-  }
-  .dropdown-menu-notifs {
-    min-width: 320px;
-    max-width: 420px;
-  }
-  .notif-item {
-    white-space: normal;
-  }
-</style>
-
-{# If you use Bootstrap Icons, ensure the icon CSS is loaded in your base layout: #}
-{# <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"> #}
-
-
-<div class="dropdown">
-  <a class="nav-link dropdown-toggle bell-wrapper" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false" id="notifBell">
-    <i class="fas fa-bell" style="font-size: 1.3rem;"></i>
-    {% if notifications_unread_count and notifications_unread_count > 0 %}
-      <span class="bell-badge" id="notifBadge">{{ notifications_unread_count }}</span>
-    {% else %}
-      <span class="bell-badge" id="notifBadge" style="display:none;">0</span>
-    {% endif %}
-  </a>
-
-  <ul class="dropdown-menu dropdown-menu-end dropdown-menu-notifs" id="notifDropdown">
-    {% if notifications_recent %}
-      {% for n in notifications_recent %}
-        <li class="dropdown-item notif-item d-flex justify-content-between align-items-start {% if not n.is_read %}fw-semibold{% endif %}"
-            data-notif-id="{{ n.id }}" id="notif-item-{{ n.id }}">
-          <div class="me-2">
-            {{ n.message }}
-            {% if n.created_at %}
-              <div class="small text-muted">{{ n.created_at|date:"M d, Y H:i" }}</div>
-            {% endif %}
-          </div>
-          <div class="ms-2">
-            {% if not n.is_read %}
-              <a href="javascript:void(0)" class="btn btn-sm btn-link p-0 mark-read" data-id="{{ n.id }}" title="Marcar como lida">Mark</a>
-            {% endif %}
-          </div>
-        </li>
-        {% if not forloop.last %}<li><hr class="dropdown-divider"></li>{% endif %}
-      {% endfor %}
-      <li><hr class="dropdown-divider"></li>
-      <li class="dropdown-item d-flex justify-content-between align-items-center">
-        <a href="{% url 'notifications:list' %}" class="me-2">View all notifications</a>
-        <a href="javascript:void(0)" id="markAllRead" class="text-decoration-none">Mark all as read</a>
-      </li>
-    {% else %}
-      <li class="dropdown-item text-muted">No notifications</li>
-    {% endif %}
-  </ul>
+<div class="dropdown" id="notificationWidget" data-recent-url="{% url 'notifications:recent_api' %}" data-mark-url="{% url 'notifications:mark_read' 0 %}" data-delete-url="{% url 'notifications:delete' 0 %}" data-mark-all-url="{% url 'notifications:mark_all' %}">
+  <button class="btn position-relative" id="notifBell" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-label="Notifications" aria-expanded="false"><i class="fas fa-bell" aria-hidden="true"></i><span id="notifBadge" class="badge bg-danger position-absolute top-0 end-0" hidden>0</span></button>
+  <div class="dropdown-menu dropdown-menu-end p-0 shadow" style="width:min(380px,90vw)">
+    <div class="d-flex justify-content-between border-bottom p-3"><strong>Notifications</strong><button class="btn btn-sm btn-link" data-notification-action="all">Mark all read</button></div>
+    <div id="notifDropdown" style="max-height:380px;overflow-y:auto"><div class="p-3 text-muted">Loading notifications…</div></div>
+    <a class="d-block text-center p-3 border-top" href="{% url 'notifications:list' %}">Open notification center</a>
+    <div id="notificationError" class="small text-danger px-3" role="status"></div>
+  </div>
+  <input type="hidden" id="notificationCsrf" value="{{ csrf_token }}">
 </div>
+{% load static %}<script src="{% static 'crm/js/notifications.js' %}" defer></script>

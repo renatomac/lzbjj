@@ -8,3 +8,6 @@ class CrmNotificationsConfig(AppConfig):
     label = "crm_notifications"   # <-- unique label within the project
     verbose_name = "CRM Notifications"
 
+
+    def ready(self):
+        from . import signals  # noqa: F401

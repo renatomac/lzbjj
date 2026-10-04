@@ -73,48 +73,7 @@ function decrementBadge() {
   setBadge(next);
 }
 
-// --- DOM updates ---
-function markItemReadInDOM(id) {
-  const li = document.getElementById(`notif-item-${id}`);
-  if (!li) return;
-  li.classList.remove('fw-semibold');
-  const btn = li.querySelector('.mark-read');
-  if (btn) btn.remove();
-}
-
-// --- Click handlers for mark / mark-all ---
-document.addEventListener('click', (e) => {
-  // Single mark
-  if (e.target && e.target.classList.contains('mark-read')) {
-    const id = e.target.getAttribute('data-id');
-    csrfFetch(`/notifications/mark/${id}/`, { method: 'POST' })
-      .then(r => r.json())
-      .then(data => {
-        if (data.status === 'ok') {
-          markItemReadInDOM(id);
-          setBadge(data.unread);
-        }
-      })
-      .catch(err => console.error('mark-read error', err));
-  }
-
-  // Mark all
-  if (e.target && e.target.id === 'markAllRead') {
-    csrfFetch(`/notifications/mark-all/`, { method: 'POST' })
-      .then(r => r.json())
-      .then(data => {
-        if (data.status === 'ok') {
-          document.querySelectorAll('#notifDropdown .notif-item').forEach(li => {
-            li.classList.remove('fw-semibold');
-            const btn = li.querySelector('.mark-read');
-            if (btn) btn.remove();
-          });
-          setBadge(0);
-        }
-      })
-      .catch(err => console.error('mark-all error', err));
-  }
-});
+function markItemReadInDOM(id) { window.refreshNotifications?.(); }
 
 // --- Global Timer Javascript Helpers ---
 let activeTimerState = null;
@@ -328,57 +287,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Guard to avoid duplicate subscription if scripts are included twice by mistake
     if (!window.__notifSubscribed) {
-      channel.subscribe('new', (msg) => {
-        // 1) bump badge
-        const badge = document.getElementById('notifBadge');
-        const current = badge ? parseInt(badge.textContent || "0", 10) || 0 : 0;
-        setBadge(current + 1);
-
-        // 2) prepend to dropdown (optional but nice)
-        const dropdown = document.getElementById('notifDropdown');
-        if (!dropdown) return;
-
-        // Remove "No notifications" placeholder if present
-        const noItems = dropdown.querySelector('.dropdown-item.text-muted');
-        if (noItems) noItems.remove();
-
-        // New li (unread)
-        const li = document.createElement('li');
-        li.className = 'dropdown-item notif-item d-flex justify-content-between align-items-start fw-semibold';
-        li.id = `notif-item-${msg.data.id}`;
-        li.setAttribute('data-notif-id', msg.data.id);
-        li.innerHTML = `
-          <div class="me-2">
-            ${msg.data.message}
-            ${msg.data.created_at ? `<div class="small text-muted">${new Date(msg.data.created_at).toLocaleString()}</div>` : ''}
-          </div>
-          <div class="ms-2">
-            <a href="javascript:void(0)" class="btn btn-sm btn-link p-0 mark-read" data-id="${msg.data.id}" title="Marcar como lida">Mark</a>
-          </div>
-        `;
-        const first = dropdown.firstElementChild;
-        dropdown.insertBefore(li, first);
-        if (li.nextElementSibling) {
-          const divider = document.createElement('li');
-          divider.innerHTML = '<hr class="dropdown-divider">';
-          dropdown.insertBefore(divider, li.nextElementSibling);
-        }
-      });
-
-      // (Optional) keep other tabs in sync if you publish mark events from views:
-      channel.subscribe('marked', (msg) => {
-        const id = msg?.data?.id;
-        if (!id) return;
-        markItemReadInDOM(id);
-      });
-      channel.subscribe('marked_all', () => {
-        document.querySelectorAll('#notifDropdown .notif-item').forEach(li => {
-          li.classList.remove('fw-semibold');
-          const btn = li.querySelector('.mark-read');
-          if (btn) btn.remove();
-        });
-        setBadge(0);
-      });
+      channel.subscribe('new', () => window.refreshNotifications?.());
+      channel.subscribe('marked_read', () => window.refreshNotifications?.());
+      channel.subscribe('marked_all', () => window.refreshNotifications?.());
 
       // --- Ably active timer subscription ---
       const timerChannelName = "user-{{ request.user.id }}-timer";

@@ -23,8 +23,6 @@ def _token_user(request):
     key = auth.split(' ', 1)[1].strip()
     try:
         t = APIToken.objects.get(token=key)
-        t.last_used = timezone.now()
-        t.save(update_fields=['last_used'])
         return t.user, None
     except APIToken.DoesNotExist:
         return None, Response({'error': 'Invalid token'}, status=401)
@@ -38,8 +36,6 @@ class ObtainAPIToken(APIView):
         if not u:
             return Response({'error': 'Invalid credentials'}, status=401)
         tok, _ = APIToken.objects.get_or_create(user=u)
-        tok.last_used = timezone.now()
-        tok.save(update_fields=['last_used'])
         return Response({'token': tok.token})
         
 class GetMembers(APIView):
@@ -117,62 +113,19 @@ class PiAttendanceCompat(APIView):
         att, created = SessionAttendance.objects.get_or_create(
             session=session,
             member=member,
-            defaults={
-                'present': True,
-                'check_in_time': ts or timezone.now(),
-                'check_in_method': method,
-                'notes': notes
-            }
+            defaults={'present': True}
         )
         if not created:
-            # Update fields on repeat posts (e.g., confidence/notes refinements)
             att.present = True
-            if hasattr(att, 'check_in_method'):
-                att.check_in_method = method
-            if ts:
-                att.check_in_time = ts
-            if hasattr(att, 'notes'):
-                att.notes = notes
-            att.save()
+            att.save(update_fields=['present'])
 
         # Optional: notify staff - Updated to use your existing notification structure
         try:
-            # Import the publish function directly from realtime
-            from notifications.realtime import publish_user_notification
-            
-            # Create a notification in the database
-            from notifications.models import Notification
-            
-            # Create the notification in the database
-            notification = Notification.objects.create(
-                user=user,
-                message=f"Check-in: {member} on {day.isoformat()}",
-                data={
-                    'member_id': member.id,
-                    'member_name': str(member),
-                    'date': day.isoformat(),
-                    'method': method,
-                    'attendance_id': att.id
-                },
-                is_read=False,
-                created_at=timezone.now()
-            )
-            
-            # Publish real-time notification via Ably
-            try:
-                publish_user_notification(
-                    user_id=user.id,
-                    payload={
-                        'id': notification.id,
-                        'type': 'attendance',
-                        'message': notification.message,
-                        'data': notification.data,
-                        'created_at': notification.created_at.isoformat()
-                    }
-                )
-            except Exception:
-                pass  # Real-time notification failed, but DB notification still exists
-                
+            from notifications.utils import create_notification
+            create_notification(user, 'ATTENDANCE',
+                f"Check-in: {member} on {day.isoformat()}",
+                {'member_id': member.pk, 'date': day.isoformat(),
+                 'method': method, 'attendance_id': att.pk})
         except Exception as e:
             # Log the error but don't fail the request
             print(f"Notification creation failed: {e}")

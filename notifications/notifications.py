@@ -36,22 +36,14 @@ def get_coaches_for_member(member):
     Returns:
         QuerySet: User objects who are coaches and teach member's classes
     """
-    try:
-        # Get all classes attended by this member
-        attended_sessions = SessionAttendance.objects.filter(
-            member=member
-        ).values_list('session', flat=True).distinct()
-        
-        # Get coaches from those sessions
-        coaches = User.objects.filter(
-            is_coach=True,
-            sessions__in=attended_sessions
-        ).distinct()
-        
-        return coaches
-    except Exception:
-        # Fallback: get all coaches if something goes wrong
-        return User.objects.filter(is_coach=True)
+    attended = SessionAttendance.objects.filter(member=member, present=True)
+    override_ids = attended.values_list('session__instructor__user_id', flat=True)
+    template_ids = attended.filter(session__instructor__isnull=True).values_list(
+        'session__class_template__instructor__user_id', flat=True)
+    coaches = User.objects.filter(is_active=True, is_coach=True).filter(
+        Q(pk__in=override_ids) | Q(pk__in=template_ids)).distinct()
+    return coaches if coaches.exists() else User.objects.filter(is_active=True).filter(
+        Q(is_coach=True) | Q(is_staff=True))
 
 
 def notify_coaches_about_member_event(member, event_type, message_template, context_data):
@@ -102,20 +94,27 @@ def generate_birthday_notifications():
     Returns:
         list: List of created notifications
     """
-    today = timezone.now().date()
+    today = timezone.localdate()
     
     # Find members with birthday today
     members = Member.objects.filter(
         is_active=True,
         date_of_birth__month=today.month,
         date_of_birth__day=today.day
-    ).exclude(user__isnull=True)
+    )
     
     notifications = []
     for member in members:
-        if not member.user:
+        from .models import Notification
+        staff_message = f'Birthday today: {member.first_name} {member.last_name}.'
+        for recipient in User.objects.filter(is_active=True).filter(Q(is_staff=True) | Q(is_coach=True)):
+            if not Notification.objects.filter(user=recipient, message=staff_message,
+                    created_at__date=today).exists():
+                notifications.append(create_notification(recipient, 'MEMBER_BIRTHDAY', staff_message))
+        if not member.user or Notification.objects.filter(user=member.user,
+                message__startswith=f'🎉 Happy Birthday, {member.first_name}!', created_at__date=today).exists():
             continue
-            
+
         # Calculate age
         age = today.year - member.date_of_birth.year
         
@@ -154,7 +153,7 @@ def generate_promotion_milestone_notifications():
     notifications = []
     
     # Get all active members
-    active_members = Member.objects.filter(is_active=True).exclude(user__isnull=True)
+    active_members = Member.objects.filter(is_active=True)
     
     for member in active_members:
         # Get the reference date: either last promotion date or join date
@@ -172,14 +171,16 @@ def generate_promotion_milestone_notifications():
         classes_attended = SessionAttendance.objects.filter(
             member=member,
             present=True,
-            session__date__gte=reference_date
+            session__date__gte=reference_date,
+            session__date__lte=timezone.localdate(),
+            session__is_canceled=False,
         ).count()
         
         # Alternative: count using Attendance model if SessionAttendance is not used
         if classes_attended == 0:
             classes_attended = Attendance.objects.filter(
                 member=member,
-                date__gte=reference_date
+                date__gte=reference_date, date__lte=timezone.localdate()
             ).count()
         
         # Check if member has reached 30 classes milestone
@@ -187,8 +188,7 @@ def generate_promotion_milestone_notifications():
             # Check if notification already sent recently (within last 7 days)
             from .models import Notification
             recent_notification = Notification.objects.filter(
-                user=member.user,
-                message__icontains="promotion milestone",
+                message__icontains=f"Promotion Ready: {member.first_name} {member.last_name} ",
                 created_at__gte=timezone.now() - timedelta(days=7)
             ).exists()
             
@@ -199,19 +199,20 @@ def generate_promotion_milestone_notifications():
                     f"belt promotion evaluation. Talk to your instructor!"
                 )
                 
-                notification = create_notification(
-                    user=member.user,
-                    notification_type="PROMOTION_MILESTONE",
-                    message=message,
-                    data={
-                        "member_id": member.id,
-                        "member_name": f"{member.first_name} {member.last_name}",
-                        "classes_attended": classes_attended,
-                        "belt_rank": member.belt_rank,
-                        "reference_date": reference_date.isoformat(),
-                    }
-                )
-                notifications.append(notification)
+                if member.user:
+                    notification = create_notification(
+                        user=member.user,
+                        notification_type="PROMOTION_MILESTONE",
+                        message=message,
+                        data={
+                            "member_id": member.id,
+                            "member_name": f"{member.first_name} {member.last_name}",
+                            "classes_attended": classes_attended,
+                            "belt_rank": member.belt_rank,
+                            "reference_date": reference_date.isoformat(),
+                        }
+                    )
+                    notifications.append(notification)
                 
                 # Also notify coaches about this milestone
                 coach_message = (
@@ -250,11 +251,11 @@ def generate_low_attendance_notifications():
     notifications = []
     
     # Calculate date range: last 7 days
-    today = timezone.now().date()
+    today = timezone.localdate()
     seven_days_ago = today - timedelta(days=7)
     
     # Get all active members
-    active_members = Member.objects.filter(is_active=True).exclude(user__isnull=True)
+    active_members = Member.objects.filter(is_active=True)
     
     for member in active_members:
         # Check attendance in the last 7 days
@@ -278,8 +279,7 @@ def generate_low_attendance_notifications():
             # Check if already notified recently (within last 3 days)
             from .models import Notification
             recent_notification = Notification.objects.filter(
-                user=member.user,
-                message__icontains="attendance",
+                message__icontains=f"Low Attendance Alert: {member.first_name} {member.last_name} ",
                 created_at__gte=timezone.now() - timedelta(days=3)
             ).exists()
             
@@ -289,18 +289,19 @@ def generate_low_attendance_notifications():
                     f"Come back to class soon. Check the schedule and join us!"
                 )
                 
-                notification = create_notification(
-                    user=member.user,
-                    notification_type="LOW_ATTENDANCE",
-                    message=message,
-                    data={
-                        "member_id": member.id,
-                        "member_name": f"{member.first_name} {member.last_name}",
-                        "days_since_last_class": 7,
-                        "belt_rank": member.belt_rank,
-                    }
-                )
-                notifications.append(notification)
+                if member.user:
+                    notification = create_notification(
+                        user=member.user,
+                        notification_type="LOW_ATTENDANCE",
+                        message=message,
+                        data={
+                            "member_id": member.id,
+                            "member_name": f"{member.first_name} {member.last_name}",
+                            "days_since_last_class": 7,
+                            "belt_rank": member.belt_rank,
+                        }
+                    )
+                    notifications.append(notification)
                 
                 # Also notify coaches about inactive member
                 coach_message = (
@@ -335,7 +336,7 @@ def generate_membership_expiration_warnings():
     """
     notifications = []
     
-    today = timezone.now().date()
+    today = timezone.localdate()
     warning_date = today + timedelta(days=14)
     
     # Find members with membership ending soon
@@ -395,23 +396,17 @@ def generate_streak_milestone_notifications():
     active_members = Member.objects.filter(is_active=True).exclude(user__isnull=True)
     
     for member in active_members:
-        # Get all classes attended, ordered by date (most recent first)
+        # A missed scheduled class breaks the streak; future sessions do not count.
         attended_classes = SessionAttendance.objects.filter(
-            member=member,
-            present=True,
-            session__is_canceled=False
-        ).order_by('-session__date')
-        
-        if not attended_classes.exists():
-            continue
-        
-        # Count consecutive recent attendances
+            member=member, session__is_canceled=False,
+            session__date__lte=timezone.localdate(),
+        ).order_by('-session__date', '-session_id')
         current_streak = 0
         for attendance in attended_classes:
-            if attendance.session.is_canceled:
+            if not attendance.present:
                 break
             current_streak += 1
-        
+
         # Check for milestone achievement
         for milestone in milestones:
             if current_streak == milestone:
@@ -501,7 +496,7 @@ def generate_new_member_welcome_notification(member):
         return None
     
     message = (
-        f"🥋 Welcome to {member.user.first_name}! We're excited to have you join our academy. "
+        f"🥋 Welcome, {member.first_name}! We're excited to have you join our academy. "
         f"Check out the class schedule and don't hesitate to ask instructors questions!"
     )
     
@@ -587,51 +582,18 @@ def generate_waiver_expiration_warnings():
     Returns:
         list: List of created notifications
     """
-    from crm.models import WaiverSignature
-    
+    # Waivers use active versions, not expiration dates.
+    from .models import Notification
     notifications = []
-    today = timezone.now().date()
-    warning_date = today + timedelta(days=30)
-    
-    # This is a template - adjust based on your actual WaiverSignature model
-    try:
-        expiring_waivers = WaiverSignature.objects.filter(
-            member__is_active=True,
-            # Add expiration date field if it exists
-            # expires_at__lte=warning_date,
-            # expires_at__gte=today
-        ).exclude(member__user__isnull=True)
-        
-        for waiver in expiring_waivers:
-            member = waiver.member
-            
-            # Check if already notified
-            from .models import Notification
-            recent_notification = Notification.objects.filter(
-                user=member.user,
-                message__icontains="waiver",
-                created_at__gte=timezone.now() - timedelta(days=7)
-            ).exists()
-            
-            if not recent_notification:
-                message = (
-                    f"📝 {member.first_name}, your waiver expires soon. "
-                    f"Please renew it to continue attending classes."
-                )
-                
-                notification = create_notification(
-                    user=member.user,
-                    notification_type="WAIVER_EXPIRING",
-                    message=message,
-                    data={
-                        "member_id": member.id,
-                        "member_name": f"{member.first_name} {member.last_name}",
-                    }
-                )
-                notifications.append(notification)
-    except Exception as e:
-        print(f"Error generating waiver expiration warnings: {e}")
-    
+    for member in Member.objects.filter(is_active=True).exclude(user__isnull=True):
+        if member.has_latest_waiver:
+            continue
+        if Notification.objects.filter(user=member.user, message__icontains='waiver',
+                created_at__gte=timezone.now() - timedelta(days=7)).exists():
+            continue
+        notifications.append(create_notification(member.user, 'WAIVER_REQUIRED',
+            f'📝 {member.first_name}, please sign the current waiver before attending classes.',
+            {'member_id': member.pk}))
     return notifications
 
 
@@ -749,6 +711,8 @@ def run_all_notifications():
         print(f"Error in waiver expiration warnings: {e}")
         results['waiver_expiring'] = []
     
+    results['trial_expired'] = generate_trial_expiration_notifications()
+
     # Print summary
     total = sum(len(v) for v in results.values() if isinstance(v, list))
     print(f"✓ Notifications generated: {total} total")

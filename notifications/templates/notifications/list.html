@@ -1,29 +1,15 @@
 {% extends "layout.html" %}
 {% block content %}
-<div class="container py-3">
-  <h3>Notifications</h3>
-  <div class="mb-2">
-    <a href="javascript:void(0)" id="markAllRead" class="btn btn-sm btn-outline-primary">Mark all as read</a>
+<div class="container py-4" id="notificationCenter" style="max-width:1000px">
+  <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4"><div><h2>Notification center</h2><p class="text-muted mb-0">Stay on top of academy updates and member activity.</p></div><button class="btn btn-outline-primary" data-notification-action="all">Mark all as read</button></div>
+  <div class="d-flex gap-3 mb-4"><div class="card p-3 flex-fill"><span class="text-muted">All notifications</span><strong class="fs-3">{{ total }}</strong></div><div class="card p-3 flex-fill"><span class="text-muted">Unread</span><strong class="fs-3 text-primary">{{ unread }}</strong></div></div>
+  <form method="get" class="d-flex gap-2 flex-wrap mb-3" aria-label="Filter notifications"><input type="search" name="q" value="{{ query }}" class="form-control flex-fill" style="width:auto" placeholder="Search notifications" aria-label="Search notifications"><select name="status" class="form-select" style="width:auto" aria-label="Read status"><option value="all">All statuses</option><option value="unread" {% if status_filter == 'unread' %}selected{% endif %}>Unread</option><option value="read" {% if status_filter == 'read' %}selected{% endif %}>Read</option></select><button class="btn btn-primary">Apply</button><a class="btn btn-outline-secondary" href="{% url 'notifications:list' %}">Reset</a></form>
+  <div id="centerError" class="text-danger mb-2" role="status"></div>
+  <div class="card shadow-sm overflow-hidden">
+  {% for n in notifications %}
+    <article class="p-3 border-bottom {% if not n.is_read %}bg-light{% endif %}"><div class="d-flex justify-content-between gap-3 flex-wrap"><div class="flex-grow-1"><span class="badge {% if n.is_read %}bg-secondary{% else %}bg-primary{% endif %} mb-2">{% if n.is_read %}Read{% else %}Unread{% endif %}</span><p class="mb-1 {% if not n.is_read %}fw-semibold{% endif %}">{{ n.message }}</p><time class="small text-muted" datetime="{{ n.created_at|date:'c' }}">{{ n.created_at|date:"M j, Y · g:i A" }}</time></div><div class="d-flex gap-2 align-items-center">{% if not n.is_read %}<button class="btn btn-sm btn-outline-primary" data-notification-action="read" data-id="{{ n.pk }}">Mark as read</button>{% endif %}<button class="btn btn-sm btn-outline-danger" data-notification-action="delete" data-id="{{ n.pk }}">Delete</button></div></div></article>
+  {% empty %}<div class="p-5 text-center"><h5>No notifications found</h5><p class="text-muted mb-0">New updates will appear here. Try changing your search or status filter.</p></div>{% endfor %}
   </div>
-  <ul class="list-group">
-    {% for n in notifications %}
-      <li class="list-group-item d-flex justify-content-between align-items-start {% if not n.is_read %}fw-semibold{% endif %}"
-          id="notif-item-{{ n.id }}" data-notif-id="{{ n.id }}">
-        <div>
-          {{ n.message }}
-          {% if n.created_at %}
-            <div class="small text-muted">{{ n.created_at|date:"M d, Y H:i" }}</div>
-          {% endif %}
-        </div>
-        <div>
-          {% if not n.is_read %}
-            <a href="javascript:void(0)" class="btn btn-sm btn-link mark-read" data-id="{{ n.id }}">Mark</a>
-          {% endif %}
-        </div>
-      </li>
-    {% empty %}
-      <li class="list-group-item text-muted">No notifications</li>
-    {% endfor %}
-  </ul>
+  {% if page_obj.has_other_pages %}<nav class="d-flex justify-content-between align-items-center mt-3" aria-label="Notification pages">{% if page_obj.has_previous %}<a class="btn btn-outline-secondary" href="?page={{ page_obj.previous_page_number }}&q={{ query|urlencode }}&status={{ status_filter|urlencode }}">Previous</a>{% else %}<span></span>{% endif %}<span class="text-muted">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>{% if page_obj.has_next %}<a class="btn btn-outline-secondary" href="?page={{ page_obj.next_page_number }}&q={{ query|urlencode }}&status={{ status_filter|urlencode }}">Next</a>{% endif %}</nav>{% endif %}
 </div>
 {% endblock %}

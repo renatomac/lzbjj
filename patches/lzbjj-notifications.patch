@@ -1,0 +1,1300 @@
+diff --git a/api/views.py b/api/views.py
+index 5fc8198..711f3c8 100644
+--- a/api/views.py
++++ b/api/views.py
+@@ -23,8 +23,6 @@ def _token_user(request):
+     key = auth.split(' ', 1)[1].strip()
+     try:
+         t = APIToken.objects.get(token=key)
+-        t.last_used = timezone.now()
+-        t.save(update_fields=['last_used'])
+         return t.user, None
+     except APIToken.DoesNotExist:
+         return None, Response({'error': 'Invalid token'}, status=401)
+@@ -38,8 +36,6 @@ class ObtainAPIToken(APIView):
+         if not u:
+             return Response({'error': 'Invalid credentials'}, status=401)
+         tok, _ = APIToken.objects.get_or_create(user=u)
+-        tok.last_used = timezone.now()
+-        tok.save(update_fields=['last_used'])
+         return Response({'token': tok.token})
+         
+ class GetMembers(APIView):
+@@ -117,62 +113,19 @@ class PiAttendanceCompat(APIView):
+         att, created = SessionAttendance.objects.get_or_create(
+             session=session,
+             member=member,
+-            defaults={
+-                'present': True,
+-                'check_in_time': ts or timezone.now(),
+-                'check_in_method': method,
+-                'notes': notes
+-            }
++            defaults={'present': True}
+         )
+         if not created:
+-            # Update fields on repeat posts (e.g., confidence/notes refinements)
+             att.present = True
+-            if hasattr(att, 'check_in_method'):
+-                att.check_in_method = method
+-            if ts:
+-                att.check_in_time = ts
+-            if hasattr(att, 'notes'):
+-                att.notes = notes
+-            att.save()
++            att.save(update_fields=['present'])
+ 
+         # Optional: notify staff - Updated to use your existing notification structure
+         try:
+-            # Import the publish function directly from realtime
+-            from notifications.realtime import publish_user_notification
+-            
+-            # Create a notification in the database
+-            from notifications.models import Notification
+-            
+-            # Create the notification in the database
+-            notification = Notification.objects.create(
+-                user=user,
+-                message=f"Check-in: {member} on {day.isoformat()}",
+-                data={
+-                    'member_id': member.id,
+-                    'member_name': str(member),
+-                    'date': day.isoformat(),
+-                    'method': method,
+-                    'attendance_id': att.id
+-                },
+-                is_read=False,
+-                created_at=timezone.now()
+-            )
+-            
+-            # Publish real-time notification via Ably
+-            try:
+-                publish_user_notification(
+-                    user_id=user.id,
+-                    payload={
+-                        'id': notification.id,
+-                        'type': 'attendance',
+-                        'message': notification.message,
+-                        'data': notification.data,
+-                        'created_at': notification.created_at.isoformat()
+-                    }
+-                )
+-            except Exception:
+-                pass  # Real-time notification failed, but DB notification still exists
+-                
++            from notifications.utils import create_notification
++            create_notification(user, 'ATTENDANCE',
++                f"Check-in: {member} on {day.isoformat()}",
++                {'member_id': member.pk, 'date': day.isoformat(),
++                 'method': method, 'attendance_id': att.pk})
+         except Exception as e:
+             # Log the error but don't fail the request
+             print(f"Notification creation failed: {e}")
+diff --git a/crm/static/crm/js/notifications.js b/crm/static/crm/js/notifications.js
+new file mode 100644
+index 0000000..68b5f02
+--- /dev/null
++++ b/crm/static/crm/js/notifications.js
+@@ -0,0 +1,57 @@
++(() => {
++  const widget = document.getElementById('notificationWidget');
++  if (!widget) return;
++  let pending = false;
++  const error = document.getElementById('notificationError');
++  const badge = document.getElementById('notifBadge');
++  function count(value) {
++    badge.textContent = value; badge.hidden = !value; badge.style.display = value ? '' : 'none';
++    document.getElementById('notifBell').setAttribute('aria-label', `Notifications: ${value} unread`);
++  }
++  async function refresh() {
++    if (pending) return;
++    pending = true;
++    try {
++      const response = await fetch(widget.dataset.recentUrl, {credentials: 'same-origin'});
++      if (!response.ok) throw new Error('Unable to refresh notifications.');
++      const data = await response.json();
++      const list = document.getElementById('notifDropdown'); list.replaceChildren();
++      count(data.unread);
++      for (const item of data.recent) {
++        const row = document.createElement('div');
++        row.className = 'p-3 border-bottom' + (item.is_read ? '' : ' bg-light fw-semibold');
++        const message = document.createElement('div'); message.textContent = item.message; row.append(message);
++        const time = document.createElement('div'); time.className = 'small text-muted mt-1';
++        time.textContent = new Date(item.created_at).toLocaleString(); row.append(time);
++        if (!item.is_read) {
++          const button = document.createElement('button'); button.className = 'btn btn-sm btn-link px-0';
++          button.textContent = 'Mark as read'; button.dataset.notificationAction = 'read'; button.dataset.id = item.id; row.append(button);
++        }
++        list.append(row);
++      }
++      if (!data.recent.length) { const empty = document.createElement('div'); empty.className = 'p-4 text-center text-muted'; empty.textContent = 'You’re all caught up.'; list.append(empty); }
++      error.textContent = '';
++    } catch (e) { error.textContent = 'Unable to refresh. Try again shortly.'; }
++    finally { pending = false; }
++  }
++  window.refreshNotifications = refresh;
++  document.addEventListener('click', async (event) => {
++    const button = event.target.closest('[data-notification-action]'); if (!button) return;
++    event.preventDefault();
++    const action = button.dataset.notificationAction;
++    if (action === 'delete' && !confirm('Delete this notification permanently?')) return;
++    const url = action === 'all' ? widget.dataset.markAllUrl : (action === 'delete' ? widget.dataset.deleteUrl : widget.dataset.markUrl).replace('/0/', `/${button.dataset.id}/`);
++    button.disabled = true;
++    try {
++      const response = await fetch(url, {method: 'POST', credentials: 'same-origin', headers: {'X-CSRFToken': document.getElementById('notificationCsrf').value}});
++      if (!response.ok) throw new Error();
++      if (document.getElementById('notificationCenter')) window.location.reload();
++      else await refresh();
++    } catch (e) { error.textContent = 'Action failed. Refresh the page and try again.'; const centerError = document.getElementById('centerError'); if (centerError) centerError.textContent = error.textContent; }
++    finally { button.disabled = false; }
++  });
++  refresh();
++  setInterval(() => { if (!document.hidden) refresh(); }, 30000);
++  document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
++  document.getElementById('notifBell').addEventListener('click', refresh);
++})();
+diff --git a/crm/templates/layout.html b/crm/templates/layout.html
+index c99cdf9..53d3a5b 100644
+--- a/crm/templates/layout.html
++++ b/crm/templates/layout.html
+@@ -73,48 +73,7 @@ function decrementBadge() {
+   setBadge(next);
+ }
+ 
+-// --- DOM updates ---
+-function markItemReadInDOM(id) {
+-  const li = document.getElementById(`notif-item-${id}`);
+-  if (!li) return;
+-  li.classList.remove('fw-semibold');
+-  const btn = li.querySelector('.mark-read');
+-  if (btn) btn.remove();
+-}
+-
+-// --- Click handlers for mark / mark-all ---
+-document.addEventListener('click', (e) => {
+-  // Single mark
+-  if (e.target && e.target.classList.contains('mark-read')) {
+-    const id = e.target.getAttribute('data-id');
+-    csrfFetch(`/notifications/mark/${id}/`, { method: 'POST' })
+-      .then(r => r.json())
+-      .then(data => {
+-        if (data.status === 'ok') {
+-          markItemReadInDOM(id);
+-          setBadge(data.unread);
+-        }
+-      })
+-      .catch(err => console.error('mark-read error', err));
+-  }
+-
+-  // Mark all
+-  if (e.target && e.target.id === 'markAllRead') {
+-    csrfFetch(`/notifications/mark-all/`, { method: 'POST' })
+-      .then(r => r.json())
+-      .then(data => {
+-        if (data.status === 'ok') {
+-          document.querySelectorAll('#notifDropdown .notif-item').forEach(li => {
+-            li.classList.remove('fw-semibold');
+-            const btn = li.querySelector('.mark-read');
+-            if (btn) btn.remove();
+-          });
+-          setBadge(0);
+-        }
+-      })
+-      .catch(err => console.error('mark-all error', err));
+-  }
+-});
++function markItemReadInDOM(id) { window.refreshNotifications?.(); }
+ 
+ // --- Global Timer Javascript Helpers ---
+ let activeTimerState = null;
+@@ -328,57 +287,9 @@ document.addEventListener('DOMContentLoaded', async () => {
+ 
+     // Guard to avoid duplicate subscription if scripts are included twice by mistake
+     if (!window.__notifSubscribed) {
+-      channel.subscribe('new', (msg) => {
+-        // 1) bump badge
+-        const badge = document.getElementById('notifBadge');
+-        const current = badge ? parseInt(badge.textContent || "0", 10) || 0 : 0;
+-        setBadge(current + 1);
+-
+-        // 2) prepend to dropdown (optional but nice)
+-        const dropdown = document.getElementById('notifDropdown');
+-        if (!dropdown) return;
+-
+-        // Remove "No notifications" placeholder if present
+-        const noItems = dropdown.querySelector('.dropdown-item.text-muted');
+-        if (noItems) noItems.remove();
+-
+-        // New li (unread)
+-        const li = document.createElement('li');
+-        li.className = 'dropdown-item notif-item d-flex justify-content-between align-items-start fw-semibold';
+-        li.id = `notif-item-${msg.data.id}`;
+-        li.setAttribute('data-notif-id', msg.data.id);
+-        li.innerHTML = `
+-          <div class="me-2">
+-            ${msg.data.message}
+-            ${msg.data.created_at ? `<div class="small text-muted">${new Date(msg.data.created_at).toLocaleString()}</div>` : ''}
+-          </div>
+-          <div class="ms-2">
+-            <a href="javascript:void(0)" class="btn btn-sm btn-link p-0 mark-read" data-id="${msg.data.id}" title="Marcar como lida">Mark</a>
+-          </div>
+-        `;
+-        const first = dropdown.firstElementChild;
+-        dropdown.insertBefore(li, first);
+-        if (li.nextElementSibling) {
+-          const divider = document.createElement('li');
+-          divider.innerHTML = '<hr class="dropdown-divider">';
+-          dropdown.insertBefore(divider, li.nextElementSibling);
+-        }
+-      });
+-
+-      // (Optional) keep other tabs in sync if you publish mark events from views:
+-      channel.subscribe('marked', (msg) => {
+-        const id = msg?.data?.id;
+-        if (!id) return;
+-        markItemReadInDOM(id);
+-      });
+-      channel.subscribe('marked_all', () => {
+-        document.querySelectorAll('#notifDropdown .notif-item').forEach(li => {
+-          li.classList.remove('fw-semibold');
+-          const btn = li.querySelector('.mark-read');
+-          if (btn) btn.remove();
+-        });
+-        setBadge(0);
+-      });
++      channel.subscribe('new', () => window.refreshNotifications?.());
++      channel.subscribe('marked_read', () => window.refreshNotifications?.());
++      channel.subscribe('marked_all', () => window.refreshNotifications?.());
+ 
+       // --- Ably active timer subscription ---
+       const timerChannelName = "user-{{ request.user.id }}-timer";
+diff --git a/crm/utils.py b/crm/utils.py
+index f1703ee..b7440fe 100644
+--- a/crm/utils.py
++++ b/crm/utils.py
+@@ -322,37 +322,8 @@ def birthdays_of_the_month():
+ 
+ 
+ def create_birthday_notifications():
+-    today = timezone.localdate()
+-    members = list(
+-        Member.objects.filter(
+-            is_active=True,
+-            date_of_birth__month=today.month,
+-            date_of_birth__day=today.day,
+-        ).order_by('first_name', 'last_name')
+-    )
+-
+-    if not members:
+-        return 0
+-
+-    recipients = list(
+-        User.objects.filter(is_staff=True, is_active=True).order_by('id')
+-    )
+-
+-    if not recipients:
+-        return 0
+-
+-    message = (
+-        f"Today is {', '.join(f'{member.first_name} {member.last_name}' for member in members)}'s birthday."
+-    )
+-
+-    for user in recipients:
+-        Notification.objects.create(
+-            user=user,
+-            message=message,
+-            is_read=False,
+-        )
+-
+-    return len(recipients)
++    from notifications.notifications import generate_birthday_notifications
++    return len(generate_birthday_notifications())
+ 
+ 
+ def get_client_ip(request):
+@@ -367,9 +338,5 @@ def get_client_ip(request):
+ 
+ 
+ def create_notification(user, title, message="", url=""):
+-    Notification.objects.create(
+-        user=user,
+-        title=title,
+-        message=message,
+-        url=url
+-    )
++    from notifications.utils import create_notification as notify
++    return notify(user, title, message or title, {'url': url})
+diff --git a/notifications/REVIEW.md b/notifications/REVIEW.md
+new file mode 100644
+index 0000000..19d7747
+--- /dev/null
++++ b/notifications/REVIEW.md
+@@ -0,0 +1,28 @@
++# Notification review and deployment
++
++## Confirmed failures fixed
++
++- Pi authentication updated a nonexistent `APIToken.last_used` field and check-in supplied nonexistent attendance fields; both prevented notification creation. The endpoint now writes only fields present in the models.
++- Pi single check-in attempted to write `Notification.data`, which does not exist; creation failed inside a swallowed exception.
++- Bulk delivery published before records were saved and omitted notification IDs.
++- Navbar updates depended on successful Ably connection; no database polling fallback existed. The dropdown now refreshes on load/open, every 30 seconds while visible, and on realtime events.
++- Notifications generated on dashboard visits bypassed the publisher and repeatedly created birthday alerts.
++- Coach lookup used a nonexistent User.sessions relation and silently fell back to all coaches. It now resolves session overrides and template instructors through Staff.user.
++- Promotion/low-attendance deduplication searched text absent from the actual messages. Staff now receive these alerts even for students with no account.
++- Waiver generator warned all signature holders of imaginary expiration dates; it now checks the current required waiver version.
++- Streaks counted only present rows and never broke on missed classes. Future/canceled sessions are excluded.
++- Welcome and cancellation generators had no model hooks; these are now connected, with cancellation triggered only when entering canceled state.
++- Read/delete accepted GET and let staff mutate another recipient's notification. Mutations now require owner-only POST with CSRF.
++- Navbar context loaded the entire history on every page. It is now bounded.
++
++## Notification center
++
++Search, all/read/unread filters, totals, 20-row pagination, readable timestamps, mark one/all read, individual deletion with confirmation, and accessible empty/error states. The bell always links to the center, including when empty. Text from realtime events is no longer injected as HTML.
++
++## Deployment checks
++
++Deploy this branch and run collectstatic for the new `crm/js/notifications.js`. No database schema changes are required. Reload Django and hard-refresh the browser.
++
++Scheduled alerts require a daily server job running `python manage.py generate_notifications`. The repository documents scheduling but does not provision a running job. Confirm the PythonAnywhere task/virtualenv separately; repository review cannot verify the deployed scheduler, production data, migrations, settings, or Ably credentials. Do not run generation as a diagnostics-only action: it creates real alerts and expires trials.
++
++The model still stores message, recipient, read state, and timestamp; event type/context passed to the service is realtime payload only. Existing historical notifications are preserved. Name/text-based frequency guards do not guarantee uniqueness during concurrent generator runs or after users delete alerts. Use one scheduled worker. A future schema migration can add durable event identifiers and typed context after checking the deployed migration history (migration files are excluded from this repository).
+diff --git a/notifications/admin.py b/notifications/admin.py
+new file mode 100644
+index 0000000..905f156
+--- /dev/null
++++ b/notifications/admin.py
+@@ -0,0 +1,10 @@
++from django.contrib import admin
++from .models import Notification
++
++
++@admin.register(Notification)
++class NotificationAdmin(admin.ModelAdmin):
++    list_display = ('user', 'message', 'is_read', 'created_at')
++    list_filter = ('is_read', 'created_at')
++    search_fields = ('message', 'user__username', 'user__email')
++    readonly_fields = ('created_at',)
+diff --git a/notifications/apps.py b/notifications/apps.py
+index 4715dc0..c97739c 100644
+--- a/notifications/apps.py
++++ b/notifications/apps.py
+@@ -1,10 +1,13 @@
+-
+-# notifications/apps.py
+-from django.apps import AppConfig
+-
+-class CrmNotificationsConfig(AppConfig):
+-    default_auto_field = "django.db.models.BigAutoField"
+-    name = "notifications"        # your python package
+-    label = "crm_notifications"   # <-- unique label within the project
+-    verbose_name = "CRM Notifications"
+-
++
++# notifications/apps.py
++from django.apps import AppConfig
++
++class CrmNotificationsConfig(AppConfig):
++    default_auto_field = "django.db.models.BigAutoField"
++    name = "notifications"        # your python package
++    label = "crm_notifications"   # <-- unique label within the project
++    verbose_name = "CRM Notifications"
++
++
++    def ready(self):
++        from . import signals  # noqa: F401
+diff --git a/notifications/context_processors.py b/notifications/context_processors.py
+index 50309ca..5530dfa 100644
+--- a/notifications/context_processors.py
++++ b/notifications/context_processors.py
+@@ -14,7 +14,7 @@ def notifications(request):
+         unread_count = qs.filter(is_read=False).count()
+         
+         # All notifications (for displaying in full list)
+-        all_notifications = list(qs)
++        all_notifications = list(qs[:10])
+         
+         # Recent 10 for dropdown/widget display
+         recent = list(qs[:10])
+diff --git a/notifications/notifications.py b/notifications/notifications.py
+index ef7e7e3..1419511 100644
+--- a/notifications/notifications.py
++++ b/notifications/notifications.py
+@@ -36,22 +36,14 @@ def get_coaches_for_member(member):
+     Returns:
+         QuerySet: User objects who are coaches and teach member's classes
+     """
+-    try:
+-        # Get all classes attended by this member
+-        attended_sessions = SessionAttendance.objects.filter(
+-            member=member
+-        ).values_list('session', flat=True).distinct()
+-        
+-        # Get coaches from those sessions
+-        coaches = User.objects.filter(
+-            is_coach=True,
+-            sessions__in=attended_sessions
+-        ).distinct()
+-        
+-        return coaches
+-    except Exception:
+-        # Fallback: get all coaches if something goes wrong
+-        return User.objects.filter(is_coach=True)
++    attended = SessionAttendance.objects.filter(member=member, present=True)
++    override_ids = attended.values_list('session__instructor__user_id', flat=True)
++    template_ids = attended.filter(session__instructor__isnull=True).values_list(
++        'session__class_template__instructor__user_id', flat=True)
++    coaches = User.objects.filter(is_active=True, is_coach=True).filter(
++        Q(pk__in=override_ids) | Q(pk__in=template_ids)).distinct()
++    return coaches if coaches.exists() else User.objects.filter(is_active=True).filter(
++        Q(is_coach=True) | Q(is_staff=True))
+ 
+ 
+ def notify_coaches_about_member_event(member, event_type, message_template, context_data):
+@@ -102,20 +94,27 @@ def generate_birthday_notifications():
+     Returns:
+         list: List of created notifications
+     """
+-    today = timezone.now().date()
++    today = timezone.localdate()
+     
+     # Find members with birthday today
+     members = Member.objects.filter(
+         is_active=True,
+         date_of_birth__month=today.month,
+         date_of_birth__day=today.day
+-    ).exclude(user__isnull=True)
++    )
+     
+     notifications = []
+     for member in members:
+-        if not member.user:
++        from .models import Notification
++        staff_message = f'Birthday today: {member.first_name} {member.last_name}.'
++        for recipient in User.objects.filter(is_active=True).filter(Q(is_staff=True) | Q(is_coach=True)):
++            if not Notification.objects.filter(user=recipient, message=staff_message,
++                    created_at__date=today).exists():
++                notifications.append(create_notification(recipient, 'MEMBER_BIRTHDAY', staff_message))
++        if not member.user or Notification.objects.filter(user=member.user,
++                message__startswith=f'🎉 Happy Birthday, {member.first_name}!', created_at__date=today).exists():
+             continue
+-            
++
+         # Calculate age
+         age = today.year - member.date_of_birth.year
+         
+@@ -154,7 +153,7 @@ def generate_promotion_milestone_notifications():
+     notifications = []
+     
+     # Get all active members
+-    active_members = Member.objects.filter(is_active=True).exclude(user__isnull=True)
++    active_members = Member.objects.filter(is_active=True)
+     
+     for member in active_members:
+         # Get the reference date: either last promotion date or join date
+@@ -172,14 +171,16 @@ def generate_promotion_milestone_notifications():
+         classes_attended = SessionAttendance.objects.filter(
+             member=member,
+             present=True,
+-            session__date__gte=reference_date
++            session__date__gte=reference_date,
++            session__date__lte=timezone.localdate(),
++            session__is_canceled=False,
+         ).count()
+         
+         # Alternative: count using Attendance model if SessionAttendance is not used
+         if classes_attended == 0:
+             classes_attended = Attendance.objects.filter(
+                 member=member,
+-                date__gte=reference_date
++                date__gte=reference_date, date__lte=timezone.localdate()
+             ).count()
+         
+         # Check if member has reached 30 classes milestone
+@@ -187,8 +188,7 @@ def generate_promotion_milestone_notifications():
+             # Check if notification already sent recently (within last 7 days)
+             from .models import Notification
+             recent_notification = Notification.objects.filter(
+-                user=member.user,
+-                message__icontains="promotion milestone",
++                message__icontains=f"Promotion Ready: {member.first_name} {member.last_name} ",
+                 created_at__gte=timezone.now() - timedelta(days=7)
+             ).exists()
+             
+@@ -199,19 +199,20 @@ def generate_promotion_milestone_notifications():
+                     f"belt promotion evaluation. Talk to your instructor!"
+                 )
+                 
+-                notification = create_notification(
+-                    user=member.user,
+-                    notification_type="PROMOTION_MILESTONE",
+-                    message=message,
+-                    data={
+-                        "member_id": member.id,
+-                        "member_name": f"{member.first_name} {member.last_name}",
+-                        "classes_attended": classes_attended,
+-                        "belt_rank": member.belt_rank,
+-                        "reference_date": reference_date.isoformat(),
+-                    }
+-                )
+-                notifications.append(notification)
++                if member.user:
++                    notification = create_notification(
++                        user=member.user,
++                        notification_type="PROMOTION_MILESTONE",
++                        message=message,
++                        data={
++                            "member_id": member.id,
++                            "member_name": f"{member.first_name} {member.last_name}",
++                            "classes_attended": classes_attended,
++                            "belt_rank": member.belt_rank,
++                            "reference_date": reference_date.isoformat(),
++                        }
++                    )
++                    notifications.append(notification)
+                 
+                 # Also notify coaches about this milestone
+                 coach_message = (
+@@ -250,11 +251,11 @@ def generate_low_attendance_notifications():
+     notifications = []
+     
+     # Calculate date range: last 7 days
+-    today = timezone.now().date()
++    today = timezone.localdate()
+     seven_days_ago = today - timedelta(days=7)
+     
+     # Get all active members
+-    active_members = Member.objects.filter(is_active=True).exclude(user__isnull=True)
++    active_members = Member.objects.filter(is_active=True)
+     
+     for member in active_members:
+         # Check attendance in the last 7 days
+@@ -278,8 +279,7 @@ def generate_low_attendance_notifications():
+             # Check if already notified recently (within last 3 days)
+             from .models import Notification
+             recent_notification = Notification.objects.filter(
+-                user=member.user,
+-                message__icontains="attendance",
++                message__icontains=f"Low Attendance Alert: {member.first_name} {member.last_name} ",
+                 created_at__gte=timezone.now() - timedelta(days=3)
+             ).exists()
+             
+@@ -289,18 +289,19 @@ def generate_low_attendance_notifications():
+                     f"Come back to class soon. Check the schedule and join us!"
+                 )
+                 
+-                notification = create_notification(
+-                    user=member.user,
+-                    notification_type="LOW_ATTENDANCE",
+-                    message=message,
+-                    data={
+-                        "member_id": member.id,
+-                        "member_name": f"{member.first_name} {member.last_name}",
+-                        "days_since_last_class": 7,
+-                        "belt_rank": member.belt_rank,
+-                    }
+-                )
+-                notifications.append(notification)
++                if member.user:
++                    notification = create_notification(
++                        user=member.user,
++                        notification_type="LOW_ATTENDANCE",
++                        message=message,
++                        data={
++                            "member_id": member.id,
++                            "member_name": f"{member.first_name} {member.last_name}",
++                            "days_since_last_class": 7,
++                            "belt_rank": member.belt_rank,
++                        }
++                    )
++                    notifications.append(notification)
+                 
+                 # Also notify coaches about inactive member
+                 coach_message = (
+@@ -335,7 +336,7 @@ def generate_membership_expiration_warnings():
+     """
+     notifications = []
+     
+-    today = timezone.now().date()
++    today = timezone.localdate()
+     warning_date = today + timedelta(days=14)
+     
+     # Find members with membership ending soon
+@@ -395,23 +396,17 @@ def generate_streak_milestone_notifications():
+     active_members = Member.objects.filter(is_active=True).exclude(user__isnull=True)
+     
+     for member in active_members:
+-        # Get all classes attended, ordered by date (most recent first)
++        # A missed scheduled class breaks the streak; future sessions do not count.
+         attended_classes = SessionAttendance.objects.filter(
+-            member=member,
+-            present=True,
+-            session__is_canceled=False
+-        ).order_by('-session__date')
+-        
+-        if not attended_classes.exists():
+-            continue
+-        
+-        # Count consecutive recent attendances
++            member=member, session__is_canceled=False,
++            session__date__lte=timezone.localdate(),
++        ).order_by('-session__date', '-session_id')
+         current_streak = 0
+         for attendance in attended_classes:
+-            if attendance.session.is_canceled:
++            if not attendance.present:
+                 break
+             current_streak += 1
+-        
++
+         # Check for milestone achievement
+         for milestone in milestones:
+             if current_streak == milestone:
+@@ -501,7 +496,7 @@ def generate_new_member_welcome_notification(member):
+         return None
+     
+     message = (
+-        f"🥋 Welcome to {member.user.first_name}! We're excited to have you join our academy. "
++        f"🥋 Welcome, {member.first_name}! We're excited to have you join our academy. "
+         f"Check out the class schedule and don't hesitate to ask instructors questions!"
+     )
+     
+@@ -587,51 +582,18 @@ def generate_waiver_expiration_warnings():
+     Returns:
+         list: List of created notifications
+     """
+-    from crm.models import WaiverSignature
+-    
++    # Waivers use active versions, not expiration dates.
++    from .models import Notification
+     notifications = []
+-    today = timezone.now().date()
+-    warning_date = today + timedelta(days=30)
+-    
+-    # This is a template - adjust based on your actual WaiverSignature model
+-    try:
+-        expiring_waivers = WaiverSignature.objects.filter(
+-            member__is_active=True,
+-            # Add expiration date field if it exists
+-            # expires_at__lte=warning_date,
+-            # expires_at__gte=today
+-        ).exclude(member__user__isnull=True)
+-        
+-        for waiver in expiring_waivers:
+-            member = waiver.member
+-            
+-            # Check if already notified
+-            from .models import Notification
+-            recent_notification = Notification.objects.filter(
+-                user=member.user,
+-                message__icontains="waiver",
+-                created_at__gte=timezone.now() - timedelta(days=7)
+-            ).exists()
+-            
+-            if not recent_notification:
+-                message = (
+-                    f"📝 {member.first_name}, your waiver expires soon. "
+-                    f"Please renew it to continue attending classes."
+-                )
+-                
+-                notification = create_notification(
+-                    user=member.user,
+-                    notification_type="WAIVER_EXPIRING",
+-                    message=message,
+-                    data={
+-                        "member_id": member.id,
+-                        "member_name": f"{member.first_name} {member.last_name}",
+-                    }
+-                )
+-                notifications.append(notification)
+-    except Exception as e:
+-        print(f"Error generating waiver expiration warnings: {e}")
+-    
++    for member in Member.objects.filter(is_active=True).exclude(user__isnull=True):
++        if member.has_latest_waiver:
++            continue
++        if Notification.objects.filter(user=member.user, message__icontains='waiver',
++                created_at__gte=timezone.now() - timedelta(days=7)).exists():
++            continue
++        notifications.append(create_notification(member.user, 'WAIVER_REQUIRED',
++            f'📝 {member.first_name}, please sign the current waiver before attending classes.',
++            {'member_id': member.pk}))
+     return notifications
+ 
+ 
+@@ -749,6 +711,8 @@ def run_all_notifications():
+         print(f"Error in waiver expiration warnings: {e}")
+         results['waiver_expiring'] = []
+     
++    results['trial_expired'] = generate_trial_expiration_notifications()
++
+     # Print summary
+     total = sum(len(v) for v in results.values() if isinstance(v, list))
+     print(f"✓ Notifications generated: {total} total")
+diff --git a/notifications/realtime.py b/notifications/realtime.py
+index 7bffb31..901ddd9 100644
+--- a/notifications/realtime.py
++++ b/notifications/realtime.py
+@@ -6,15 +6,15 @@ from django.conf import settings
+ from asgiref.sync import async_to_sync
+ 
+ def publish_user_notification(user_id: int, payload: dict):
+-    if not settings.ABLY_API_KEY:
++    if not getattr(settings, "ABLY_API_KEY", ""):
+         return  # silently skip in dev if not configured
+-    client = AblyRest(settings.ABLY_API_KEY)
++    client = AblyRest(getattr(settings, "ABLY_API_KEY", ""))
+     channel = client.channels.get(f"user-{user_id}-notifications")
+     async_to_sync(channel.publish)(name="new", data=payload)
+ 
+ def publish_timer_update(user_id: int, payload: dict):
+-    if not settings.ABLY_API_KEY:
++    if not getattr(settings, "ABLY_API_KEY", ""):
+         return  # silently skip in dev if not configured
+-    client = AblyRest(settings.ABLY_API_KEY)
++    client = AblyRest(getattr(settings, "ABLY_API_KEY", ""))
+     channel = client.channels.get(f"user-{user_id}-timer")
+     async_to_sync(channel.publish)(name="update", data=payload)
+\ No newline at end of file
+diff --git a/notifications/signals.py b/notifications/signals.py
+new file mode 100644
+index 0000000..5f81381
+--- /dev/null
++++ b/notifications/signals.py
+@@ -0,0 +1,25 @@
++from django.db.models.signals import pre_save, post_save
++from django.dispatch import receiver
++from crm.models import Member, ClassSession
++from .notifications import generate_new_member_welcome_notification, generate_class_cancellation_notifications
++
++
++@receiver(post_save, sender=Member)
++def welcome_member(sender, instance, created, raw=False, **kwargs):
++    if created and not raw:
++        generate_new_member_welcome_notification(instance)
++
++
++@receiver(pre_save, sender=ClassSession)
++def remember_cancellation(sender, instance, raw=False, **kwargs):
++    if raw:
++        return
++    instance._was_canceled = sender.objects.filter(pk=instance.pk, is_canceled=True).exists()
++
++
++@receiver(post_save, sender=ClassSession)
++def notify_cancellation(sender, instance, raw=False, update_fields=None, **kwargs):
++    if raw or (update_fields is not None and 'is_canceled' not in update_fields):
++        return
++    if instance.is_canceled and not getattr(instance, '_was_canceled', False):
++        generate_class_cancellation_notifications(instance)
+diff --git a/notifications/templates/notifications/list.html b/notifications/templates/notifications/list.html
+index b507e75..8093a73 100644
+--- a/notifications/templates/notifications/list.html
++++ b/notifications/templates/notifications/list.html
+@@ -1,29 +1,15 @@
+ {% extends "layout.html" %}
+ {% block content %}
+-<div class="container py-3">
+-  <h3>Notifications</h3>
+-  <div class="mb-2">
+-    <a href="javascript:void(0)" id="markAllRead" class="btn btn-sm btn-outline-primary">Mark all as read</a>
++<div class="container py-4" id="notificationCenter" style="max-width:1000px">
++  <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4"><div><h2>Notification center</h2><p class="text-muted mb-0">Stay on top of academy updates and member activity.</p></div><button class="btn btn-outline-primary" data-notification-action="all">Mark all as read</button></div>
++  <div class="d-flex gap-3 mb-4"><div class="card p-3 flex-fill"><span class="text-muted">All notifications</span><strong class="fs-3">{{ total }}</strong></div><div class="card p-3 flex-fill"><span class="text-muted">Unread</span><strong class="fs-3 text-primary">{{ unread }}</strong></div></div>
++  <form method="get" class="d-flex gap-2 flex-wrap mb-3" aria-label="Filter notifications"><input type="search" name="q" value="{{ query }}" class="form-control flex-fill" style="width:auto" placeholder="Search notifications" aria-label="Search notifications"><select name="status" class="form-select" style="width:auto" aria-label="Read status"><option value="all">All statuses</option><option value="unread" {% if status_filter == 'unread' %}selected{% endif %}>Unread</option><option value="read" {% if status_filter == 'read' %}selected{% endif %}>Read</option></select><button class="btn btn-primary">Apply</button><a class="btn btn-outline-secondary" href="{% url 'notifications:list' %}">Reset</a></form>
++  <div id="centerError" class="text-danger mb-2" role="status"></div>
++  <div class="card shadow-sm overflow-hidden">
++  {% for n in notifications %}
++    <article class="p-3 border-bottom {% if not n.is_read %}bg-light{% endif %}"><div class="d-flex justify-content-between gap-3 flex-wrap"><div class="flex-grow-1"><span class="badge {% if n.is_read %}bg-secondary{% else %}bg-primary{% endif %} mb-2">{% if n.is_read %}Read{% else %}Unread{% endif %}</span><p class="mb-1 {% if not n.is_read %}fw-semibold{% endif %}">{{ n.message }}</p><time class="small text-muted" datetime="{{ n.created_at|date:'c' }}">{{ n.created_at|date:"M j, Y · g:i A" }}</time></div><div class="d-flex gap-2 align-items-center">{% if not n.is_read %}<button class="btn btn-sm btn-outline-primary" data-notification-action="read" data-id="{{ n.pk }}">Mark as read</button>{% endif %}<button class="btn btn-sm btn-outline-danger" data-notification-action="delete" data-id="{{ n.pk }}">Delete</button></div></div></article>
++  {% empty %}<div class="p-5 text-center"><h5>No notifications found</h5><p class="text-muted mb-0">New updates will appear here. Try changing your search or status filter.</p></div>{% endfor %}
+   </div>
+-  <ul class="list-group">
+-    {% for n in notifications %}
+-      <li class="list-group-item d-flex justify-content-between align-items-start {% if not n.is_read %}fw-semibold{% endif %}"
+-          id="notif-item-{{ n.id }}" data-notif-id="{{ n.id }}">
+-        <div>
+-          {{ n.message }}
+-          {% if n.created_at %}
+-            <div class="small text-muted">{{ n.created_at|date:"M d, Y H:i" }}</div>
+-          {% endif %}
+-        </div>
+-        <div>
+-          {% if not n.is_read %}
+-            <a href="javascript:void(0)" class="btn btn-sm btn-link mark-read" data-id="{{ n.id }}">Mark</a>
+-          {% endif %}
+-        </div>
+-      </li>
+-    {% empty %}
+-      <li class="list-group-item text-muted">No notifications</li>
+-    {% endfor %}
+-  </ul>
++  {% if page_obj.has_other_pages %}<nav class="d-flex justify-content-between align-items-center mt-3" aria-label="Notification pages">{% if page_obj.has_previous %}<a class="btn btn-outline-secondary" href="?page={{ page_obj.previous_page_number }}&q={{ query|urlencode }}&status={{ status_filter|urlencode }}">Previous</a>{% else %}<span></span>{% endif %}<span class="text-muted">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>{% if page_obj.has_next %}<a class="btn btn-outline-secondary" href="?page={{ page_obj.next_page_number }}&q={{ query|urlencode }}&status={{ status_filter|urlencode }}">Next</a>{% endif %}</nav>{% endif %}
+ </div>
+-{% endblock %}
+\ No newline at end of file
++{% endblock %}
+diff --git a/notifications/templates/partials/navbar_bell.html b/notifications/templates/partials/navbar_bell.html
+index a81129a..cddf679 100644
+--- a/notifications/templates/partials/navbar_bell.html
++++ b/notifications/templates/partials/navbar_bell.html
+@@ -1,75 +1,11 @@
+-
+-{% load static %}
+-
+-<style>
+-  .bell-wrapper {
+-    position: relative;
+-    display: inline-block;
+-    margin-right: 1rem;
+-    cursor: pointer;
+-  }
+-  .bell-badge {
+-    position: absolute;
+-    top: -6px;
+-    right: -6px;
+-    background: #dc3545; /* bootstrap danger */
+-    color: white;
+-    border-radius: 999px;
+-    padding: 0 6px;
+-    font-size: 0.70rem;
+-    line-height: 1.2;
+-    min-width: 18px;
+-    text-align: center;
+-  }
+-  .dropdown-menu-notifs {
+-    min-width: 320px;
+-    max-width: 420px;
+-  }
+-  .notif-item {
+-    white-space: normal;
+-  }
+-</style>
+-
+-{# If you use Bootstrap Icons, ensure the icon CSS is loaded in your base layout: #}
+-{# <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"> #}
+-
+-
+-<div class="dropdown">
+-  <a class="nav-link dropdown-toggle bell-wrapper" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false" id="notifBell">
+-    <i class="fas fa-bell" style="font-size: 1.3rem;"></i>
+-    {% if notifications_unread_count and notifications_unread_count > 0 %}
+-      <span class="bell-badge" id="notifBadge">{{ notifications_unread_count }}</span>
+-    {% else %}
+-      <span class="bell-badge" id="notifBadge" style="display:none;">0</span>
+-    {% endif %}
+-  </a>
+-
+-  <ul class="dropdown-menu dropdown-menu-end dropdown-menu-notifs" id="notifDropdown">
+-    {% if notifications_recent %}
+-      {% for n in notifications_recent %}
+-        <li class="dropdown-item notif-item d-flex justify-content-between align-items-start {% if not n.is_read %}fw-semibold{% endif %}"
+-            data-notif-id="{{ n.id }}" id="notif-item-{{ n.id }}">
+-          <div class="me-2">
+-            {{ n.message }}
+-            {% if n.created_at %}
+-              <div class="small text-muted">{{ n.created_at|date:"M d, Y H:i" }}</div>
+-            {% endif %}
+-          </div>
+-          <div class="ms-2">
+-            {% if not n.is_read %}
+-              <a href="javascript:void(0)" class="btn btn-sm btn-link p-0 mark-read" data-id="{{ n.id }}" title="Marcar como lida">Mark</a>
+-            {% endif %}
+-          </div>
+-        </li>
+-        {% if not forloop.last %}<li><hr class="dropdown-divider"></li>{% endif %}
+-      {% endfor %}
+-      <li><hr class="dropdown-divider"></li>
+-      <li class="dropdown-item d-flex justify-content-between align-items-center">
+-        <a href="{% url 'notifications:list' %}" class="me-2">View all notifications</a>
+-        <a href="javascript:void(0)" id="markAllRead" class="text-decoration-none">Mark all as read</a>
+-      </li>
+-    {% else %}
+-      <li class="dropdown-item text-muted">No notifications</li>
+-    {% endif %}
+-  </ul>
+-</div>
+\ No newline at end of file
++<div class="dropdown" id="notificationWidget" data-recent-url="{% url 'notifications:recent_api' %}" data-mark-url="{% url 'notifications:mark_read' 0 %}" data-delete-url="{% url 'notifications:delete' 0 %}" data-mark-all-url="{% url 'notifications:mark_all' %}">
++  <button class="btn position-relative" id="notifBell" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-label="Notifications" aria-expanded="false"><i class="fas fa-bell" aria-hidden="true"></i><span id="notifBadge" class="badge bg-danger position-absolute top-0 end-0" hidden>0</span></button>
++  <div class="dropdown-menu dropdown-menu-end p-0 shadow" style="width:min(380px,90vw)">
++    <div class="d-flex justify-content-between border-bottom p-3"><strong>Notifications</strong><button class="btn btn-sm btn-link" data-notification-action="all">Mark all read</button></div>
++    <div id="notifDropdown" style="max-height:380px;overflow-y:auto"><div class="p-3 text-muted">Loading notifications…</div></div>
++    <a class="d-block text-center p-3 border-top" href="{% url 'notifications:list' %}">Open notification center</a>
++    <div id="notificationError" class="small text-danger px-3" role="status"></div>
++  </div>
++  <input type="hidden" id="notificationCsrf" value="{{ csrf_token }}">
++</div>
++{% load static %}<script src="{% static 'crm/js/notifications.js' %}" defer></script>
+diff --git a/notifications/tests.py b/notifications/tests.py
+new file mode 100644
+index 0000000..25713a4
+--- /dev/null
++++ b/notifications/tests.py
+@@ -0,0 +1,122 @@
++from unittest.mock import patch
++from django.test import TestCase, Client, override_settings
++from django.contrib.auth import get_user_model
++from django.urls import reverse
++from django.db import transaction
++from django.utils import timezone
++from crm.models import Member
++from .models import Notification
++from .utils import create_bulk_notifications, create_notification
++from .notifications import generate_birthday_notifications, generate_waiver_expiration_warnings
++
++
++class NotificationTests(TestCase):
++    def setUp(self):
++        self.user = get_user_model().objects.create_user(username='owner', email='owner@example.com', password='test', is_staff=True)
++        self.other = get_user_model().objects.create_user(username='other', email='other@example.com', password='test')
++        self.client.force_login(self.user)
++
++    def test_publishes_saved_ids_after_commit(self):
++        with patch('notifications.utils.publish_user_notification') as publish:
++            with self.captureOnCommitCallbacks(execute=True):
++                notifications = create_bulk_notifications([self.user, self.other], 'TEST', 'Saved first')
++                publish.assert_not_called()
++            self.assertEqual(publish.call_count, 2)
++            self.assertEqual([call.args[1]['id'] for call in publish.call_args_list], [n.pk for n in notifications])
++
++    def test_rollback_does_not_publish(self):
++        with patch('notifications.utils.publish_user_notification') as publish:
++            with self.captureOnCommitCallbacks(execute=True):
++                try:
++                    with transaction.atomic():
++                        create_notification(self.user, 'TEST', 'Rollback')
++                        raise ValueError()
++                except ValueError:
++                    pass
++            publish.assert_not_called()
++            self.assertFalse(Notification.objects.exists())
++
++    def test_owner_only_post_mutations(self):
++        n = Notification.objects.create(user=self.other, message='Private')
++        for action in ('mark_read', 'delete'):
++            url = reverse('notifications:' + action, args=[n.pk])
++            self.assertEqual(self.client.get(url).status_code, 405)
++            self.assertEqual(self.client.post(url).status_code, 404)
++        self.assertTrue(Notification.objects.filter(pk=n.pk, is_read=False).exists())
++
++    def test_read_delete_and_all(self):
++        n = Notification.objects.create(user=self.user, message='Hello')
++        self.assertEqual(self.client.post(reverse('notifications:mark_read', args=[n.pk])).json()['unread'], 0)
++        self.assertEqual(self.client.post(reverse('notifications:delete', args=[n.pk])).status_code, 200)
++        Notification.objects.create(user=self.user, message='Another')
++        self.assertEqual(self.client.post(reverse('notifications:mark_all')).json()['unread'], 0)
++        self.assertEqual(self.client.get(reverse('notifications:delete_all')).status_code, 405)
++
++    def test_csrf_enforced(self):
++        client = Client(enforce_csrf_checks=True); client.force_login(self.user)
++        self.assertEqual(client.post(reverse('notifications:mark_all')).status_code, 403)
++
++    def test_search_filter_pagination_and_private_api(self):
++        Notification.objects.bulk_create([Notification(user=self.user, message='Academy update') for _ in range(25)])
++        Notification.objects.create(user=self.other, message='Private')
++        response = self.client.get(reverse('notifications:list'), {'q': 'Academy', 'status': 'unread'})
++        self.assertEqual(response.status_code, 200)
++        self.assertEqual(len(response.context['notifications']), 20)
++        self.assertContains(response, 'Notification center')
++        self.assertNotContains(response, 'Private')
++        data = self.client.get(reverse('notifications:recent_api')).json()
++        self.assertEqual(data['unread'], 25)
++        self.assertEqual(len(data['recent']), 10)
++
++    def test_birthday_staff_for_member_without_account_and_no_duplicates(self):
++        Member.objects.create(first_name='Jane', last_name='Doe', date_of_birth=timezone.localdate(), address='Street', city='Chicago', zip_code='60601')
++        self.assertEqual(len(generate_birthday_notifications()), 1)
++        self.assertEqual(generate_birthday_notifications(), [])
++        self.assertTrue(Notification.objects.filter(user=self.user, message__contains='Jane Doe').exists())
++
++    @override_settings(ABLY_API_KEY='')
++    def test_no_ably_still_persists_and_api_works(self):
++        with self.captureOnCommitCallbacks(execute=True):
++            create_notification(self.user, 'TEST', 'Offline transport')
++        self.assertEqual(self.client.get(reverse('notifications:recent_api')).json()['unread'], 1)
++
++    def test_low_attendance_alerts_staff_for_member_without_account_once(self):
++        from .notifications import generate_low_attendance_notifications
++        Member.objects.create(first_name='Absent', last_name='Student', date_of_birth=timezone.localdate(), address='Street', city='Chicago', zip_code='60601')
++        self.assertEqual(len(generate_low_attendance_notifications()), 1)
++        self.assertEqual(generate_low_attendance_notifications(), [])
++
++    def test_welcome_and_cancellation_signals(self):
++        from datetime import time
++        from crm.models import Staff, Class, ClassSession, SessionAttendance
++        from .notifications import get_coaches_for_member
++        self.user.is_coach = True; self.user.save()
++        staff = Staff.objects.create(user=self.user, join_date=timezone.localdate())
++        member = Member.objects.create(user=self.other, first_name='Student', last_name='Member', date_of_birth=timezone.localdate(), address='Street', city='Chicago', zip_code='60601')
++        self.assertTrue(Notification.objects.filter(user=self.other, message__startswith='🥋 Welcome').exists())
++        template = Class.objects.create(name='Adults', type='adult', instructor=staff, days_of_week=['MON'], start_time=time(18), end_time=time(19), start_date=timezone.localdate())
++        session = ClassSession.objects.create(class_template=template, date=timezone.localdate())
++        SessionAttendance.objects.update_or_create(session=session, member=member, defaults={'present': True})
++        self.assertIn(self.user, get_coaches_for_member(member))
++        session.is_canceled = True; session.save()
++        session.save()
++        self.assertEqual(Notification.objects.filter(user=self.other, message__contains='has been canceled').count(), 1)
++
++    def test_valid_waiver_does_not_generate_warning(self):
++        from unittest.mock import PropertyMock
++        Member.objects.create(user=self.other, first_name='Student', last_name='Member', date_of_birth=timezone.localdate(), address='Street', city='Chicago', zip_code='60601')
++        with patch.object(Member, 'has_latest_waiver', new_callable=PropertyMock, return_value=True):
++            self.assertEqual(generate_waiver_expiration_warnings(), [])
++
++    def test_pi_checkin_creates_notification(self):
++        from api.models import APIToken
++        from datetime import time
++        from crm.models import Staff, Class, ClassSession
++        member = Member.objects.create(first_name='Pi', last_name='Student', date_of_birth=timezone.localdate(), address='Street', city='Chicago', zip_code='60601')
++        staff = Staff.objects.create(user=self.user, join_date=timezone.localdate())
++        template = Class.objects.create(name='Checkin', type='adult', instructor=staff, days_of_week=['MON'], start_time=time(18), end_time=time(19), start_date=timezone.localdate())
++        ClassSession.objects.create(class_template=template, date=timezone.localdate())
++        token = APIToken.objects.create(user=self.user)
++        response = self.client.post(reverse('api:api-attendance'), {'member_id': member.pk, 'date': timezone.localdate().isoformat()}, content_type='application/json', HTTP_AUTHORIZATION=f'Token {token.token}')
++        self.assertEqual(response.status_code, 201)
++        self.assertTrue(Notification.objects.filter(user=self.user, message__startswith='Check-in:').exists())
+diff --git a/notifications/utils.py b/notifications/utils.py
+index 2e4b1fb..e1bffaa 100644
+--- a/notifications/utils.py
++++ b/notifications/utils.py
+@@ -6,90 +6,35 @@ from django.utils import timezone
+ 
+ User = get_user_model()
+ 
++import logging
++from django.db import transaction
++
++logger = logging.getLogger(__name__)
++
++def _publish(notification, notification_type, data):
++    try:
++        publish_user_notification(notification.user_id, {
++            'id': notification.pk, 'type': notification_type,
++            'message': notification.message, 'data': data,
++            'created_at': notification.created_at.isoformat(),
++        })
++    except Exception:
++        logger.exception('Realtime notification delivery failed for notification %s', notification.pk)
++
++
+ def create_notification(user, notification_type: str, message: str, data: dict = None):
+-    """
+-    Create a notification for a user and publish it via Ably if configured.
+-    
+-    Args:
+-        user: User instance or user ID
+-        notification_type: Type of notification (e.g., 'Attendance', 'Sync')
+-        message: Human-readable message
+-        data: Optional additional data to store with the notification
+-    """
+-    # Handle both user object and user ID
+-    if isinstance(user, int):
+-        user = User.objects.get(id=user)
+-    
+-    # Create the notification in database
+     notification = Notification.objects.create(
+-        user=user,
+-        message=message,
+-        is_read=False,
++        user_id=user if isinstance(user, int) else user.pk,
++        message=message, is_read=False,
+     )
+-    
+-    # Publish real-time notification via Ably
+-    try:
+-        publish_user_notification(
+-            user_id=user.id,
+-            payload={
+-                'id': notification.id,
+-                'type': notification_type,
+-                'message': message,
+-                'data': data,
+-                'created_at': notification.created_at.isoformat()
+-            }
+-        )
+-    except Exception:
+-        # Fail silently - notification is already in DB
+-        pass
+-    
++    transaction.on_commit(lambda: _publish(notification, notification_type, data))
+     return notification
+ 
+ 
+ def create_bulk_notifications(users, notification_type: str, message: str, data: dict = None):
+-    """
+-    Create the same notification for multiple users.
+-    
+-    Args:
+-        users: List of User instances or IDs
+-        notification_type: Type of notification
+-        message: Human-readable message
+-        data: Optional additional data
+-    """
+-    notifications = []
+-    now = timezone.now()
+-    
+-    for user in users:
+-        if isinstance(user, int):
+-            user = User.objects.get(id=user)
+-        
+-        notification = Notification(
+-            user=user,
+-            message=message,
+-            is_read=False,
+-            created_at=now
+-        )
+-        notifications.append(notification)
+-        
+-        # Publish to each user in real-time
+-        try:
+-            publish_user_notification(
+-                user_id=user.id,
+-                payload={
+-                    'type': notification_type,
+-                    'message': message,
+-                    'data': data,
+-                    'created_at': now.isoformat()
+-                }
+-            )
+-        except Exception:
+-            pass
+-    
+-    # Bulk create in database
+-    if notifications:
+-        Notification.objects.bulk_create(notifications)
+-    
+-    return notifications
++    # Commit all recipients together; publish only after durable IDs exist.
++    with transaction.atomic():
++        return [create_notification(user, notification_type, message, data) for user in users]
+ 
+ 
+ def mark_notification_read(notification_id, user):
+diff --git a/notifications/views.py b/notifications/views.py
+index b634400..6ca13fa 100644
+--- a/notifications/views.py
++++ b/notifications/views.py
+@@ -1,5 +1,8 @@
+ from django.contrib.auth.decorators import login_required
+-from django.http import JsonResponse, HttpResponseForbidden
++from django.http import JsonResponse
++from django.core.paginator import Paginator
++from django.views.decorators.http import require_POST
++from django.views.decorators.csrf import ensure_csrf_cookie
+ from django.shortcuts import render, get_object_or_404
+ from django.conf import settings
+ from ably import AblyRest
+@@ -7,31 +10,30 @@ from .models import Notification
+ from asgiref.sync import async_to_sync   
+ import json
+ 
+-try:
+-    from notifications.utils import create_notification
+-    NOTIFICATIONS_AVAILABLE = True
+-except ImportError:
+-    NOTIFICATIONS_AVAILABLE = False
+-    # Fallback function if notifications aren't available
+-    def create_notification(user, notification_type, message, data=None):
+-        print(f"NOTIFICATION ({notification_type}): {message}")  # For debugging
+-        return None
+-
+-
+ @login_required
++@ensure_csrf_cookie
+ def notification_list(request):
+-    qs = Notification.objects.filter(user=request.user).order_by('-created_at')
+-    return render(request, 'notifications/list.html', {'notifications': qs})
+-
+-@login_required
+-
++    qs = Notification.objects.filter(user=request.user).order_by('-created_at', '-pk')
++    total = qs.count()
++    unread = qs.filter(is_read=False).count()
++    status = request.GET.get('status', 'all')
++    if status in ('read', 'unread'):
++        qs = qs.filter(is_read=status == 'read')
++    query = request.GET.get('q', '').strip()[:200]
++    if query:
++        qs = qs.filter(message__icontains=query)
++    page = Paginator(qs, 20).get_page(request.GET.get('page'))
++    return render(request, 'notifications/list.html', {
++        'notifications': page, 'page_obj': page, 'total': total,
++        'unread': unread, 'status_filter': status, 'query': query,
++    })
+ 
+ @login_required
+ def ably_token(request):
+-    if not settings.ABLY_API_KEY:
++    if not getattr(settings, "ABLY_API_KEY", ""):
+         return JsonResponse({"error": "ABLY_API_KEY not configured"}, status=500)
+ 
+-    client = AblyRest(settings.ABLY_API_KEY)
++    client = AblyRest(getattr(settings, "ABLY_API_KEY", ""))
+ 
+     # Some Ably SDK versions expose async methods; wrap with async_to_sync
+     try:
+@@ -58,14 +60,10 @@ def ably_token(request):
+ 
+ 
+ @login_required
++@require_POST
+ def mark_notification_read(request, pk):
+-    if request.method not in ("POST", "GET"):  # allow GET for quick dev; switch to POST if you prefer
+-        return JsonResponse({"error": "Method not allowed"}, status=405)
+ 
+-    n = get_object_or_404(Notification, pk=pk)
+-    # Only owner or staff can mark read
+-    if n.user != request.user and not request.user.is_staff:
+-        return HttpResponseForbidden("Not allowed")
++    n = get_object_or_404(Notification, pk=pk, user=request.user)
+ 
+     if not n.is_read:
+         n.is_read = True
+@@ -76,15 +74,11 @@ def mark_notification_read(request, pk):
+     return JsonResponse({"status": "ok", "id": n.id, "unread": unread})
+ 
+ @login_required
++@require_POST
+ def delete_notification(request, pk):
+     """Delete a notification permanently"""
+-    if request.method not in ("POST", "GET"):
+-        return JsonResponse({"error": "Method not allowed"}, status=405)
+ 
+-    n = get_object_or_404(Notification, pk=pk)
+-    # Only owner or staff can delete
+-    if n.user != request.user and not request.user.is_staff:
+-        return HttpResponseForbidden("Not allowed")
++    n = get_object_or_404(Notification, pk=pk, user=request.user)
+ 
+     notification_id = n.id
+     n.delete()
+@@ -94,26 +88,25 @@ def delete_notification(request, pk):
+     return JsonResponse({"status": "ok", "id": notification_id, "unread": unread})
+ 
+ @login_required
++@require_POST
+ def mark_all_read(request):
+-    if request.method not in ("POST", "GET"):
+-        return JsonResponse({"error": "Method not allowed"}, status=405)
+ 
+     Notification.objects.filter(user=request.user, is_read=False).update(is_read=True)
+     return JsonResponse({"status": "ok", "unread": 0})
+ 
+ @login_required
++@require_POST
+ def delete_all_notifications(request):
+     """Delete all notifications for the user"""
+-    if request.method not in ("POST", "GET"):
+-        return JsonResponse({"error": "Method not allowed"}, status=405)
+ 
+     Notification.objects.filter(user=request.user).delete()
+     return JsonResponse({"status": "ok", "unread": 0})
+ 
+ # Optional: JSON for the 5 most recent (for repopulating dropdown if you want)
+ @login_required
++@ensure_csrf_cookie
+ def recent_notifications_api(request):
+-    qs = Notification.objects.filter(user=request.user).order_by('-created_at')[:5]
++    qs = Notification.objects.filter(user=request.user).order_by('-created_at')[:10]
+     data = [
+         {
+             "id": n.id,

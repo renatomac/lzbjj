@@ -14,7 +14,7 @@ def notifications(request):
         unread_count = qs.filter(is_read=False).count()
         
         # All notifications (for displaying in full list)
-        all_notifications = list(qs)
+        all_notifications = list(qs[:10])
         
         # Recent 10 for dropdown/widget display
         recent = list(qs[:10])

@@ -322,37 +322,8 @@ def birthdays_of_the_month():
 
 
 def create_birthday_notifications():
-    today = timezone.localdate()
-    members = list(
-        Member.objects.filter(
-            is_active=True,
-            date_of_birth__month=today.month,
-            date_of_birth__day=today.day,
-        ).order_by('first_name', 'last_name')
-    )
-
-    if not members:
-        return 0
-
-    recipients = list(
-        User.objects.filter(is_staff=True, is_active=True).order_by('id')
-    )
-
-    if not recipients:
-        return 0
-
-    message = (
-        f"Today is {', '.join(f'{member.first_name} {member.last_name}' for member in members)}'s birthday."
-    )
-
-    for user in recipients:
-        Notification.objects.create(
-            user=user,
-            message=message,
-            is_read=False,
-        )
-
-    return len(recipients)
+    from notifications.notifications import generate_birthday_notifications
+    return len(generate_birthday_notifications())
 
 
 def get_client_ip(request):
@@ -367,9 +338,5 @@ def get_client_ip(request):
 
 
 def create_notification(user, title, message="", url=""):
-    Notification.objects.create(
-        user=user,
-        title=title,
-        message=message,
-        url=url
-    )
+    from notifications.utils import create_notification as notify
+    return notify(user, title, message or title, {'url': url})

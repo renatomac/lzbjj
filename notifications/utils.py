@@ -6,90 +6,35 @@ from django.utils import timezone
 
 User = get_user_model()
 
-def create_notification(user, notification_type: str, message: str, data: dict = None):
-    """
-    Create a notification for a user and publish it via Ably if configured.
-    
-    Args:
-        user: User instance or user ID
-        notification_type: Type of notification (e.g., 'Attendance', 'Sync')
-        message: Human-readable message
-        data: Optional additional data to store with the notification
-    """
-    # Handle both user object and user ID
-    if isinstance(user, int):
-        user = User.objects.get(id=user)
-    
-    # Create the notification in database
-    notification = Notification.objects.create(
-        user=user,
-        message=message,
-        is_read=False,
-    )
-    
-    # Publish real-time notification via Ably
+import logging
+from django.db import transaction
+
+logger = logging.getLogger(__name__)
+
+def _publish(notification, notification_type, data):
     try:
-        publish_user_notification(
-            user_id=user.id,
-            payload={
-                'id': notification.id,
-                'type': notification_type,
-                'message': message,
-                'data': data,
-                'created_at': notification.created_at.isoformat()
-            }
-        )
+        publish_user_notification(notification.user_id, {
+            'id': notification.pk, 'type': notification_type,
+            'message': notification.message, 'data': data,
+            'created_at': notification.created_at.isoformat(),
+        })
     except Exception:
-        # Fail silently - notification is already in DB
-        pass
-    
+        logger.exception('Realtime notification delivery failed for notification %s', notification.pk)
+
+
+def create_notification(user, notification_type: str, message: str, data: dict = None):
+    notification = Notification.objects.create(
+        user_id=user if isinstance(user, int) else user.pk,
+        message=message, is_read=False,
+    )
+    transaction.on_commit(lambda: _publish(notification, notification_type, data))
     return notification
 
 
 def create_bulk_notifications(users, notification_type: str, message: str, data: dict = None):
-    """
-    Create the same notification for multiple users.
-    
-    Args:
-        users: List of User instances or IDs
-        notification_type: Type of notification
-        message: Human-readable message
-        data: Optional additional data
-    """
-    notifications = []
-    now = timezone.now()
-    
-    for user in users:
-        if isinstance(user, int):
-            user = User.objects.get(id=user)
-        
-        notification = Notification(
-            user=user,
-            message=message,
-            is_read=False,
-            created_at=now
-        )
-        notifications.append(notification)
-        
-        # Publish to each user in real-time
-        try:
-            publish_user_notification(
-                user_id=user.id,
-                payload={
-                    'type': notification_type,
-                    'message': message,
-                    'data': data,
-                    'created_at': now.isoformat()
-                }
-            )
-        except Exception:
-            pass
-    
-    # Bulk create in database
-    if notifications:
-        Notification.objects.bulk_create(notifications)
-    
-    return notifications
+    # Commit all recipients together; publish only after durable IDs exist.
+    with transaction.atomic():
+        return [create_notification(user, notification_type, message, data) for user in users]
 
 
 def mark_notification_read(notification_id, user):
