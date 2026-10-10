@@ -49,6 +49,7 @@ class BeltRank(models.TextChoices):
     RED_WHITE = 'red-white', 'Red & White'
     RED = 'red', 'Red'
 
+
 ADULT_BELT_ORDER = [
     BeltRank.WHITE,
     BeltRank.BLUE,
