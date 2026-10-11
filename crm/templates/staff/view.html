@@ -45,13 +45,13 @@
                             <strong>Role:</strong> {{ staff.role }}
                         </div>
                         <div class="col-md-6 mb-2">
-                            <strong>Gender:</strong> {{ staff.get_gender_display }}
+                            <strong>Gender:</strong> {{ staff.effective_gender_display }}
                         </div>
                         <div class="col-md-6 mb-2">
-                            <strong>Belt Rank:</strong> {{ staff.get_belt_rank_display }}
+                            <strong>Belt Rank:</strong> {{ staff.effective_belt_rank }}
                         </div>
                         <div class="col-md-6 mb-2">
-                            <strong>Stripes:</strong> {{ staff.stripes }}
+                            <strong>Stripes:</strong> {{ staff.effective_stripes }}
                         </div>
                         <div class="col-md-6 mb-2">
                             <strong>Date of Birth:</strong>
@@ -65,6 +65,7 @@
 
                     <hr>
 
+                    {% if staff.member_profile_id %}<p class="small text-muted"><i class="fas fa-link me-1"></i>Personal information is maintained in the linked Member profile.</p>{% endif %}
                     <!-- Address -->
                     <div>
                         <strong>Address:</strong><br>
