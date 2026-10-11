@@ -20,7 +20,8 @@
                             {% endif %}"  
                         method="post">
                     {% csrf_token %}
-                    {{ form |crispy}}
+                    <p class="text-muted small">Link an existing training member to use their belt rank and promotion history automatically. Unlinked staff keep their standalone belt fields.</p>
+                    {{ form|crispy }}
                     <input type="submit" value="Submit">
                 </form>    
             </div>
