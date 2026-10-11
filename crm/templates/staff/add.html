@@ -8,12 +8,11 @@
 <script>
 document.addEventListener("DOMContentLoaded", function () {
     const memberSelect = document.getElementById("id_member_profile");
-    const userSelect = document.getElementById("id_user");
     const dataElement = document.getElementById("staff-member-prefill");
     if (!memberSelect || !dataElement) return;
     const profiles = JSON.parse(dataElement.textContent);
     const fields = ["first_name", "last_name", "gender", "address", "city",
-                    "state", "zip_code", "date_of_birth", "photo", "belt_rank", "stripes"];
+                    "state", "zip_code", "date_of_birth", "belt_rank", "stripes"];
     const isNew = "{{ action_url|escapejs }}" === "addStaff";
     const controlled = ["belt_rank", "stripes", "first_name", "last_name", "gender", "address", "city", "state", "zip_code", "date_of_birth", "photo"];
     const note = document.createElement("div");
@@ -24,6 +23,8 @@ document.addEventListener("DOMContentLoaded", function () {
     function syncMember() {
         const profile = profiles[memberSelect.value];
         note.classList.toggle("d-none", !profile);
+        if (profile && !profile.user) note.textContent = "This member needs a linked User account before they can be assigned as staff.";
+        else note.textContent = "Personal details and belt rank follow the selected Member profile. The associated login is assigned automatically.";
         for (const key of controlled) {
             const field = document.getElementById("id_" + key);
             if (field) field.disabled = Boolean(profile);
@@ -41,10 +42,6 @@ document.addEventListener("DOMContentLoaded", function () {
                 const field = document.getElementById("id_" + key);
                 if (field) field.value = String(profile[key]);
             }
-        }
-        if (profile.user && userSelect) {
-            userSelect.value = profile.user;
-            userSelect.dispatchEvent(new Event("change", {bubbles: false}));
         }
     }
     memberSelect.addEventListener("change", syncMember);
@@ -69,7 +66,7 @@ document.addEventListener("DOMContentLoaded", function () {
                             {% endif %}"  
                         method="post">
                     {% csrf_token %}
-                    <p class="text-muted small">Link an existing training member to use their belt rank and promotion history automatically. Unlinked staff keep their standalone belt fields.</p>
+                    <p class="text-muted small">Select the training member. Their personal information and linked login will be used automatically. Members without a login account must have one linked before staff creation.</p>
                     {{ form|crispy }}
                     <input type="submit" value="Submit">
                 </form>    
