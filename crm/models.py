@@ -545,7 +545,7 @@ class Staff(models.Model):
     @property
     def age(self):
         """Return the staff's age in years."""
-        dob = self.date_of_birth or (self.member_profile.date_of_birth if self.member_profile else None)
+        dob = self.effective_date_of_birth
         if not dob:
             return None
 
@@ -577,6 +577,60 @@ class Staff(models.Model):
             return f"{years} year{'s' if years != 1 else ''}, {months} month{'s' if months != 1 else ''}"
         else:
             return f"{months} month{'s' if months != 1 else ''}"
+
+    # Linked members are the source of truth for personal information.
+    # Unlinked staff continue using their independent staff fields.
+    @property
+    def effective_first_name(self):
+        return getattr(self.member_profile, "first_name") if self.member_profile_id else self.first_name
+
+    @property
+    def effective_last_name(self):
+        return getattr(self.member_profile, "last_name") if self.member_profile_id else self.last_name
+
+    @property
+    def effective_gender(self):
+        return getattr(self.member_profile, "gender") if self.member_profile_id else self.gender
+
+    @property
+    def effective_address(self):
+        return getattr(self.member_profile, "address") if self.member_profile_id else self.address
+
+    @property
+    def effective_city(self):
+        return getattr(self.member_profile, "city") if self.member_profile_id else self.city
+
+    @property
+    def effective_state(self):
+        return getattr(self.member_profile, "state") if self.member_profile_id else self.state
+
+    @property
+    def effective_zip_code(self):
+        return getattr(self.member_profile, "zip_code") if self.member_profile_id else self.zip_code
+
+    @property
+    def effective_date_of_birth(self):
+        return getattr(self.member_profile, "date_of_birth") if self.member_profile_id else self.date_of_birth
+
+    @property
+    def effective_photo(self):
+        return getattr(self.member_profile, "photo") if self.member_profile_id else self.photo
+
+    @property
+    def effective_email(self):
+        if self.member_profile_id:
+            return self.member_profile.email or (self.member_profile.user.email if self.member_profile.user_id else "")
+        return self.user.email if self.user_id else ""
+
+    @property
+    def effective_phone(self):
+        return self.member_profile.phone if self.member_profile_id else None
+
+    @property
+    def effective_gender_display(self):
+        if self.member_profile_id:
+            return self.member_profile.get_gender_display()
+        return self.get_gender_display()
 
     @property
     def effective_belt_rank(self):
