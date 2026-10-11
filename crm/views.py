@@ -494,7 +494,9 @@ def members(request):
             'promotion_age_text': promotion_age_text,
             'age': m.age,  # use the property directly
             'is_active': m.is_active,
-            'belt_rank': makeRank(m.belt_rank, m.stripes),
+            'belt_rank': m.belt_rank,
+            'stripes': m.stripes,
+            'member_type': m.member_type,
             'belt_color': m.belt_rank,
             'photo_url': m.get_photo_url(),
             'classes_since_promotion': classes_since_promotion,
