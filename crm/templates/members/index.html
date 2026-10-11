@@ -1,4 +1,5 @@
 {% extends "layout.html" %}
+{% load belt_images %}
 
 {% block header_title %}
 <i class="fas fa-users me-2"></i>
@@ -139,9 +140,7 @@ Members <span class="badge bg-primary ms-2">{{ members.paginator.count }}</span>
                                 </td>
 
                                 <td>
-                                    <span class="badge belt {{ member.belt_color }}-belt px-2 px-lg-3 py-2 rounded-pill" style="font-size: 0.75rem;">
-                                        {{ member.belt_rank|capfirst|truncatechars:8 }}
-                                    </span>
+                                    {% belt_image member.belt_rank member.stripes member.member_type 86 %}
                                 </td>
 
                                 <td>
