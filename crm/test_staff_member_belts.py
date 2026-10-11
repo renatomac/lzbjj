@@ -102,3 +102,35 @@ class StaffMemberBeltTests(TestCase):
         staff.refresh_from_db()
         self.assertEqual(staff.first_name, "Correct")
         self.assertEqual(staff.role, "Instructor")
+
+    def test_staff_form_uses_selected_members_user_without_user_dropdown(self):
+        from crm.forms import StaffForm
+        user = get_user_model().objects.create_user(username="member_only_staff", password="test-password")
+        member = Member.objects.create(
+            user=user, first_name="Member", last_name="Only",
+            date_of_birth=date(1992, 1, 1), address="Member Street",
+            city="Lake Zurich", state="IL", zip_code="60047",
+        )
+        form = StaffForm(data={
+            "member_profile": str(member.pk), "role": "Instructor",
+            "join_date": "2026-10-11",
+        })
+        self.assertNotIn("user", form.fields)
+        self.assertTrue(form.is_valid(), form.errors)
+        staff = form.save()
+        self.assertEqual(staff.user_id, user.pk)
+        self.assertEqual(staff.member_profile_id, member.pk)
+
+    def test_staff_form_requires_member_login_account(self):
+        from crm.forms import StaffForm
+        member = Member.objects.create(
+            first_name="No", last_name="Login",
+            date_of_birth=date(1992, 1, 1), address="Member Street",
+            city="Lake Zurich", state="IL", zip_code="60047",
+        )
+        form = StaffForm(data={
+            "member_profile": str(member.pk), "role": "Instructor",
+            "join_date": "2026-10-11",
+        })
+        self.assertFalse(form.is_valid())
+        self.assertIn("member_profile", form.errors)
