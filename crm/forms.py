@@ -379,11 +379,14 @@ class BeltPromotionForm(forms.ModelForm):
             "old_stripes": forms.HiddenInput(),
             "new_rank": forms.HiddenInput(),
             "new_stripes": forms.HiddenInput(),
+            "promoted_by": forms.HiddenInput(),
         }
 
     def __init__(self, *args, member=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.member = member
+        # The view assigns the authenticated instructor after validation.
+        self.fields["promoted_by"].required = False
         self.belt_options = []
         if member is None:
             return
