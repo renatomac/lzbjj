@@ -56,9 +56,7 @@ coverage.xml
 *.py,cover
 .cache/
 
-# Migrations (optional: only if you want to ignore migrations in Git)
-*/migrations/*.py
-!*/migrations/__init__.py
+# Track Django migration history in Git for reproducible test and deployment schemas.
 
 # Other
 *.bak
