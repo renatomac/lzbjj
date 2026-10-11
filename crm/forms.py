@@ -269,6 +269,30 @@ class StaffForm(forms.ModelForm):
             self.fields["stripes"].initial = 0
             self.fields["is_active"].initial = True
 
+        # When creating a staff profile, a selected member is the source for
+        # shared identity fields. Role, join date and employment status stay separate.
+        selected_id = self.data.get("member_profile") if self.is_bound else linked
+        selected_member = self.fields["member_profile"].queryset.filter(pk=selected_id).first() if selected_id else None
+        if selected_member:
+            for field in ("first_name", "last_name", "gender", "address", "city",
+                          "state", "zip_code", "date_of_birth", "photo",
+                          "belt_rank", "stripes"):
+                if field in self.fields:
+                    value = getattr(selected_member, field, None)
+                    if field == "date_of_birth" and value:
+                        value = value.isoformat()
+                    if value is not None:
+                        self.fields[field].initial = value
+            if selected_member.user_id and not self.is_bound:
+                self.fields["user"].initial = selected_member.user_id
+            for field in ("belt_rank", "stripes"):
+                self.fields[field].disabled = True
+            if not self.instance.pk:
+                # New staff records must never be created with stale member details.
+                for field in ("first_name", "last_name", "gender", "address",
+                              "city", "state", "zip_code", "date_of_birth", "photo"):
+                    self.fields[field].required = False
+
         if linked:
             # Display authoritative member belt on the form without allowing edits
             # to the legacy staff belt fields.
@@ -285,6 +309,13 @@ class StaffForm(forms.ModelForm):
             self.add_error("member_profile", "This member belongs to a different login user.")
         if member and Staff.objects.filter(member_profile=member).exclude(pk=self.instance.pk).exists():
             self.add_error("member_profile", "This member is already linked to another staff record.")
+        if member and member.user_id and not user:
+            cleaned["user"] = member.user
+        if member and not self.instance.pk:
+            for field in ("first_name", "last_name", "gender", "address", "city",
+                          "state", "zip_code", "date_of_birth", "photo",
+                          "belt_rank", "stripes"):
+                cleaned[field] = getattr(member, field, None)
         return cleaned
 
     @transaction.atomic
