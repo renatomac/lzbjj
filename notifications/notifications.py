@@ -103,13 +103,16 @@ def generate_birthday_notifications():
         date_of_birth__day=today.day
     )
     
+    # Use an explicit local-day window for reliable MySQL date comparisons.
+    day_start = timezone.make_aware(datetime.combine(today, datetime.min.time()))
+    next_day_start = day_start + timedelta(days=1)
     notifications = []
     for member in members:
         from .models import Notification
         staff_message = f'Birthday today: {member.first_name} {member.last_name}.'
         for recipient in User.objects.filter(is_active=True).filter(Q(is_staff=True) | Q(is_coach=True)):
             if not Notification.objects.filter(user=recipient, message=staff_message,
-                    created_at__date=today).exists():
+                    created_at__gte=day_start, created_at__lt=next_day_start).exists():
                 notifications.append(create_notification(recipient, 'MEMBER_BIRTHDAY', staff_message))
         if not member.user or Notification.objects.filter(user=member.user,
                 message__startswith=f'🎉 Happy Birthday, {member.first_name}!', created_at__date=today).exists():
