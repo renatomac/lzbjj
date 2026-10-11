@@ -3,7 +3,7 @@
 
 {% block header_title %}
 <i class="fas fa-users me-2"></i>
-Members <span class="badge bg-primary ms-2">{{ members.paginator.count }}</span>
+Members <span class="badge bg-primary ms-2" data-member-count>{{ all_members|length }}</span>
 {% endblock %}
 
 {% block content %}
@@ -25,8 +25,8 @@ Members <span class="badge bg-primary ms-2">{{ members.paginator.count }}</span>
                             <i class="fa-solid fa-arrow-left me-1"></i>Back to Dashboard
                         </a>
                     </div>
-                    <form method="GET" class="row g-2 align-items-end">
-                        <div class="col-12 col-md-6">
+                    <form method="GET" id="member-filter-form" class="row g-3 align-items-end" role="search">
+                        <div class="col-12 col-md-6 member-filter-col">
                             <label for="member-query" class="form-label small fw-semibold mb-1">Search</label>
                             <div class="member-search-field">
                                 <i class="fas fa-search text-muted member-search-icon" aria-hidden="true"></i>
@@ -34,7 +34,7 @@ Members <span class="badge bg-primary ms-2">{{ members.paginator.count }}</span>
                                        name="query" placeholder="Name or email..." value="{{ query }}">
                             </div>
                         </div>
-                        <div class="col-6 col-md-3">
+                        <div class="col-6 col-md-3 member-filter-col">
                             <label for="member-status" class="form-label small fw-semibold mb-1">Status</label>
                             <select id="member-status" name="status" class="form-select">
                                 <option value="">All Members</option>
@@ -42,7 +42,7 @@ Members <span class="badge bg-primary ms-2">{{ members.paginator.count }}</span>
                                 <option value="inactive" {% if status == "inactive" %}selected{% endif %}>Inactive</option>
                             </select>
                         </div>
-                        <div class="col-6 col-md-3">
+                        <div class="col-6 col-md-3 member-filter-col">
                             <label for="member-type" class="form-label small fw-semibold mb-1">Type</label>
                             <select id="member-type" name="member_type" class="form-select">
                                 <option value="" {% if not member_type %}selected{% endif %}>All Types</option>
@@ -51,11 +51,9 @@ Members <span class="badge bg-primary ms-2">{{ members.paginator.count }}</span>
                                 <option value="transition" {% if member_type == "transition" %}selected{% endif %}>Transitioning</option>
                             </select>
                         </div>
-                        <div class="col-12 d-flex justify-content-end gap-2 mt-2">
-                            <a href="{% url 'members' %}" class="btn btn-outline-secondary btn-sm">Clear</a>
-                            <button type="submit" class="btn btn-primary btn-sm px-3">
-                                <i class="fas fa-filter me-1"></i>Apply Filters
-                            </button>
+                        <div class="col-12 d-flex justify-content-end align-items-center gap-2 mt-1">
+                            <span id="member-filter-status" class="small text-muted" role="status" aria-live="polite"></span>
+                            <a href="{% url 'members' %}" id="member-clear-filters" class="btn btn-outline-secondary btn-sm">Clear</a>
                         </div>
                     </form>
                 </div>
@@ -257,6 +255,16 @@ Members <span class="badge bg-primary ms-2">{{ members.paginator.count }}</span>
 
 <!-- Mobile Optimized CSS -->
 <style>
+    /* Match filter heights and provide consistent horizontal spacing. */
+    #member-filter-form { --bs-gutter-x: 1rem; --bs-gutter-y: .875rem; }
+    #member-filter-form .member-filter-col { min-width: 0; }
+    #member-filter-form .member-filter-col .form-control,
+    #member-filter-form .member-filter-col .form-select {
+        height: 42px;
+        min-height: 42px;
+        box-sizing: border-box;
+    }
+    #member-filter-form .member-filter-col .form-label { display: block; }
     /* Single input border; small icon positioned inside it. */
     .member-search-field {
         position: relative;
@@ -381,4 +389,84 @@ Members <span class="badge bg-primary ms-2">{{ members.paginator.count }}</span>
     }
 </style>
 
+<script>
+(function () {
+    "use strict";
+    const form = document.getElementById("member-filter-form");
+    if (!form) return;
+    const query = document.getElementById("member-query");
+    const status = document.getElementById("member-status");
+    const type = document.getElementById("member-type");
+    const feedback = document.getElementById("member-filter-status");
+    const clear = document.getElementById("member-clear-filters");
+    let debounceTimer = null;
+    let controller = null;
+    let requestId = 0;
+
+    function setFeedback(message) { feedback.textContent = message; }
+    function urlForFilters() {
+        const url = new URL(form.action || window.location.href, window.location.href);
+        const params = new URLSearchParams();
+        // Keep status explicit: an empty value means 'All Members'.
+        params.set("status", status.value);
+        if (query.value.trim()) params.set("query", query.value.trim());
+        if (type.value) params.set("member_type", type.value);
+        url.search = params.toString();
+        return url;
+    }
+    async function refreshMembers() {
+        const url = urlForFilters();
+        const current = ++requestId;
+        if (controller) controller.abort();
+        controller = new AbortController();
+        setFeedback("Updating…");
+        try {
+            const response = await fetch(url.toString(), {
+                signal: controller.signal,
+                headers: { "X-Requested-With": "XMLHttpRequest" },
+                credentials: "same-origin"
+            });
+            if (!response.ok) throw new Error("Request failed");
+            const html = await response.text();
+            const page = new DOMParser().parseFromString(html, "text/html");
+            const existingTable = document.querySelector(".table-responsive table");
+            const updatedTable = page.querySelector(".table-responsive table");
+            if (!existingTable || !updatedTable) throw new Error("Member table missing");
+            if (current !== requestId) return;
+            existingTable.replaceWith(updatedTable);
+            const heading = document.querySelector("[data-member-count]");
+            const newHeading = page.querySelector("[data-member-count]");
+            if (heading && newHeading) heading.textContent = newHeading.textContent;
+            history.replaceState(null, "", url.pathname + url.search);
+            setFeedback("");
+        } catch (error) {
+            if (error.name === "AbortError" || current !== requestId) return;
+            setFeedback("Could not refresh. Press Enter to retry.");
+        }
+    }
+    query.addEventListener("input", () => {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(refreshMembers, 350);
+    });
+    for (const select of [status, type]) {
+        select.addEventListener("change", () => {
+            clearTimeout(debounceTimer);
+            refreshMembers();
+        });
+    }
+    form.addEventListener("submit", event => {
+        event.preventDefault();
+        clearTimeout(debounceTimer);
+        refreshMembers();
+    });
+    clear.addEventListener("click", event => {
+        event.preventDefault();
+        query.value = "";
+        status.value = "";
+        type.value = "";
+        clearTimeout(debounceTimer);
+        refreshMembers();
+    });
+})();
+</script>
 {% endblock %}
