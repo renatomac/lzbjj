@@ -1,6 +1,53 @@
 {% extends "layout.html" %}
 
-{% block title %}Add Staff{% endblock %}
+{% block title %}Add Staff{{ member_prefill|json_script:"staff-member-prefill" }}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const memberSelect = document.getElementById("id_member_profile");
+    const userSelect = document.getElementById("id_user");
+    const dataElement = document.getElementById("staff-member-prefill");
+    if (!memberSelect || !dataElement) return;
+    const profiles = JSON.parse(dataElement.textContent);
+    const fields = ["first_name", "last_name", "gender", "address", "city",
+                    "state", "zip_code", "date_of_birth", "photo", "belt_rank", "stripes"];
+    const isNew = "{{ action_url|escapejs }}" === "addStaff";
+    const controlled = ["belt_rank", "stripes"];
+    const note = document.createElement("div");
+    note.className = "alert alert-info small mt-2 d-none";
+    note.textContent = "Personal details were imported from the selected member. Belt rank and stripes follow the member's promotions.";
+    memberSelect.closest(".mb-3, .form-group, div")?.appendChild(note);
+
+    function syncMember() {
+        const profile = profiles[memberSelect.value];
+        note.classList.toggle("d-none", !profile);
+        for (const key of controlled) {
+            const field = document.getElementById("id_" + key);
+            if (field) field.disabled = Boolean(profile);
+        }
+        if (!profile) return;
+        if (isNew) {
+            for (const key of fields) {
+                const field = document.getElementById("id_" + key);
+                if (!field) continue;
+                field.value = profile[key] == null ? "" : String(profile[key]);
+                field.dispatchEvent(new Event("change", {bubbles: false}));
+            }
+        } else {
+            for (const key of controlled) {
+                const field = document.getElementById("id_" + key);
+                if (field) field.value = String(profile[key]);
+            }
+        }
+        if (profile.user && userSelect) {
+            userSelect.value = profile.user;
+            userSelect.dispatchEvent(new Event("change", {bubbles: false}));
+        }
+    }
+    memberSelect.addEventListener("change", syncMember);
+    syncMember();
+});
+</script>
+{% endblock %}
 {% block header_title %}Staff Manager{% endblock %}
 
 {% block content %}
