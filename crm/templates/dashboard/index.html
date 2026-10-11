@@ -1,4 +1,5 @@
 {% extends "layout.html" %}
+{% load belt_images %}
 
 {% block title %}Dashboard{% endblock %}
 {% block header_title %}Dashboard{% endblock %}
@@ -170,9 +171,7 @@
                                 </a>
                             </td>
                             <td>
-                                <span class="belt {{ member.belt_rank }}-belt badge">
-                                    {{ member.belt_rank|capfirst }}
-                                </span>
+                                {% belt_image member.belt_rank member.stripes member.member_type 84 %}
                             </td>
                             <td>{{ member.age }}</td>
                         </tr>
