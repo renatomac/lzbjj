@@ -1,4 +1,5 @@
 {% extends "layout.html" %}
+{% load belt_images %}
 
 {% block title %}Member Profile{% endblock %}
 
@@ -85,7 +86,7 @@
                                     <div class="row">
                                         <div class="col-md-6 mb-2"><strong>Role:</strong> {{ member.role }}</div>
                                         <div class="col-md-6 mb-2"><strong>Gender:</strong> {{ member.get_gender_display }}</div>
-                                        <div class="col-md-6 mb-2"><strong>Belt Rank:</strong> {{ member.get_belt_rank_display }}</div>
+                                        <div class="col-md-6 mb-2"><strong>Belt Rank:</strong> {% belt_image member.belt_rank member.stripes member.member_type 100 %}</div>
                                         <div class="col-md-6 mb-2"><strong>Stripes:</strong> {{ member.stripes }}</div>
                                         <div class="col-md-6 mb-2"><strong>Date of Birth:</strong> {{ member.date_of_birth|date:"M d, Y"|default:"—" }}</div>
                                         <div class="col-md-6 mb-2"><strong>Join Date:</strong> {{ member.join_date|date:"M d, Y" }}</div>
@@ -145,7 +146,7 @@
                             </div>
                             <div class="col-md-4">
                                 <strong>Belt Rank:</strong>
-                                <p class="text-secondary">{{ member.belt_rank }}</p>
+                                <p class="text-secondary">{% belt_image member.belt_rank member.stripes member.member_type 110 %}</p>
                             </div>
                             <div class="col-md-4">
                                 <strong>Stripes:</strong>
@@ -185,7 +186,7 @@
                                         {% for promotion in promotions %}
                                         <tr>
                                             <td>{{ promotion.promotion_date|date:"M d, Y" }}</td>
-                                            <td><span class="badge bg-dark text-white">{{ promotion.new_rank }}</span></td>
+                                            <td>{% belt_image promotion.new_rank promotion.new_stripes member.member_type 88 %}</td>
                                             <td>{{ promotion.new_stripes }}</td>
                                             <td>{{ promotion.promoted_by.first_name }} {{ promotion.promoted_by.last_name|default:"—" }}</td>
                                         </tr>

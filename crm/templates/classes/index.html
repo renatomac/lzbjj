@@ -1,85 +1,57 @@
 {% extends "layout.html" %}
+{% load static %}
 
-{% block title %}Classes{% endblock %}
+{% block title %}Classes
+{% endblock %}
 {% block header_title %}Class Manager{% endblock %}
 
 {% block content %}
-
-<div class="row justify-content-center">
-
-    <div class="col-lg-8 order-lg-1">
-
-        <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-            <div class="btn-toolbar mb-2 mb-md-0">
-                <div class="btn-group me-2">
-                    <a href="{% url 'addClasses'%}" class="btn btn-primary">
-                        <i class="fas fa-user-plus me-2"></i>Add Class
-                    </a>
-                    <form method="post" action="{% url 'create_sessions' %}" class="d-inline">
-                    {% csrf_token %}<button type="submit" class="btn btn-outline-secondary">
-                        <i class="fas fa-download me-2"></i>Create Class Sessions
-                    </button></form>
-                </div>
+<link rel="stylesheet" href="{% static 'crm/css/manager_filters.css' %}">
+<div class="container-fluid px-0">
+  <div class="d-flex justify-content-end flex-wrap gap-2 pt-2 pb-2 mb-3"><a href="{% url 'addClasses' %}" class="btn btn-primary"><i class="fas fa-plus me-2"></i>Add Class</a>
+<form method="post" action="{% url 'create_sessions' %}" class="d-inline">{% csrf_token %}<button type="submit" class="btn btn-outline-secondary"><i class="fas fa-calendar-plus me-2"></i>Create Class Sessions</button></form></div>
+  <div class="row g-3 g-lg-4 align-items-stretch mb-3 mb-lg-4">
+    <div class="col-12 ">
+      <div class="card border-0 shadow-sm rounded-3 manager-filter-card h-100">
+        <div class="card-body p-3 p-lg-4">
+          <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
+            <h5 class="fw-bold fs-6 mb-0"><i class="fas fa-search text-primary me-2"></i>Find Classes</h5>
+            <a href="{% url 'dashboard' %}" class="btn btn-custom-ghost btn-sm"><i class="fas fa-arrow-left me-1"></i>Back to Dashboard</a>
+          </div>
+          <form method="GET" class="row g-3 align-items-end manager-filter-form" data-live-target="classes-results" role="search">
+            <div class="col-12 col-md-6">
+              <label class="form-label small fw-semibold" for="manager-query">Search</label>
+              <div class="manager-search"><i class="fas fa-search text-muted" aria-hidden="true"></i>
+                <input id="manager-query" type="search" class="form-control" name="query" placeholder="Instructor or class type..." value="{{ query }}">
+              </div>
             </div>
-        </div>
-
-
-        <div class="card shadow-sm rounded-3 p-0 mb-2">
-                        <a href="{% url 'dashboard' %}" class="btn btn-custom-ghost ms-auto">
-                <i class="fa-solid fa-arrow-left me-2"></i> Back to Dashboard
-            </a>
-            <div class="card-body">
-               <form method="GET" class="row g-3">
-                    <div class="d-flex flex-wrap gap-2 mb-3 align-items-left">
-                        <div class="p-2 flex-fill align-content-center">
-                            
-                            <div class="input-group input-group">
-                                <span class="input-group-text">
-                                    <i class="fa-solid fa-magnifying-glass fa-sm text-muted"></i>
-                                </span>
-                                <input
-                                    id="searchInput"
-                                    type="text"
-                                    class="form-control"
-                                    name="query"
-                                    placeholder="Search by instructor or class type"
-                                    value="{{ query }}"
-                                >
-                            </div>
-                            
-                            
-                        </div>
-                        <div class="p-2 flex-fill align-content-center">
-                            <select name="filterClassType" id="filterClassType" class="form-select" style="width: auto;">
-                                <option value="">All Class Types</option>
-                                {% for type in classTypes %}
-                                <option value="{{ type }}">{{ type }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="p-2 flex-fill align-content-center">
-                            <select name="filterInstructor" id="filterInstructor" class="form-select" style="width: auto;">
-                                <option value="">All Instructors</option>
-                                {% for instructor in instructors %}
-                                <option value="{{ instructor.id }}">{{ instructor.first_name }} {{ instructor.last_name }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="p-2 flex-fill align-content-center">
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-filter me-2"></i>Filter
-                            </button>
-                        </div>
-                    </div>
-                </form>
+            <div class="col-6 col-md-3">
+  <label class="form-label small fw-semibold" for="manager-class-type">Class type</label>
+  <select class="form-select" id="manager-class-type" name="filterClassType">
+    <option value="">All types</option>
+    {% for type in classTypes %}<option value="{{ type }}" {% if filterClassType == type %}selected{% endif %}>{{ type }}</option>{% endfor %}
+  </select>
+</div>
+<div class="col-6 col-md-3">
+  <label class="form-label small fw-semibold" for="manager-instructor">Instructor</label>
+  <select class="form-select" id="manager-instructor" name="filterInstructor">
+    <option value="">All instructors</option>
+    {% for instructor in instructors %}<option value="{{ instructor.id }}" {% if filterInstructor == instructor.id|stringformat:"s" %}selected{% endif %}>{{ instructor.first_name }} {{ instructor.last_name }}</option>{% endfor %}
+  </select>
+</div>
+            <div class="col-12 d-flex justify-content-end align-items-center gap-2">
+              <span class="small text-muted" data-filter-feedback role="status" aria-live="polite"></span>
+              <a href="{% url 'classes' %}" class="btn btn-outline-secondary btn-sm" data-clear-filters>Clear</a>
             </div>
+          </form>
         </div>
-
-        <div class="card shadow-sm rounded-3 p-0 mb-2">
+      </div>
+    </div>
+    
+  </div>
+  <div id="classes-results">        <div class="card shadow-sm rounded-3 p-0 mb-2 manager-table-card">
             <div class="card-body">
                 <h5 class="fw-bold mb-3">Recurring Class Schedules</h5>
-                <div class="d-flex flex-wrap gap-2 mb-3 align-items-center">
-
                 <div class="table-responsive">
                     <table class="table table-hover align-middle">
                         <thead>
@@ -117,9 +89,8 @@
                     </table>
                 </div>
             </div>
-        </div>
-    </div>
-   
+        </div></div>
 </div>
 
+<script src="{% static 'crm/js/manager_live_filters.js' %}" defer></script>
 {% endblock %}

@@ -234,50 +234,109 @@ class MemberForm(forms.ModelForm):
 
 
 class StaffForm(forms.ModelForm):
+    """Linked members own personal data; staff owns employment information."""
+
     class Meta:
         model = Staff
         fields = [
-            "user", "is_active", "first_name", "last_name", "role", "gender", "address", "city", "state", "zip_code",
+            "member_profile", "is_active", "first_name", "last_name",
+            "role", "gender", "address", "city", "state", "zip_code",
             "date_of_birth", "join_date", "belt_rank", "stripes", "photo",
         ]
-
         widgets = {
             "date_of_birth": forms.DateInput(attrs={"type": "date"}),
             "join_date": forms.DateInput(attrs={"type": "date"}),
             "is_active": forms.HiddenInput(),
         }
+        labels = {"member_profile": "Linked training member (optional)"}
+        help_texts = {
+            "member_profile": "Choose an existing member if this staff member also trains here. Their member belt and promotion history become authoritative.",
+            "belt_rank": "Used only when no training member is linked.",
+            "stripes": "Used only when no training member is linked.",
+        }
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
+        linked = self.instance.member_profile_id if self.instance.pk else None
+        self.fields["member_profile"].queryset = Member.objects.exclude(
+            staff_profile__isnull=False
+        ) | Member.objects.filter(pk=linked)
+        self.fields["member_profile"].queryset = self.fields["member_profile"].queryset.distinct().order_by("first_name", "last_name")
+        self.fields["member_profile"].required = not bool(self.instance.pk)
         if not self.instance.pk:
             self.fields["state"].initial = "IL"
             self.fields["belt_rank"].initial = "white"
             self.fields["stripes"].initial = 0
             self.fields["is_active"].initial = True
 
-    def __str__(self):
-        return f"{self.first_name} {self.last_name}"
+        # When creating a staff profile, a selected member is the source for
+        # shared identity fields. Role, join date and employment status stay separate.
+        selected_id = self.data.get("member_profile") if self.is_bound else linked
+        selected_member = self.fields["member_profile"].queryset.filter(pk=selected_id).first() if selected_id else None
+        if selected_member:
+            for field in ("first_name", "last_name", "gender", "address", "city",
+                          "state", "zip_code", "date_of_birth", "photo",
+                          "belt_rank", "stripes"):
+                if field in self.fields:
+                    value = getattr(selected_member, field, None)
+                    if field == "date_of_birth" and value:
+                        value = value.isoformat()
+                    if value is not None:
+                        self.fields[field].initial = value
+            for field in ("belt_rank", "stripes"):
+                self.fields[field].disabled = True
+            if not self.instance.pk:
+                # New staff records must never be created with stale member details.
+                for field in ("first_name", "last_name", "gender", "address",
+                              "city", "state", "zip_code", "date_of_birth", "photo"):
+                    self.fields[field].required = False
 
+        if selected_member:
+            # Linked personal details are display-only. No stale staff-side edits.
+            for field in ("first_name", "last_name", "gender", "address", "city",
+                          "state", "zip_code", "date_of_birth", "photo"):
+                self.fields[field].disabled = True
+                self.fields[field].required = False
+
+        if linked:
+            # Display authoritative member belt on the form without allowing edits
+            # to the legacy staff belt fields.
+            self.fields["belt_rank"].disabled = True
+            self.fields["stripes"].disabled = True
+            self.fields["belt_rank"].initial = self.instance.member_profile.belt_rank
+            self.fields["stripes"].initial = self.instance.member_profile.stripes
 
     def clean(self):
-        cleaned_data = super().clean()
-        user = cleaned_data.get("user")
-
-        return cleaned_data
+        cleaned = super().clean()
+        member = cleaned.get("member_profile")
+        if member and Staff.objects.filter(member_profile=member).exclude(pk=self.instance.pk).exists():
+            self.add_error("member_profile", "This member is already linked to another staff record.")
+        if member:
+            if not member.user_id:
+                self.add_error("member_profile", "This member has no login account. Create or link a User account in the Member profile before assigning staff.")
+            elif Staff.objects.filter(user_id=member.user_id).exclude(pk=self.instance.pk).exists():
+                self.add_error("member_profile", "This member's login is already assigned to another staff record.")
+            else:
+                cleaned["user"] = member.user
+        elif not self.instance.pk:
+            self.add_error("member_profile", "Select a training member to create staff.")
+        if member:
+            for field in ("first_name", "last_name", "gender", "address", "city",
+                          "state", "zip_code", "date_of_birth", "photo",
+                          "belt_rank", "stripes"):
+                cleaned[field] = getattr(member, field, None)
+        return cleaned
 
     @transaction.atomic
     def save(self, commit=True):
         staff = super().save(commit=False)
-
-        selected_user = self.cleaned_data.get("user")
-
-        staff.user = selected_user
-
+        if self.cleaned_data.get("user"):
+            staff.user = self.cleaned_data["user"]
         if commit:
             staff.save()
             self.save_m2m()
-
         return staff
+
 
 class PlanForm(forms.ModelForm):
     class Meta:
@@ -367,114 +426,100 @@ class AttendanceForm(forms.ModelForm):
 
 
 class BeltPromotionForm(forms.ModelForm):
+    """A single visual selection for rank and stripe progression."""
+
+    belt_selection = forms.ChoiceField(label="New belt and stripes")
+
     class Meta:
         model = BeltPromotion
         exclude = ["member", "notes"]
+        widgets = {
+            "old_rank": forms.HiddenInput(),
+            "old_stripes": forms.HiddenInput(),
+            "new_rank": forms.HiddenInput(),
+            "new_stripes": forms.HiddenInput(),
+            "promoted_by": forms.HiddenInput(),
+        }
 
     def __init__(self, *args, member=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.member = member
-
-        if not member:
+        # The view assigns the authenticated instructor after validation.
+        self.fields["promoted_by"].required = False
+        self.belt_options = []
+        if member is None:
             return
 
-        # ----------------------------
-        # Prefill old values
-        # ----------------------------
-        starting_rank = self.instance.old_rank if self.instance.pk else member.belt_rank
-        starting_stripes = self.instance.old_stripes if self.instance.pk else member.stripes
-        self.fields["old_rank"].initial = starting_rank
-        self.fields["old_stripes"].initial = starting_stripes
-        if not self.instance.pk:
-            self.fields["new_rank"].initial = member.belt_rank
-            self.fields["new_stripes"].initial = member.stripes
+        from django.contrib.staticfiles.storage import staticfiles_storage
+        from .templatetags.belt_images import belt_image_path
 
-        # ----------------------------
-        # Prefill promotion date
-        # ----------------------------
-        if not self.instance.pk:
-            self.fields["promotion_date"].initial = timezone.localdate()
+        start_rank = self.instance.old_rank if self.instance.pk else member.belt_rank
+        start_stripes = self.instance.old_stripes if self.instance.pk else member.stripes
+        self.fields["old_rank"].initial = start_rank
+        self.fields["old_stripes"].initial = start_stripes
+        self.fields["old_rank"].disabled = True
+        self.fields["old_stripes"].disabled = True
 
-        # ----------------------------
-        # Make old values read-only
-        # ----------------------------
-        for field in ("old_rank", "old_stripes"):
-            self.fields[field].disabled = True
-
-        # ----------------------------
-        # Restrict new_rank choices based on age (under 16 = kid belt order)
-        # ----------------------------
-        # Calculate age from date_of_birth
         today = timezone.localdate()
-        age = None
-        if member.date_of_birth:
-            age = today.year - member.date_of_birth.year - ((today.month, today.day) < (member.date_of_birth.month, member.date_of_birth.day))
-        
-        # Use KID_BELT_ORDER for members under 16, ADULT_BELT_ORDER for 16 and older
-        belt_order = KID_BELT_ORDER if age is not None and age < 16 else ADULT_BELT_ORDER
-        if starting_rank not in belt_order:
-            belt_order = KID_BELT_ORDER if starting_rank in KID_BELT_ORDER else ADULT_BELT_ORDER
-        
+        age = (today.year - member.date_of_birth.year -
+               ((today.month, today.day) <
+                (member.date_of_birth.month, member.date_of_birth.day))
+               if member.date_of_birth else None)
+        order = KID_BELT_ORDER if age is not None and age < 16 else ADULT_BELT_ORDER
+        if start_rank not in order:
+            order = KID_BELT_ORDER if start_rank in KID_BELT_ORDER else ADULT_BELT_ORDER
+        self.belt_order = order
         try:
-            current_index = belt_order.index(starting_rank)
+            start_index = order.index(start_rank)
         except ValueError:
-            current_index = 0
+            start_index = 0
 
-        # Allow only current belt or next belt
-        allowed_ranks = belt_order[current_index : ]
+        is_youth = order == KID_BELT_ORDER
+        stripe_max = 11 if is_youth else 4
+        choices = []
+        for rank in order[start_index:]:
+            for stripes in range(stripe_max + 1):
+                # No demotions or unchanged selections for a new promotion.
+                # On edit, retain the originally saved rank/stripe combination.
+                existing = (self.instance.pk and rank == self.instance.new_rank
+                            and stripes == self.instance.new_stripes)
+                if not existing and rank == start_rank and stripes <= start_stripes:
+                    continue
+                path = belt_image_path(rank, stripes, "child" if is_youth else "adult")
+                if path is None:
+                    continue
+                value = f"{rank}|{stripes}"
+                label = f"{dict(BeltRank.choices).get(rank, rank)} — {stripes} stripes"
+                choices.append((value, label))
+                self.belt_options.append({
+                    "value": value, "label": label,
+                    "image_url": staticfiles_storage.url(path),
+                    "rank": rank, "stripes": stripes,
+                })
 
-        # Map to (value, label) for choices
-        choices_dict = dict(self.fields["new_rank"].choices)
-        self.fields["new_rank"].choices = [
-            (rank, choices_dict.get(rank, rank))
-            for rank in allowed_ranks
-        ]
-
-        # Optional: limit stripes to 0-12
-        self.fields["new_stripes"].widget.attrs["min"] = 0
-        self.fields["new_stripes"].widget.attrs["max"] = 12
+        self.fields["belt_selection"].choices = choices
+        if self.instance.pk:
+            selected = f"{self.instance.new_rank}|{self.instance.new_stripes}"
+        else:
+            selected = choices[0][0] if choices else ""
+            self.fields["promotion_date"].initial = timezone.localdate()
+        self.fields["belt_selection"].initial = selected
+        self.fields["new_rank"].required = False
+        self.fields["new_stripes"].required = False
+        self.fields["new_rank"].initial = selected.split("|")[0] if selected else start_rank
+        self.fields["new_stripes"].initial = int(selected.split("|")[1]) if selected else start_stripes
 
     def clean(self):
         cleaned = super().clean()
-
-        old_rank = cleaned.get("old_rank")
-        new_rank = cleaned.get("new_rank")
-        old_stripes = cleaned.get("old_stripes")
-        new_stripes = cleaned.get("new_stripes")
-
-        member = getattr(self, "member", None)
-        if not member or not old_rank or not new_rank:
+        selected = cleaned.get("belt_selection")
+        if not selected:
             return cleaned
-
-        # Calculate age for belt order determination
-        today = timezone.localdate()
-        age = None
-        if member.date_of_birth:
-            age = today.year - member.date_of_birth.year - ((today.month, today.day) < (member.date_of_birth.month, member.date_of_birth.day))
-        
-        # Use appropriate belt order based on age (under 16 = kid belt order)
-        belt_order = KID_BELT_ORDER if age is not None and age < 16 else ADULT_BELT_ORDER
-        if old_rank not in belt_order:
-            belt_order = KID_BELT_ORDER if old_rank in KID_BELT_ORDER else ADULT_BELT_ORDER
-
-        # ----------------------------
-        # Prevent demotion
-        # ----------------------------
-        if old_rank in belt_order and new_rank in belt_order and belt_order.index(new_rank) < belt_order.index(old_rank):
-            self.add_error("new_rank", "You cannot demote a belt.")
-
-        # ----------------------------
-        # Stripes must increase if same belt
-        # ----------------------------
-        if new_rank == old_rank and new_stripes <= old_stripes:
-            self.add_error("new_stripes", "Stripes must increase when staying in the same belt.")
-
-        # ----------------------------
-        # Reset stripes when moving to new belt
-        # ----------------------------
-        if new_rank != old_rank:
-            cleaned["new_stripes"] = 0
-
+        # ChoiceField validates the submitted value against the server-generated
+        # allowed choices. Never trust rank/stripes from hidden inputs.
+        rank, stripe_text = selected.split("|", 1)
+        stripes = int(stripe_text)
+        cleaned["new_rank"] = rank
+        cleaned["new_stripes"] = stripes
         return cleaned
 
 

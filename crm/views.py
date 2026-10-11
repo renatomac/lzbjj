@@ -264,6 +264,8 @@ def users(request):
     return render(request, "users/index.html", {
         "all_users": all_users,
         "summary": summary,
+        "query": query,
+        "status": status,
     })
 
 
@@ -494,7 +496,9 @@ def members(request):
             'promotion_age_text': promotion_age_text,
             'age': m.age,  # use the property directly
             'is_active': m.is_active,
-            'belt_rank': makeRank(m.belt_rank, m.stripes),
+            'belt_rank': m.belt_rank,
+            'stripes': m.stripes,
+            'member_type': m.member_type,
             'belt_color': m.belt_rank,
             'photo_url': m.get_photo_url(),
             'classes_since_promotion': classes_since_promotion,
@@ -1548,23 +1552,27 @@ def classes(request):
     query = request.GET.get("query", "")
     classType = request.GET.get("filterClassType", "")
     instructor = request.GET.get("filterInstructor", "")
-    print(instructor)
     classes = Class.objects.select_related("instructor").order_by("start_time")
     if query:
         classes = classes.filter(
             Q(instructor__first_name__icontains=query) |
-            Q(instructor__last_name__icontains=query)
+            Q(instructor__last_name__icontains=query) |
+            Q(name__icontains=query) |
+            Q(type__icontains=query)
         )
     if classType:
         classes = classes.filter(type = classType)
     if instructor:
         classes = classes.filter(instructor_id=instructor)
-    instructors = instructors = Staff.objects.filter(is_active=True ).distinct()
+    instructors = Staff.objects.filter(is_active=True).distinct()
     classTypes = (Class.objects.values_list("type", flat=True).distinct())
     return render(request, "classes/index.html",{
                   "classes":classes,
                   "classTypes": classTypes,
                   "instructors": instructors,
+                  "query": query,
+                  "filterClassType": classType,
+                  "filterInstructor": instructor,
                   })
 
 
@@ -1780,46 +1788,73 @@ def reportsRevenue(request):
     return render(request, "reports/revenue.html")
 
 def staff(request):
-    query = request.GET.get("query", "")
+    query = request.GET.get("query", "").strip()
     status = request.GET.get("status", "")
+    all_staff = Staff.objects.select_related("user", "member_profile", "member_profile__user").all()
     if status == "active":
-        all_staff = Staff.objects.filter(is_active = True).values()
+        all_staff = all_staff.filter(is_active=True)
     elif status == "inactive":
-        all_staff = Staff.objects.filter(is_active = False).values()
-    else:
-        all_staff = Staff.objects.all().values()
+        all_staff = all_staff.filter(is_active=False)
     if query:
         all_staff = all_staff.filter(
             Q(first_name__icontains=query) |
-            Q(last_name__icontains=query)
+            Q(last_name__icontains=query) |
+            Q(member_profile__first_name__icontains=query) |
+            Q(member_profile__last_name__icontains=query)
         )
-
-    summary = {'active':Staff.objects.filter(is_active = True).count(), 'inactive':Staff.objects.filter(is_active = False).count(),'total':Staff.objects.all().count()}
+    summary = {
+        "active": Staff.objects.filter(is_active=True).count(),
+        "inactive": Staff.objects.filter(is_active=False).count(),
+        "total": Staff.objects.count(),
+    }
     return render(request, "staff/index.html", {
-        'all_staff' : all_staff ,
-        'summary': summary,
-        })
+        "all_staff": all_staff,
+        "summary": summary,
+        "query": query,
+        "status": status,
+    })
+
+
+def staff_member_prefill_data():
+    """Existing eligible members, keyed by ID for the staff form."""
+    used = Staff.objects.exclude(member_profile__isnull=True).values_list("member_profile_id", flat=True)
+    result = {}
+    for member in Member.objects.exclude(pk__in=used).select_related("user"):
+        result[str(member.pk)] = {
+            "user": str(member.user_id or ""),
+            "first_name": member.first_name,
+            "last_name": member.last_name,
+            "gender": member.gender or "",
+            "address": member.address or "",
+            "city": member.city or "",
+            "state": member.state or "",
+            "zip_code": member.zip_code or "",
+            "date_of_birth": member.date_of_birth.isoformat() if member.date_of_birth else "",
+            "photo": member.photo or "",
+            "belt_rank": member.belt_rank,
+            "stripes": member.stripes,
+        }
+    return result
+
 
 def addStaff(request):
     if request.method == 'POST':
         form = StaffForm(request.POST)
         if form.is_valid():
             form.save()
-        else:
-            print("Form is invalid.")
-        return HttpResponseRedirect(reverse("staff"))
+            return redirect("staff")
     else:
         form = StaffForm()
-        print(form)
     return render(request, "staff/add.html" , {
         "form": form,
         'title':'Add Staff',
         "action_url": "addStaff",
+        "member_prefill": staff_member_prefill_data(),
         })
 
 def editStaff(request, staff_id):
 
-    instance = get_object_or_404(Staff, pk=staff_id)
+    instance = get_object_or_404(Staff.objects.select_related("member_profile", "member_profile__user"), pk=staff_id)
     if request.method == 'POST':
         form = StaffForm(request.POST, instance=instance)
         if form.is_valid():
@@ -1832,6 +1867,7 @@ def editStaff(request, staff_id):
         'title':'Edit Staff',
         "staff_id": instance.id,
         "action_url": "editStaff",
+        "member_prefill": staff_member_prefill_data(),
         })
 
 def viewStaff(request, staff_id):
