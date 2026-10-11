@@ -116,7 +116,10 @@
                                 </td>
                                 <td class="py-3">{{ staff.role }}</td>
                                 <td class="py-3">
-                                    {% belt_image staff.belt_rank staff.stripes "adult" 86 %}
+                                    {% belt_image staff.effective_belt_rank staff.effective_stripes "adult" 86 %}
+                                    {% if staff.member_profile_id %}
+                                    <span class="d-block small text-muted" title="Rank follows linked member promotions"><i class="fas fa-link me-1"></i>Member-linked</span>
+                                    {% endif %}
                                 </td>
                                 <td class="py-3">{{ staff.join_date }}</td>
                                 <td class="py-3">
