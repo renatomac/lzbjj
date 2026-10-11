@@ -234,7 +234,7 @@ class MemberForm(forms.ModelForm):
 
 
 class StaffForm(forms.ModelForm):
-    """Staff may optionally link to an existing member for shared belt progress."""
+    """Linked members own personal data; staff owns employment information."""
 
     class Meta:
         model = Staff
@@ -293,6 +293,13 @@ class StaffForm(forms.ModelForm):
                               "city", "state", "zip_code", "date_of_birth", "photo"):
                     self.fields[field].required = False
 
+        if selected_member:
+            # Linked personal details are display-only. No stale staff-side edits.
+            for field in ("first_name", "last_name", "gender", "address", "city",
+                          "state", "zip_code", "date_of_birth", "photo"):
+                self.fields[field].disabled = True
+                self.fields[field].required = False
+
         if linked:
             # Display authoritative member belt on the form without allowing edits
             # to the legacy staff belt fields.
@@ -311,7 +318,7 @@ class StaffForm(forms.ModelForm):
             self.add_error("member_profile", "This member is already linked to another staff record.")
         if member and member.user_id and not user:
             cleaned["user"] = member.user
-        if member and not self.instance.pk:
+        if member:
             for field in ("first_name", "last_name", "gender", "address", "city",
                           "state", "zip_code", "date_of_birth", "photo",
                           "belt_rank", "stripes"):
