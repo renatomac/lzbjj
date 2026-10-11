@@ -29,18 +29,31 @@ YOUTH_SUFFIXES = {
 
 def belt_image_path(rank, stripes=0, member_type="adult"):
     """Return static-relative artwork path, or None for unsupported ranks."""
-    rank = str(rank or "").lower()
+    rank = str(rank or "").strip().lower().replace("_", "-")
     try:
         stripes = int(stripes)
     except (TypeError, ValueError):
         return None
-    if member_type == "child":
-        prefix = YOUTH_PREFIXES.get(rank)
+
+    # All ranks other than white are exclusive to one belt system.
+    # Historical members can retain a youth belt after their member_type
+    # changes to adult/transition, so infer the system from the rank.
+    if rank in YOUTH_PREFIXES and rank not in ADULT_PREFIXES:
+        prefix = YOUTH_PREFIXES[rank]
         suffix = YOUTH_SUFFIXES.get(stripes)
-    else:
-        prefix = ADULT_PREFIXES.get(rank)
+    elif rank in ADULT_PREFIXES and rank not in YOUTH_PREFIXES:
+        prefix = ADULT_PREFIXES[rank]
         suffix = str(stripes) if 0 <= stripes <= 4 else None
-    if not prefix or suffix is None:
+    elif rank == "white":
+        # White is shared; monthly youth stripes 5-11 identify youth art.
+        # For stripes 0-4, both systems use the same W*.svg artwork.
+        prefix = "W"
+        suffix = (YOUTH_SUFFIXES.get(stripes) if stripes > 4
+                  else str(stripes) if 0 <= stripes <= 4 else None)
+    else:
+        return None
+
+    if suffix is None:
         return None
     return f"crm/img/belts/{prefix}{suffix}.svg"
 
