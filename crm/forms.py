@@ -367,114 +367,97 @@ class AttendanceForm(forms.ModelForm):
 
 
 class BeltPromotionForm(forms.ModelForm):
+    """A single visual selection for rank and stripe progression."""
+
+    belt_selection = forms.ChoiceField(label="New belt and stripes")
+
     class Meta:
         model = BeltPromotion
         exclude = ["member", "notes"]
+        widgets = {
+            "old_rank": forms.HiddenInput(),
+            "old_stripes": forms.HiddenInput(),
+            "new_rank": forms.HiddenInput(),
+            "new_stripes": forms.HiddenInput(),
+        }
 
     def __init__(self, *args, member=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.member = member
-
-        if not member:
+        self.belt_options = []
+        if member is None:
             return
 
-        # ----------------------------
-        # Prefill old values
-        # ----------------------------
-        starting_rank = self.instance.old_rank if self.instance.pk else member.belt_rank
-        starting_stripes = self.instance.old_stripes if self.instance.pk else member.stripes
-        self.fields["old_rank"].initial = starting_rank
-        self.fields["old_stripes"].initial = starting_stripes
-        if not self.instance.pk:
-            self.fields["new_rank"].initial = member.belt_rank
-            self.fields["new_stripes"].initial = member.stripes
+        from django.contrib.staticfiles.storage import staticfiles_storage
+        from .templatetags.belt_images import belt_image_path
 
-        # ----------------------------
-        # Prefill promotion date
-        # ----------------------------
-        if not self.instance.pk:
-            self.fields["promotion_date"].initial = timezone.localdate()
+        start_rank = self.instance.old_rank if self.instance.pk else member.belt_rank
+        start_stripes = self.instance.old_stripes if self.instance.pk else member.stripes
+        self.fields["old_rank"].initial = start_rank
+        self.fields["old_stripes"].initial = start_stripes
+        self.fields["old_rank"].disabled = True
+        self.fields["old_stripes"].disabled = True
 
-        # ----------------------------
-        # Make old values read-only
-        # ----------------------------
-        for field in ("old_rank", "old_stripes"):
-            self.fields[field].disabled = True
-
-        # ----------------------------
-        # Restrict new_rank choices based on age (under 16 = kid belt order)
-        # ----------------------------
-        # Calculate age from date_of_birth
         today = timezone.localdate()
-        age = None
-        if member.date_of_birth:
-            age = today.year - member.date_of_birth.year - ((today.month, today.day) < (member.date_of_birth.month, member.date_of_birth.day))
-        
-        # Use KID_BELT_ORDER for members under 16, ADULT_BELT_ORDER for 16 and older
-        belt_order = KID_BELT_ORDER if age is not None and age < 16 else ADULT_BELT_ORDER
-        if starting_rank not in belt_order:
-            belt_order = KID_BELT_ORDER if starting_rank in KID_BELT_ORDER else ADULT_BELT_ORDER
-        
+        age = (today.year - member.date_of_birth.year -
+               ((today.month, today.day) <
+                (member.date_of_birth.month, member.date_of_birth.day))
+               if member.date_of_birth else None)
+        order = KID_BELT_ORDER if age is not None and age < 16 else ADULT_BELT_ORDER
+        if start_rank not in order:
+            order = KID_BELT_ORDER if start_rank in KID_BELT_ORDER else ADULT_BELT_ORDER
+        self.belt_order = order
         try:
-            current_index = belt_order.index(starting_rank)
+            start_index = order.index(start_rank)
         except ValueError:
-            current_index = 0
+            start_index = 0
 
-        # Allow only current belt or next belt
-        allowed_ranks = belt_order[current_index : ]
+        is_youth = order == KID_BELT_ORDER
+        stripe_max = 11 if is_youth else 4
+        choices = []
+        for rank in order[start_index:]:
+            for stripes in range(stripe_max + 1):
+                # No demotions or unchanged selections for a new promotion.
+                # On edit, retain the originally saved rank/stripe combination.
+                existing = (self.instance.pk and rank == self.instance.new_rank
+                            and stripes == self.instance.new_stripes)
+                if not existing and rank == start_rank and stripes <= start_stripes:
+                    continue
+                path = belt_image_path(rank, stripes, "child" if is_youth else "adult")
+                if path is None:
+                    continue
+                value = f"{rank}|{stripes}"
+                label = f"{dict(BeltRank.choices).get(rank, rank)} — {stripes} stripes"
+                choices.append((value, label))
+                self.belt_options.append({
+                    "value": value, "label": label,
+                    "image_url": staticfiles_storage.url(path),
+                    "rank": rank, "stripes": stripes,
+                })
 
-        # Map to (value, label) for choices
-        choices_dict = dict(self.fields["new_rank"].choices)
-        self.fields["new_rank"].choices = [
-            (rank, choices_dict.get(rank, rank))
-            for rank in allowed_ranks
-        ]
-
-        # Optional: limit stripes to 0-12
-        self.fields["new_stripes"].widget.attrs["min"] = 0
-        self.fields["new_stripes"].widget.attrs["max"] = 12
+        self.fields["belt_selection"].choices = choices
+        if self.instance.pk:
+            selected = f"{self.instance.new_rank}|{self.instance.new_stripes}"
+        else:
+            selected = choices[0][0] if choices else ""
+            self.fields["promotion_date"].initial = timezone.localdate()
+        self.fields["belt_selection"].initial = selected
+        self.fields["new_rank"].required = False
+        self.fields["new_stripes"].required = False
+        self.fields["new_rank"].initial = selected.split("|")[0] if selected else start_rank
+        self.fields["new_stripes"].initial = int(selected.split("|")[1]) if selected else start_stripes
 
     def clean(self):
         cleaned = super().clean()
-
-        old_rank = cleaned.get("old_rank")
-        new_rank = cleaned.get("new_rank")
-        old_stripes = cleaned.get("old_stripes")
-        new_stripes = cleaned.get("new_stripes")
-
-        member = getattr(self, "member", None)
-        if not member or not old_rank or not new_rank:
+        selected = cleaned.get("belt_selection")
+        if not selected:
             return cleaned
-
-        # Calculate age for belt order determination
-        today = timezone.localdate()
-        age = None
-        if member.date_of_birth:
-            age = today.year - member.date_of_birth.year - ((today.month, today.day) < (member.date_of_birth.month, member.date_of_birth.day))
-        
-        # Use appropriate belt order based on age (under 16 = kid belt order)
-        belt_order = KID_BELT_ORDER if age is not None and age < 16 else ADULT_BELT_ORDER
-        if old_rank not in belt_order:
-            belt_order = KID_BELT_ORDER if old_rank in KID_BELT_ORDER else ADULT_BELT_ORDER
-
-        # ----------------------------
-        # Prevent demotion
-        # ----------------------------
-        if old_rank in belt_order and new_rank in belt_order and belt_order.index(new_rank) < belt_order.index(old_rank):
-            self.add_error("new_rank", "You cannot demote a belt.")
-
-        # ----------------------------
-        # Stripes must increase if same belt
-        # ----------------------------
-        if new_rank == old_rank and new_stripes <= old_stripes:
-            self.add_error("new_stripes", "Stripes must increase when staying in the same belt.")
-
-        # ----------------------------
-        # Reset stripes when moving to new belt
-        # ----------------------------
-        if new_rank != old_rank:
-            cleaned["new_stripes"] = 0
-
+        # ChoiceField validates the submitted value against the server-generated
+        # allowed choices. Never trust rank/stripes from hidden inputs.
+        rank, stripe_text = selected.split("|", 1)
+        stripes = int(stripe_text)
+        cleaned["new_rank"] = rank
+        cleaned["new_stripes"] = stripes
         return cleaned
 
 
