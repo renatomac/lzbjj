@@ -60,3 +60,45 @@ class StaffMemberBeltTests(TestCase):
         self.assertEqual(staff.member_profile_id, member.pk)
         self.assertEqual(staff.effective_belt_rank, "purple")
         self.assertEqual(staff.effective_stripes, 2)
+
+    def test_member_identity_changes_are_visible_without_staff_sync(self):
+        user = get_user_model().objects.create_user(username="staff_identity_live", password="test-password")
+        member = Member.objects.create(
+            first_name="Before", last_name="Student", date_of_birth=date(1990, 1, 1),
+            address="Old Street", city="Lake Zurich", zip_code="60047",
+        )
+        staff = Staff.objects.create(
+            user=user, member_profile=member, first_name="Old Staff",
+            last_name="Name", address="Stale Street",
+            role="Coach", join_date=date(2025, 1, 1),
+        )
+        member.first_name = "After"
+        member.address = "New Street"
+        member.save(update_fields=["first_name", "address"])
+        staff.refresh_from_db()
+        self.assertEqual(staff.effective_first_name, "After")
+        self.assertEqual(staff.effective_address, "New Street")
+        self.assertEqual(staff.first_name, "Old Staff")
+
+    def test_linked_staff_form_rejects_personal_edits(self):
+        from crm.forms import StaffForm
+        user = get_user_model().objects.create_user(username="staff_locked_identity", password="test-password")
+        member = Member.objects.create(
+            user=user, first_name="Correct", last_name="Person",
+            date_of_birth=date(1990, 1, 1), address="Member Address",
+            city="Lake Zurich", state="IL", zip_code="60047",
+        )
+        staff = Staff.objects.create(
+            user=user, member_profile=member, first_name="Correct",
+            last_name="Person", role="Coach", join_date=date(2025, 1, 1),
+        )
+        form = StaffForm(data={
+            "user": str(user.pk), "member_profile": str(member.pk),
+            "role": "Instructor", "join_date": "2025-01-01",
+            "first_name": "Injected", "last_name": "Injected",
+        }, instance=staff)
+        self.assertTrue(form.is_valid(), form.errors)
+        form.save()
+        staff.refresh_from_db()
+        self.assertEqual(staff.first_name, "Correct")
+        self.assertEqual(staff.role, "Instructor")
