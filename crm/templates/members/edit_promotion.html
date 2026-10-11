@@ -1,4 +1,5 @@
 {% extends "layout.html" %}
+{% load belt_images %}
 
 {% block title %}Edit Promotion{% endblock %}
 {% block header_title %}Edit Promotion{% endblock %}
@@ -33,7 +34,7 @@
             </div>
             <div class="small text-muted">
               Current:
-              <span class="badge {{ member.belt_rank }}-belt">{{ rank }}</span>
+              {% belt_image member.belt_rank member.stripes member.member_type 92 %}
               <span class="ms-2">
                 ({{ member.stripes }} stripe{% if member.stripes != 1 %}s{% endif %})
               </span>
@@ -114,13 +115,11 @@
                 </td>
                 <td>
                   <span class="badge bg-light text-dark">
-                    {{ p.old_rank|capfirst }} {% if p.old_stripes %}{{ p.old_stripes }}🥋{% endif %}
+                    {% belt_image p.old_rank p.old_stripes member.member_type 82 %}
                   </span>
                 </td>
                 <td>
-                  <span class="badge {{ p.new_rank }}-belt">
-                    {{ p.new_rank|capfirst }} {% if p.new_stripes %}{{ p.new_stripes }}🥋{% endif %}
-                  </span>
+                  {% belt_image p.new_rank p.new_stripes member.member_type 82 %}
                 </td>
                 <td>
                   <span class="text-muted">
