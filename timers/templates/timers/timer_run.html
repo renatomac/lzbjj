@@ -803,6 +803,7 @@
                     </div>
                 </div>
 
+                {% if spotify_configured %}
                 <div id="spotifyDisconnectedState">
                     <p id="spotifyConnectionStatus" class="spotify-status-text">Checking Spotify connection…</p>
                     <a href="{% url 'timers:spotify_connect' %}?next={{ request.path }}" class="spotify-connect-btn">
@@ -839,6 +840,9 @@
                     </div>
                 </div>
                 <p id="spotifyErrorText" role="alert" class="spotify-status-text text-danger mt-2 mb-0 d-none"></p>
+                {% else %}
+                <p class="spotify-status-text" role="status">Spotify controls are unavailable because Spotify is not configured on this server.</p>
+                {% endif %}
             </div>
 
         </div>
@@ -1647,6 +1651,7 @@
 </script>
 
 <!-- Spotify Playlist & Playback Controls -->
+{% if spotify_configured %}
 <script>
     document.addEventListener('DOMContentLoaded', () => {
         const panel = document.getElementById('spotifyPanel');
@@ -1940,4 +1945,5 @@
         })();
     });
 </script>
+{% endif %}
 {% endblock %}

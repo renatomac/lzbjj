@@ -405,7 +405,7 @@ class BillingPaymentListTests(TestCase):
         Payment.objects.create(
             user=user,
             amount=90.00,
-            payment_date=today - timedelta(days=20),
+            payment_date=today,
             payment_method="cash",
             status="paid",
         )
@@ -931,6 +931,9 @@ class WorkflowRegressionTests(TestCase):
         from datetime import time
         from .utils import regenerate_future_sessions, create_future_sessions
 
+        # Keep this test independent of the weekday on which it runs.
+        self.klass.days_of_week = [self.today.strftime("%a").lower()]
+        self.klass.save(update_fields=["days_of_week"])
         session = ClassSession.objects.create(
             class_template=self.klass, date=self.today, start_time=time(17, 0),
         )
