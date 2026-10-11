@@ -105,7 +105,7 @@ def generate_birthday_notifications():
     
     # Use an explicit local-day window for reliable MySQL date comparisons.
     day_start = timezone.make_aware(datetime.combine(today, datetime.min.time()))
-    next_day_start = day_start + timedelta(days=1)
+    next_day_start = timezone.make_aware(datetime.combine(today + timedelta(days=1), datetime.min.time()))
     notifications = []
     for member in members:
         from .models import Notification
