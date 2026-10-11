@@ -264,6 +264,8 @@ def users(request):
     return render(request, "users/index.html", {
         "all_users": all_users,
         "summary": summary,
+        "query": query,
+        "status": status,
     })
 
 
@@ -1550,23 +1552,27 @@ def classes(request):
     query = request.GET.get("query", "")
     classType = request.GET.get("filterClassType", "")
     instructor = request.GET.get("filterInstructor", "")
-    print(instructor)
     classes = Class.objects.select_related("instructor").order_by("start_time")
     if query:
         classes = classes.filter(
             Q(instructor__first_name__icontains=query) |
-            Q(instructor__last_name__icontains=query)
+            Q(instructor__last_name__icontains=query) |
+            Q(name__icontains=query) |
+            Q(type__icontains=query)
         )
     if classType:
         classes = classes.filter(type = classType)
     if instructor:
         classes = classes.filter(instructor_id=instructor)
-    instructors = instructors = Staff.objects.filter(is_active=True ).distinct()
+    instructors = Staff.objects.filter(is_active=True).distinct()
     classTypes = (Class.objects.values_list("type", flat=True).distinct())
     return render(request, "classes/index.html",{
                   "classes":classes,
                   "classTypes": classTypes,
                   "instructors": instructors,
+                  "query": query,
+                  "filterClassType": classType,
+                  "filterInstructor": instructor,
                   })
 
 
@@ -1800,6 +1806,8 @@ def staff(request):
     return render(request, "staff/index.html", {
         'all_staff' : all_staff ,
         'summary': summary,
+        'query': query,
+        'status': status,
         })
 
 def addStaff(request):
