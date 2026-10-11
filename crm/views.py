@@ -1790,7 +1790,7 @@ def reportsRevenue(request):
 def staff(request):
     query = request.GET.get("query", "").strip()
     status = request.GET.get("status", "")
-    all_staff = Staff.objects.select_related("user", "member_profile").all()
+    all_staff = Staff.objects.select_related("user", "member_profile", "member_profile__user").all()
     if status == "active":
         all_staff = all_staff.filter(is_active=True)
     elif status == "inactive":
@@ -1798,7 +1798,7 @@ def staff(request):
     if query:
         all_staff = all_staff.filter(
             Q(first_name__icontains=query) |
-            Q(last_name__icontains=query)
+            Q(last_name__icontains=query) |\n            Q(member_profile__first_name__icontains=query) |\n            Q(member_profile__last_name__icontains=query)
         )
     summary = {
         "active": Staff.objects.filter(is_active=True).count(),
@@ -1852,7 +1852,7 @@ def addStaff(request):
 
 def editStaff(request, staff_id):
 
-    instance = get_object_or_404(Staff, pk=staff_id)
+    instance = get_object_or_404(Staff.objects.select_related("member_profile", "member_profile__user"), pk=staff_id)
     if request.method == 'POST':
         form = StaffForm(request.POST, instance=instance)
         if form.is_valid():
