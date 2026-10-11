@@ -239,7 +239,7 @@ class StaffForm(forms.ModelForm):
     class Meta:
         model = Staff
         fields = [
-            "user", "member_profile", "is_active", "first_name", "last_name",
+            "member_profile", "is_active", "first_name", "last_name",
             "role", "gender", "address", "city", "state", "zip_code",
             "date_of_birth", "join_date", "belt_rank", "stripes", "photo",
         ]
@@ -262,7 +262,7 @@ class StaffForm(forms.ModelForm):
             staff_profile__isnull=False
         ) | Member.objects.filter(pk=linked)
         self.fields["member_profile"].queryset = self.fields["member_profile"].queryset.distinct().order_by("first_name", "last_name")
-        self.fields["member_profile"].required = False
+        self.fields["member_profile"].required = not bool(self.instance.pk)
         if not self.instance.pk:
             self.fields["state"].initial = "IL"
             self.fields["belt_rank"].initial = "white"
@@ -283,8 +283,6 @@ class StaffForm(forms.ModelForm):
                         value = value.isoformat()
                     if value is not None:
                         self.fields[field].initial = value
-            if selected_member.user_id and not self.is_bound:
-                self.fields["user"].initial = selected_member.user_id
             for field in ("belt_rank", "stripes"):
                 self.fields[field].disabled = True
             if not self.instance.pk:
@@ -310,14 +308,18 @@ class StaffForm(forms.ModelForm):
 
     def clean(self):
         cleaned = super().clean()
-        user = cleaned.get("user")
         member = cleaned.get("member_profile")
-        if user and member and member.user_id and member.user_id != user.pk:
-            self.add_error("member_profile", "This member belongs to a different login user.")
         if member and Staff.objects.filter(member_profile=member).exclude(pk=self.instance.pk).exists():
             self.add_error("member_profile", "This member is already linked to another staff record.")
-        if member and member.user_id and not user:
-            cleaned["user"] = member.user
+        if member:
+            if not member.user_id:
+                self.add_error("member_profile", "This member has no login account. Create or link a User account in the Member profile before assigning staff.")
+            elif Staff.objects.filter(user_id=member.user_id).exclude(pk=self.instance.pk).exists():
+                self.add_error("member_profile", "This member's login is already assigned to another staff record.")
+            else:
+                cleaned["user"] = member.user
+        elif not self.instance.pk:
+            self.add_error("member_profile", "Select a training member to create staff.")
         if member:
             for field in ("first_name", "last_name", "gender", "address", "city",
                           "state", "zip_code", "date_of_birth", "photo",
@@ -328,6 +330,8 @@ class StaffForm(forms.ModelForm):
     @transaction.atomic
     def save(self, commit=True):
         staff = super().save(commit=False)
+        if self.cleaned_data.get("user"):
+            staff.user = self.cleaned_data["user"]
         if commit:
             staff.save()
             self.save_m2m()
