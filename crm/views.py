@@ -1788,39 +1788,39 @@ def reportsRevenue(request):
     return render(request, "reports/revenue.html")
 
 def staff(request):
-    query = request.GET.get("query", "")
+    query = request.GET.get("query", "").strip()
     status = request.GET.get("status", "")
+    all_staff = Staff.objects.select_related("user", "member_profile").all()
     if status == "active":
-        all_staff = Staff.objects.filter(is_active = True).values()
+        all_staff = all_staff.filter(is_active=True)
     elif status == "inactive":
-        all_staff = Staff.objects.filter(is_active = False).values()
-    else:
-        all_staff = Staff.objects.all().values()
+        all_staff = all_staff.filter(is_active=False)
     if query:
         all_staff = all_staff.filter(
             Q(first_name__icontains=query) |
             Q(last_name__icontains=query)
         )
-
-    summary = {'active':Staff.objects.filter(is_active = True).count(), 'inactive':Staff.objects.filter(is_active = False).count(),'total':Staff.objects.all().count()}
+    summary = {
+        "active": Staff.objects.filter(is_active=True).count(),
+        "inactive": Staff.objects.filter(is_active=False).count(),
+        "total": Staff.objects.count(),
+    }
     return render(request, "staff/index.html", {
-        'all_staff' : all_staff ,
-        'summary': summary,
-        'query': query,
-        'status': status,
-        })
+        "all_staff": all_staff,
+        "summary": summary,
+        "query": query,
+        "status": status,
+    })
+
 
 def addStaff(request):
     if request.method == 'POST':
         form = StaffForm(request.POST)
         if form.is_valid():
             form.save()
-        else:
-            print("Form is invalid.")
-        return HttpResponseRedirect(reverse("staff"))
+            return redirect("staff")
     else:
         form = StaffForm()
-        print(form)
     return render(request, "staff/add.html" , {
         "form": form,
         'title':'Add Staff',
