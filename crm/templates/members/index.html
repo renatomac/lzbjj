@@ -185,15 +185,6 @@ Members <span class="badge bg-primary ms-2">{{ members.paginator.count }}</span>
                                             title="{% if member.is_active %}Deactivate{% else %}Activate{% endif %}">
                                             <i id='toggle-img' class="fas {% if member.is_active %}fa-user-slash{% else %}fa-user-plus{% endif %}"></i>
                                         </button>
-
-                                        <form action="{% url 'deleteMember' member_id=member.id %}" method="POST" class="d-inline-block">
-                                            {% csrf_token %}
-                                            <button type="submit" class="btn btn-sm btn-outline-danger rounded-2 rounded-lg-3" 
-                                                    onclick="return confirm('Are you sure you want to delete {{ member.first_name }} {{ member.last_name }}?');" 
-                                                    data-bs-toggle="tooltip" title="Delete">
-                                                <i class="fa-solid fa-trash"></i>
-                                            </button>
-                                        </form>
                                     </div>
                                 </td>
                             </tr>
