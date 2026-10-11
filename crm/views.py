@@ -1813,6 +1813,28 @@ def staff(request):
     })
 
 
+def staff_member_prefill_data():
+    """Existing eligible members, keyed by ID for the staff form."""
+    used = Staff.objects.exclude(member_profile__isnull=True).values_list("member_profile_id", flat=True)
+    result = {}
+    for member in Member.objects.exclude(pk__in=used).select_related("user"):
+        result[str(member.pk)] = {
+            "user": str(member.user_id or ""),
+            "first_name": member.first_name,
+            "last_name": member.last_name,
+            "gender": member.gender or "",
+            "address": member.address or "",
+            "city": member.city or "",
+            "state": member.state or "",
+            "zip_code": member.zip_code or "",
+            "date_of_birth": member.date_of_birth.isoformat() if member.date_of_birth else "",
+            "photo": member.photo or "",
+            "belt_rank": member.belt_rank,
+            "stripes": member.stripes,
+        }
+    return result
+
+
 def addStaff(request):
     if request.method == 'POST':
         form = StaffForm(request.POST)
@@ -1825,6 +1847,7 @@ def addStaff(request):
         "form": form,
         'title':'Add Staff',
         "action_url": "addStaff",
+        "member_prefill": staff_member_prefill_data(),
         })
 
 def editStaff(request, staff_id):
@@ -1842,6 +1865,7 @@ def editStaff(request, staff_id):
         'title':'Edit Staff',
         "staff_id": instance.id,
         "action_url": "editStaff",
+        "member_prefill": staff_member_prefill_data(),
         })
 
 def viewStaff(request, staff_id):
