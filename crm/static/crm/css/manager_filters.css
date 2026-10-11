@@ -1,0 +1,13 @@
+/* Compact, aligned search fields for User, Staff and Class managers. */
+.manager-filter-form { --bs-gutter-x: 1rem; --bs-gutter-y: .875rem; }
+.manager-filter-form .form-label { display:block; margin-bottom: .25rem; }
+.manager-filter-form .form-control,
+.manager-filter-form .form-select { height: 42px; min-height:42px; }
+.manager-search { position:relative; }
+.manager-search > i {
+  position:absolute; top:50%; left:13px; transform:translateY(-50%);
+  font-size:13px; line-height:1; pointer-events:none; z-index:2;
+}
+.manager-search .form-control { padding-left:36px; }
+.manager-filter-card .btn-custom-ghost { white-space:nowrap; }
+.manager-table-card .table-responsive { overflow-x:auto; }
