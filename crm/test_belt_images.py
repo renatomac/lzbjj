@@ -56,3 +56,17 @@ class BeltImageTests(SimpleTestCase):
             belt_image_path("white", 6, "transition"),
             "crm/img/belts/W2r.svg",
         )
+
+    def test_all_youth_images_exist_in_static_directory(self):
+        from django.contrib.staticfiles import finders
+        ranks = [
+            "white", "gray-white", "gray", "gray-black",
+            "yellow-white", "yellow", "yellow-black",
+            "orange-white", "orange", "orange-black",
+            "green-white", "green", "green-black",
+        ]
+        for rank in ranks:
+            for stripes in range(12):
+                with self.subTest(rank=rank, stripes=stripes):
+                    path = belt_image_path(rank, stripes, "child")
+                    self.assertIsNotNone(finders.find(path))
