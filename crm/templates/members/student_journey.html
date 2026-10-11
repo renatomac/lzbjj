@@ -1,4 +1,5 @@
 {% extends "layout.html" %}
+{% load belt_images %}
 
 {% block title %}{{ member.first_name }}'s Student Journey{% endblock %}
 {% block header_title %}Student Journey{% endblock %}
@@ -500,7 +501,7 @@
                     <p><strong>Training Duration:</strong> {{ years_training }} years</p>
                     
                     <div class="hero-badges">
-                        <div class="badge-large">{{ current_rank }}</div>
+                        <div class="badge-large">{% belt_image member.belt_rank member.stripes member.member_type 150 %}</div>
                         <div class="badge-status">
                             <i class="fas fa-check-circle"></i> Active Member
                         </div>
@@ -541,7 +542,7 @@
             <div class="belt-progression">
                 {% for belt in belt_timeline_data %}
                     <div class="belt-item {% if belt.is_completed %}completed{% endif %} {% if belt.is_current %}current{% endif %}">
-                        <div class="belt-visual {{ belt.rank }}-belt"></div>
+                        <div class="belt-visual {{ belt.rank }}-belt">{% belt_image belt.rank 0 member.member_type 100 %}</div>
                         <div class="belt-name">{{ belt.display_name }}</div>
                     </div>
                 {% endfor %}
