@@ -1,7 +1,7 @@
 {% extends "layout.html" %}
 {% load static %}
 
-{% block title %}Classes<script src="{% static 'crm/js/manager_live_filters.js' %}" defer></script>
+{% block title %}Classes
 {% endblock %}
 {% block header_title %}Class Manager{% endblock %}
 
@@ -52,8 +52,6 @@
   <div id="classes-results">        <div class="card shadow-sm rounded-3 p-0 mb-2 manager-table-card">
             <div class="card-body">
                 <h5 class="fw-bold mb-3">Recurring Class Schedules</h5>
-                <div class="d-flex flex-wrap gap-2 mb-3 align-items-center">
-
                 <div class="table-responsive">
                     <table class="table table-hover align-middle">
                         <thead>
@@ -94,4 +92,5 @@
         </div></div>
 </div>
 
+<script src="{% static 'crm/js/manager_live_filters.js' %}" defer></script>
 {% endblock %}
