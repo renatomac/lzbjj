@@ -234,50 +234,67 @@ class MemberForm(forms.ModelForm):
 
 
 class StaffForm(forms.ModelForm):
+    """Staff may optionally link to an existing member for shared belt progress."""
+
     class Meta:
         model = Staff
         fields = [
-            "user", "is_active", "first_name", "last_name", "role", "gender", "address", "city", "state", "zip_code",
+            "user", "member_profile", "is_active", "first_name", "last_name",
+            "role", "gender", "address", "city", "state", "zip_code",
             "date_of_birth", "join_date", "belt_rank", "stripes", "photo",
         ]
-
         widgets = {
             "date_of_birth": forms.DateInput(attrs={"type": "date"}),
             "join_date": forms.DateInput(attrs={"type": "date"}),
             "is_active": forms.HiddenInput(),
         }
+        labels = {"member_profile": "Linked training member (optional)"}
+        help_texts = {
+            "member_profile": "Choose an existing member if this staff member also trains here. Their member belt and promotion history become authoritative.",
+            "belt_rank": "Used only when no training member is linked.",
+            "stripes": "Used only when no training member is linked.",
+        }
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
+        linked = self.instance.member_profile_id if self.instance.pk else None
+        self.fields["member_profile"].queryset = Member.objects.exclude(
+            staff_profile__isnull=False
+        ) | Member.objects.filter(pk=linked)
+        self.fields["member_profile"].queryset = self.fields["member_profile"].queryset.distinct().order_by("first_name", "last_name")
+        self.fields["member_profile"].required = False
         if not self.instance.pk:
             self.fields["state"].initial = "IL"
             self.fields["belt_rank"].initial = "white"
             self.fields["stripes"].initial = 0
             self.fields["is_active"].initial = True
 
-    def __str__(self):
-        return f"{self.first_name} {self.last_name}"
-
+        if linked:
+            # Display authoritative member belt on the form without allowing edits
+            # to the legacy staff belt fields.
+            self.fields["belt_rank"].disabled = True
+            self.fields["stripes"].disabled = True
+            self.fields["belt_rank"].initial = self.instance.member_profile.belt_rank
+            self.fields["stripes"].initial = self.instance.member_profile.stripes
 
     def clean(self):
-        cleaned_data = super().clean()
-        user = cleaned_data.get("user")
-
-        return cleaned_data
+        cleaned = super().clean()
+        user = cleaned.get("user")
+        member = cleaned.get("member_profile")
+        if user and member and member.user_id and member.user_id != user.pk:
+            self.add_error("member_profile", "This member belongs to a different login user.")
+        if member and Staff.objects.filter(member_profile=member).exclude(pk=self.instance.pk).exists():
+            self.add_error("member_profile", "This member is already linked to another staff record.")
+        return cleaned
 
     @transaction.atomic
     def save(self, commit=True):
         staff = super().save(commit=False)
-
-        selected_user = self.cleaned_data.get("user")
-
-        staff.user = selected_user
-
         if commit:
             staff.save()
             self.save_m2m()
-
         return staff
+
 
 class PlanForm(forms.ModelForm):
     class Meta:
