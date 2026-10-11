@@ -34,3 +34,25 @@ class BeltImageTests(SimpleTestCase):
         html = str(belt_image("gray-white", 5, "child"))
         self.assertIn("GyW1r.svg", html)
         self.assertIn("alt=", html)
+
+    def test_youth_rank_artwork_even_when_member_type_is_adult(self):
+        cases = [
+            ("green", 0, "Gn0.svg"),
+            ("yellow", 0, "Y0.svg"),
+            ("yellow", 6, "Y2r.svg"),
+            ("gray", 1, "Gy1.svg"),
+            ("gray-white", 1, "GyW1.svg"),
+        ]
+        for rank, stripes, filename in cases:
+            for member_type in ("adult", "transition", "child"):
+                with self.subTest(rank=rank, stripes=stripes, member_type=member_type):
+                    self.assertEqual(
+                        belt_image_path(rank, stripes, member_type),
+                        "crm/img/belts/" + filename,
+                    )
+
+    def test_white_belt_with_monthly_stripes(self):
+        self.assertEqual(
+            belt_image_path("white", 6, "transition"),
+            "crm/img/belts/W2r.svg",
+        )
