@@ -1798,7 +1798,9 @@ def staff(request):
     if query:
         all_staff = all_staff.filter(
             Q(first_name__icontains=query) |
-            Q(last_name__icontains=query) |\n            Q(member_profile__first_name__icontains=query) |\n            Q(member_profile__last_name__icontains=query)
+            Q(last_name__icontains=query) |
+            Q(member_profile__first_name__icontains=query) |
+            Q(member_profile__last_name__icontains=query)
         )
     summary = {
         "active": Staff.objects.filter(is_active=True).count(),
