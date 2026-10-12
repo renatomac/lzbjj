@@ -1452,8 +1452,6 @@ def getSessionsByDate(request, date):
 
 @crm_staff_required
 @require_POST
-@crm_staff_required
-@require_POST
 def toggleAttendance(request, attendance_id):
     attendance = get_object_or_404(SessionAttendance.objects.select_related("session__class_template", "member"), pk=attendance_id)
     from django.core.exceptions import ValidationError
