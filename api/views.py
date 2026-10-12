@@ -102,11 +102,11 @@ class PiAttendanceCompat(APIView):
         session = ClassSession.objects.filter(pk=session_id, date=day, is_canceled=False).first()
         if not session:
             return Response({'error': 'Invalid or canceled session for this date'}, status=400)
+        created = not SessionAttendance.objects.filter(session=session, member=member).exists()
         try:
             att = set_member_attendance(session, member, True)
         except ValidationError as exc:
             return Response({'error': exc.messages[0]}, status=400)
-        created = False  # API result is idempotent; record may already exist
         # Optional: notify staff - Updated to use your existing notification structure
         try:
             from notifications.utils import create_notification
