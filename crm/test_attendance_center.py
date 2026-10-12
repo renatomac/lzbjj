@@ -15,7 +15,7 @@ class AttendanceCenterTests(TestCase):
         )
         self.client.force_login(self.user)
         self.today = timezone.localdate()
-        self.instructor = Staff.objects.create(user=self.user, first_name='Test', last_name='Coach', role='coach')
+        self.instructor = Staff.objects.create(user=self.user, first_name='Test', last_name='Coach', role='coach', join_date=self.today)
         self.klass = Class.objects.create(
             name="Kids BJJ", type="kids", instructor=self.instructor, start_time="17:00", end_time="18:00",
             days_of_week=["mon"], start_date=self.today,
