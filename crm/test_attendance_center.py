@@ -4,7 +4,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from crm.models import Class, ClassSession, Member, SessionAttendance
+from crm.models import Class, ClassSession, Member, SessionAttendance, Staff
 from crm.services.attendance import get_session_attendance, record_member_attendance, set_member_attendance
 
 
@@ -15,8 +15,9 @@ class AttendanceCenterTests(TestCase):
         )
         self.client.force_login(self.user)
         self.today = timezone.localdate()
+        self.instructor = Staff.objects.create(user=self.user, first_name='Test', last_name='Coach', role='coach')
         self.klass = Class.objects.create(
-            name="Kids BJJ", type="kids", start_time="17:00", end_time="18:00",
+            name="Kids BJJ", type="kids", instructor=self.instructor, start_time="17:00", end_time="18:00",
             days_of_week=["mon"], start_date=self.today,
         )
         self.session = ClassSession.objects.create(class_template=self.klass, date=self.today)
