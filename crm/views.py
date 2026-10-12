@@ -31,7 +31,7 @@ import logging
 import calendar
 from django.db.models import Prefetch
 from crm.transaction_dashboard import transaction_dashboard_metrics
-from crm.services.attendance import get_session_attendance, record_member_attendance
+from crm.services.attendance import get_session_attendance, record_member_attendance, set_member_attendance, validate_checkin
 from crm.services.billing import get_billing_summary
 from crm.services.trials import convert_trial_to_membership, deactivate_trial, extend_trial, start_trial_from_waiver
 from crm.services.geocoding import geocode_member
@@ -1184,70 +1184,55 @@ def typesClasses(request):
 
 @crm_staff_required
 def attendance(request):
-    today = timezone.localdate().weekday()
-    todayDate = timezone.localdate()
-    weekday = timezone.localdate().strftime("%A")
-    shortWeekday = timezone.localdate().strftime("%a").lower()[:3]
-    end_date = todayDate + timedelta(days=6)
+    today = timezone.localdate()
     sessions = (
-    ClassSession.objects
-    .filter(date__range=(todayDate, end_date))
-    .annotate(
-        effective_start_time_db=Coalesce(
-            "start_time",
-            F("class_template__start_time")
-        )
+        ClassSession.objects.filter(date__range=(today, today + timedelta(days=6)), is_canceled=False)
+        .select_related("class_template", "instructor")
+        .annotate(effective_start_time_db=Coalesce("start_time", F("class_template__start_time")))
+        .order_by("date", "effective_start_time_db")
     )
-    .order_by("date", "effective_start_time_db")
-    )
+    session_ids = list(sessions.values_list("id", flat=True))
+    counts = {
+        row["session_id"]: row
+        for row in SessionAttendance.objects.filter(session_id__in=session_ids)
+        .values("session_id")
+        .annotate(total=Count("id"), checked=Count("id", filter=Q(present=True)))
+    }
+    for session in sessions:
+        metrics = counts.get(session.id, {})
+        session.attendance_total = metrics.get("total", 0)
+        session.attendance_checked = metrics.get("checked", 0)
+    return render(request, "attendance/index.html", {"sessions": sessions, "today": today})
 
-    return render(request, "attendance/index.html", {
-        "sessions":sessions,
-        "today":today,
-    })
 
 @crm_staff_required
 def attendanceRecord(request, session_id):
-    today = timezone.localdate()
-    btnFilter = request.GET.get("filter")
-    if not btnFilter:
-        filter = "all"
-    else:
-        filter = btnFilter
-
-    sessionSelectedStr = request.GET.get("sessionSelect")
-
-    session = get_object_or_404(ClassSession, id=session_id)
-    todaySessions = ClassSession.objects.filter(date = session.date)
-    #sessionDate = session.date
-
-    if not sessionSelectedStr:
-        sessionSelected = session_id
-    else:
-        sessionSelected = int(sessionSelectedStr)
-
-    weekday = today.strftime("%A")
-
-    if session.is_canceled == False:
-        attending_list = get_session_attendance(sessionSelected, filter)
-    else:
-        attending_list = None
-
-
-    technics = Technique.objects.all().values()
+    session = get_object_or_404(
+        ClassSession.objects.select_related("class_template", "instructor"), pk=session_id
+    )
+    selected = request.GET.get("sessionSelect")
+    if selected and selected.isdigit() and int(selected) != session.pk:
+        return redirect("attendanceRecord", session_id=int(selected))
+    filter_name = request.GET.get("filter", "all")
+    if filter_name not in ("all", "checked", "unchecked", "not"):
+        filter_name = "all"
+    roster = get_session_attendance(session.pk, filter_name) if not session.is_canceled else SessionAttendance.objects.none()
+    total = SessionAttendance.objects.filter(session=session).count()
+    checked = SessionAttendance.objects.filter(session=session, present=True).count()
+    today_sessions = ClassSession.objects.filter(date=session.date, is_canceled=False).select_related("class_template")
     techniques = SessionTechnique.objects.filter(session=session).select_related("technique")
-    names = [st.technique.name for st in techniques if st.technique]
-
     return render(request, "attendance/attendance.html", {
-    "session":session,
-    "today":today,
-    "weekday":weekday,
-    "sessionSelected": sessionSelected,
-    "sessionTechniques":names,
-    "technics": technics,
-    "attending_list":attending_list,
-    "todaySessions":todaySessions,
-    "filter": filter,
+        "session": session,
+        "today": timezone.localdate(),
+        "weekday": session.date.strftime("%A"),
+        "sessionSelected": session.pk,
+        "sessionTechniques": [item.technique.name for item in techniques if item.technique],
+        "technics": Technique.objects.all().values(),
+        "attending_list": roster,
+        "todaySessions": today_sessions,
+        "filter": "unchecked" if filter_name == "not" else filter_name,
+        "count_checked": checked,
+        "count_total": total,
     })
 
 
@@ -1467,17 +1452,20 @@ def getSessionsByDate(request, date):
 
 @crm_staff_required
 @require_POST
+@crm_staff_required
+@require_POST
 def toggleAttendance(request, attendance_id):
-    attendance = get_object_or_404(SessionAttendance, pk=attendance_id)
-    if attendance.present == True:
-        attendance.present = False
-        status = "deleted"
-    else:
-        attendance.present = True
-        status = "created"
-    attendance.save(update_fields=["present"])
-
-    return JsonResponse({"status": status})
+    attendance = get_object_or_404(SessionAttendance.objects.select_related("session__class_template", "member"), pk=attendance_id)
+    from django.core.exceptions import ValidationError
+    try:
+        updated = set_member_attendance(
+            attendance.session, attendance.member, not attendance.present,
+            allow_past=True,
+        )
+    except ValidationError as exc:
+        return JsonResponse({"error": exc.messages[0]}, status=400)
+    checked = SessionAttendance.objects.filter(session=attendance.session, present=True).count()
+    return JsonResponse({"status": "created" if updated.present else "deleted", "present": updated.present, "checked": checked})
 
 @crm_staff_required
 def getClasses(request, strDate):
