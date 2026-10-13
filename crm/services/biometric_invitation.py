@@ -15,8 +15,15 @@ def resolve_invitation(token):
     return int(data["member_id"])
 
 
+def active_notice():
+    """Only a legally approved and explicitly activated database notice can be offered."""
+    from crm.models import BiometricNoticeVersion
+    return BiometricNoticeVersion.objects.filter(
+        is_approved=True, is_active=True, approved_at__isnull=False,
+        effective_date__isnull=False,
+    ).exclude(version="2026-10-draft").order_by("-effective_date", "-pk").first()
+
+
 def notice_configuration():
-    version = getattr(settings, "BIOMETRIC_CONSENT_NOTICE_VERSION", "")
-    notice = getattr(settings, "BIOMETRIC_CONSENT_NOTICE_TEXT", "")
-    approved = set(getattr(settings, "BIOMETRIC_APPROVED_NOTICE_VERSIONS", ()))
-    return version, notice, bool(version and version != "2026-10-draft" and version in approved and notice.strip())
+    notice = active_notice()
+    return (notice.version, notice.content, True) if notice else ("", "", False)
