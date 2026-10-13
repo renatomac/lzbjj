@@ -2277,7 +2277,9 @@ def adult_waiver(request, member_id=None):
 
     if request.method == "POST":
         form = AdultWaiverForm(request.POST)
-        if form.is_valid():
+        if request.POST.get("biometric_consent") not in ("yes", "no"):
+            form.add_error(None, "Choose whether to accept or decline optional biometric processing.")
+        if form.is_valid() and request.POST.get("biometric_consent") in ("yes", "no"):
             sig = form.save(commit=False)
             sig.participant_type = WaiverSignature.ADULT
             sig.waiver_version = waiver
@@ -2316,7 +2318,9 @@ def minor_waiver(request, member_id=None):
 
     if request.method == "POST":
         form = MinorWaiverForm(request.POST)
-        if form.is_valid():
+        if request.POST.get("biometric_consent") not in ("yes", "no"):
+            form.add_error(None, "Choose whether to accept or decline optional biometric processing.")
+        if form.is_valid() and request.POST.get("biometric_consent") in ("yes", "no"):
             sig = form.save(commit=False)
             sig.participant_type = WaiverSignature.MINOR
             sig.waiver_version = waiver
