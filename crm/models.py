@@ -1210,6 +1210,11 @@ class WaiverSignature(models.Model):
 
     agreed = models.BooleanField(default=False)
 
+    # Optional biometric consent, independently recorded with the waiver.
+    # Null denotes legacy waivers: never infer consent from an old signature.
+    biometric_consent = models.BooleanField(null=True, blank=True, default=None)
+    biometric_notice_version = models.CharField(max_length=30, blank=True, default="")
+
     # Audit trail
     signed_at = models.DateTimeField(auto_now_add=True)
     ip_address = models.GenericIPAddressField()
