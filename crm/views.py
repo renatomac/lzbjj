@@ -2295,7 +2295,7 @@ def adult_waiver(request, member_id=None):
             try:
                 with transaction.atomic():
                     sig.save()
-                    if notice and sig.member_id:
+                    if notice:
                         signer = (f"{sig.guardian_first_name} {sig.guardian_last_name}".strip()
                                   if sig.participant_type == WaiverSignature.MINOR
                                   else f"{sig.participant_first_name} {sig.participant_last_name}".strip())
@@ -2351,7 +2351,7 @@ def minor_waiver(request, member_id=None):
             try:
                 with transaction.atomic():
                     sig.save()
-                    if notice and sig.member_id:
+                    if notice:
                         signer = (f"{sig.guardian_first_name} {sig.guardian_last_name}".strip()
                                   if sig.participant_type == WaiverSignature.MINOR
                                   else f"{sig.participant_first_name} {sig.participant_last_name}".strip())
