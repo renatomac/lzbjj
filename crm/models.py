@@ -1240,3 +1240,19 @@ class WaiverSignature(models.Model):
         if self.guardian_first_name or self.guardian_last_name:
             return f"{self.guardian_first_name} {self.guardian_last_name}".strip()
         return ""
+
+
+class BiometricDeletionJob(models.Model):
+    """Persistent, auditable deletion request; AWS failures remain retryable."""
+    member = models.ForeignKey("Member", on_delete=models.PROTECT, related_name="biometric_deletion_jobs")
+    reason = models.CharField(max_length=32, choices=[("revocation", "Revocation"), ("retention", "Retention"), ("manual", "Manual")])
+    status = models.CharField(max_length=16, default="pending", choices=[("pending", "Pending"), ("completed", "Completed"), ("failed", "Failed")])
+    requested_at = models.DateTimeField(default=timezone.now)
+    last_attempt_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    attempts = models.PositiveIntegerField(default=0)
+    last_error = models.TextField(blank=True)
+    deleted_face_count = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ["-requested_at"]
