@@ -5,7 +5,7 @@ Run against each environment's own CRM database before taking any action.
 """
 import csv
 import re
-from collections import Counter, defaultdict
+from collections import Counter
 from pathlib import Path
 
 from botocore.exceptions import ClientError
@@ -43,8 +43,8 @@ def latest_consent_status(signatures, member):
 def classify(member, key, count, aws_count, consent):
     if member is None:
         return "INVESTIGATE_MISSING_MEMBER", "No matching member in this database; check other environments"
-    if key == (member.face_image_s3_key or ""):
-        return "PROTECT_PROFILE_PHOTO", "Referenced by Member.face_image_s3_key; never bulk-delete"
+    if key == (member.face_image_s3_key or "") or key in (member.photo or ""):
+        return "PROTECT_PROFILE_PHOTO", "Referenced by Member.face_image_s3_key or Member.photo; never bulk-delete"
     if count > 1:
         return "REVIEW_MULTIPLE_IMAGES", "Multiple enrollment images; confirm usage and references"
     if consent != "approved_consent":
@@ -74,7 +74,7 @@ class Command(BaseCommand):
         try:
             for page in s3.get_paginator("list_objects_v2").paginate(Bucket=bucket, Prefix=PREFIX):
                 objects.extend(page.get("Contents", []))
-        except (ClientError, Exception) as exc:
+        except Exception as exc:
             raise CommandError(f"S3 inventory failed; report not generated: {exc}") from exc
 
         face_counts = Counter()
@@ -126,7 +126,7 @@ class Command(BaseCommand):
                 "s3_size_bytes": obj.get("Size", ""),
                 "s3_last_modified": str(obj.get("LastModified", "")),
                 "member_exists": "yes" if member else "no",
-                "active_profile_photo_reference": "yes" if member and key == (member.face_image_s3_key or "") else "no",
+                "active_profile_photo_reference": "yes" if member and (key == (member.face_image_s3_key or "") or key in (member.photo or "")) else "no",
                 "legacy_photo_reference": "unknown",
                 "historical_image_count": count,
                 "rekognition_face_count": aws_count if aws_count is not None else "unknown",
