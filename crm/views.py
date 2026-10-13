@@ -2544,7 +2544,7 @@ def revoke_member_biometric_consent(request, member_id):
     Consent is disabled before attempting AWS deletion so failure cannot
     silently permit further recognition. Retrying the endpoint is safe.
     """
-    from crm.aws_utils import delete_member_biometrics
+    from crm.services.biometric_deletion import queue_biometric_deletion, execute_biometric_deletion
     member = get_object_or_404(Member, pk=member_id)
     with transaction.atomic():
         signatures = list(WaiverSignature.objects.select_for_update().filter(
@@ -2553,11 +2553,9 @@ def revoke_member_biometric_consent(request, member_id):
         for signature in signatures:
             signature.biometric_consent = False
             signature.save(update_fields=["biometric_consent"])
-    try:
-        deleted = delete_member_biometrics(member)
-    except Exception:
-        logger.exception("Biometric deletion failed for member %s", member.pk)
-        messages.error(request, "Consent revoked; AWS deletion could not be confirmed. Retry deletion and investigate immediately.")
+    job = execute_biometric_deletion(queue_biometric_deletion(member))
+    if job.status == "completed":
+        messages.success(request, f"Biometric consent revoked; {job.deleted_face_count} indexed face(s) deleted.")
     else:
-        messages.success(request, f"Biometric consent revoked; {deleted} indexed face(s) deleted.")
+        messages.error(request, "Consent revoked; AWS deletion is queued for retry. Contact an administrator.")
     return redirect("viewMember", member_id=member.pk)
