@@ -1243,9 +1243,11 @@ def attendance_enroll(request, member_id):
     from PIL import Image, ImageOps
 
     member = get_object_or_404(Member, pk=member_id)
+    from crm.services.biometric_consent import has_biometric_consent
+    consent_valid = has_biometric_consent(member)
     if request.method == "POST":
-        if request.POST.get("biometric_consent_confirmed") != "yes":
-            messages.error(request, "Document the student's or guardian's biometric consent before enrolling.")
+        if not consent_valid:
+            messages.error(request, "An active, signed waiver with explicit biometric consent is required.")
         else:
             try:
                 captures = request.POST.getlist("pose_images")
@@ -1273,7 +1275,7 @@ def attendance_enroll(request, member_id):
             except Exception:
                 logger.exception("Guided face enrollment failed")
                 messages.error(request, "Enrollment failed. Please retry with clear face images.")
-    return render(request, "attendance/enroll.html", {"member": member})
+    return render(request, "attendance/enroll.html", {"member": member, "consent_valid": consent_valid})
 
 
 @login_required
@@ -1282,6 +1284,7 @@ def attendance_bulk(request):
     """Two-step, staff-confirmed attendance from individual or group photographs."""
     from django.core.exceptions import ValidationError
     from crm.services.face_recognition import recognize_faces
+    from crm.services.biometric_consent import has_biometric_consent
     from crm.services.attendance import validate_checkin
 
     today = timezone.localdate()
@@ -1310,6 +1313,8 @@ def attendance_bulk(request):
             for member in Member.objects.filter(pk__in=approved):
                 try:
                     validate_checkin(selected_session, member)
+                    if not has_biometric_consent(member):
+                        raise ValidationError("Biometric consent is not on file.")
                     was_present = SessionAttendance.objects.filter(
                         session=selected_session, member=member, present=True
                     ).exists()
@@ -1349,6 +1354,8 @@ def attendance_bulk(request):
                     member = Member.objects.filter(pk=face["member_id"]).first() if face["member_id"] else None
                     if member:
                         try:
+                            if not has_biometric_consent(member):
+                                raise ValidationError("Biometric consent is not on file.")
                             validate_checkin(selected_session, member)
                             if member.pk in seen:
                                 face["status"] = "duplicate"
@@ -2274,6 +2281,8 @@ def adult_waiver(request, member_id=None):
             sig = form.save(commit=False)
             sig.participant_type = WaiverSignature.ADULT
             sig.waiver_version = waiver
+            sig.biometric_consent = request.POST.get("biometric_consent") == "yes"
+            sig.biometric_notice_version = "2026-10-draft"
             sig.ip_address = request.META.get("REMOTE_ADDR")
             sig.user_agent = request.META.get("HTTP_USER_AGENT", "")
             if member_id:
@@ -2311,6 +2320,8 @@ def minor_waiver(request, member_id=None):
             sig = form.save(commit=False)
             sig.participant_type = WaiverSignature.MINOR
             sig.waiver_version = waiver
+            sig.biometric_consent = request.POST.get("biometric_consent") == "yes"
+            sig.biometric_notice_version = "2026-10-draft"
             sig.ip_address = request.META.get("REMOTE_ADDR")
             sig.user_agent = request.META.get("HTTP_USER_AGENT", "")
             if member_id:
