@@ -2559,3 +2559,29 @@ def revoke_member_biometric_consent(request, member_id):
     else:
         messages.error(request, "Consent revoked; AWS deletion is queued for retry. Contact an administrator.")
     return redirect("viewMember", member_id=member.pk)
+
+
+@crm_staff_required
+def biometric_privacy_dashboard(request):
+    """Staff-only read-only biometric privacy overview; AWS inventory is opt-in."""
+    from crm.services.biometric_dashboard import build_privacy_inventory
+    from django.core.paginator import Paginator
+    from django.core.exceptions import PermissionDenied
+
+    # Biometric data is sensitive: restrict to superusers and Django staff.
+    if not (request.user.is_superuser or request.user.is_staff):
+        raise PermissionDenied
+    scan = request.GET.get("scan") == "1"
+    try:
+        context = build_privacy_inventory(include_aws=scan)
+    except Exception:
+        logger.exception("Biometric privacy dashboard AWS inventory failed")
+        messages.error(request, "AWS inventory could not be completed. No changes were made.")
+        context = build_privacy_inventory(include_aws=False)
+    if context["aws_scanned"]:
+        category = request.GET.get("category", "")
+        if category:
+            context["rows"] = [row for row in context["rows"] if row["classification"] == category]
+        context["selected_category"] = category
+        context["page"] = Paginator(context["rows"], 25).get_page(request.GET.get("page"))
+    return render(request, "crm/biometric_privacy_dashboard.html", context)
