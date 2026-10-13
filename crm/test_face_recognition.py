@@ -228,3 +228,27 @@ class BiometricDeletionTests(SimpleTestCase):
             delete_member_biometrics(member)
         self.assertEqual(member.rekognition_face_id, "old")
         member.save.assert_not_called()
+
+
+class BiometricDeletionQueueTests(SimpleTestCase):
+    @patch("crm.services.biometric_deletion.delete_member_biometrics", return_value=5)
+    def test_success_marks_job_complete(self, delete):
+        from types import SimpleNamespace
+        from crm.services.biometric_deletion import execute_biometric_deletion
+        job = SimpleNamespace(pk=7, member=SimpleNamespace(pk=2), attempts=0, status="pending",
+                              last_error="", save=Mock())
+        result = execute_biometric_deletion(job)
+        self.assertEqual(result.status, "completed")
+        self.assertEqual(result.deleted_face_count, 5)
+        job.save.assert_called_once()
+
+    @patch("crm.services.biometric_deletion.delete_member_biometrics", side_effect=RuntimeError("AWS unavailable"))
+    def test_failure_remains_retryable(self, delete):
+        from types import SimpleNamespace
+        from crm.services.biometric_deletion import execute_biometric_deletion
+        job = SimpleNamespace(pk=7, member=SimpleNamespace(pk=2), attempts=0, status="pending",
+                              last_error="", save=Mock())
+        result = execute_biometric_deletion(job)
+        self.assertEqual(result.status, "failed")
+        self.assertEqual(result.attempts, 1)
+        self.assertIn("AWS unavailable", result.last_error)
