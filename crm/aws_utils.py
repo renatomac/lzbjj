@@ -176,3 +176,34 @@ def index_member_face_sequence(member, images):
     if old_ids:
         client.delete_faces(CollectionId=collection, FaceIds=old_ids)
     return new_ids[0]
+
+
+def delete_member_biometrics(member):
+    """Delete ALL Rekognition vectors for member, including guided-pose records.
+
+    Raise on incomplete AWS deletion; never clear the local marker on failure.
+    Profile S3 photos are deliberately not removed by this operation.
+    """
+    collection = ensure_collection()
+    client = get_rekognition_client()
+    face_ids = []
+    token = None
+    while True:
+        params = {"CollectionId": collection, "MaxResults": 4096}
+        if token:
+            params["NextToken"] = token
+        page = client.list_faces(**params)
+        face_ids.extend(f["FaceId"] for f in page.get("Faces", [])
+                        if f.get("ExternalImageId") == str(member.pk))
+        token = page.get("NextToken")
+        if not token:
+            break
+    for start in range(0, len(face_ids), 4096):
+        batch = face_ids[start:start + 4096]
+        response = client.delete_faces(CollectionId=collection, FaceIds=batch)
+        deleted = set(response.get("DeletedFaces", []))
+        if deleted != set(batch):
+            raise RuntimeError("AWS Rekognition did not confirm deletion of all face vectors")
+    member.rekognition_face_id = None
+    member.save(update_fields=["rekognition_face_id"])
+    return len(face_ids)
