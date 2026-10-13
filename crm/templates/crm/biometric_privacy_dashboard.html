@@ -24,6 +24,22 @@
       <table class="table table-sm mb-0"><thead><tr><th>Status</th><th class="text-end">Jobs</th></tr></thead><tbody>{% for status, count in job_counts.items %}<tr><td>{{ status }}</td><td class="text-end">{{ count }}</td></tr>{% empty %}<tr><td colspan="2">No deletion jobs recorded</td></tr>{% endfor %}</tbody></table>
     </div></div></div>
   </div>
+  <div class="card mb-4">
+    <div class="card-header fw-semibold d-flex justify-content-between"><span>Waivers requiring individual review</span><span class="badge text-bg-warning">{{ attention|length }} cases</span></div>
+    <div class="card-body"><p class="text-muted small">Read-only diagnostics. Review the original signed waiver and member details; do not change historical signatures or assume consent from a name match.</p>
+      <div class="table-responsive"><table class="table table-sm align-middle">
+        <thead><tr><th>Member</th><th>Member type</th><th>Expected waiver</th><th>Latest linked waiver</th><th>Biometric consent</th><th>Face marker</th><th>Review</th></tr></thead>
+        <tbody>{% for item in attention %}
+        <tr><td><a href="{% url 'viewMember' item.member.pk %}">#{{ item.member.pk }} — {{ item.member.first_name }} {{ item.member.last_name }}</a></td>
+          <td>{{ item.member.member_type }}</td><td>{{ item.expected_type }}</td>
+          <td>{% if item.waiver %}<a href="{% url 'waiver_detail' item.waiver.pk %}">#{{ item.waiver.pk }} · {{ item.waiver.participant_type }}</a>{% else %}None linked{% endif %}</td>
+          <td><span class="badge text-bg-warning">{{ item.status }}</span></td>
+          <td>{% if item.has_face_marker %}Yes{% else %}No{% endif %}</td>
+          <td class="small">Verify member type, signer, guardian (if minor), waiver version, and explicit opt-in</td></tr>
+        {% empty %}<tr><td colspan="7" class="text-muted">No linked waiver mismatches or explicit refusals identified.</td></tr>{% endfor %}</tbody>
+      </table></div>
+    </div>
+  </div>
   {% if aws_scanned %}
   <div class="card mb-4"><div class="card-header fw-semibold">AWS inventory classifications</div><div class="card-body">
     <div class="d-flex flex-wrap gap-2 mb-3"><a class="btn btn-sm btn-outline-dark" href="?scan=1">All records</a>
