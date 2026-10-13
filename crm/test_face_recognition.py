@@ -293,5 +293,7 @@ class BiometricDashboardTests(SimpleTestCase):
         from django.test import RequestFactory
         from django.contrib.auth.models import AnonymousUser
         from crm.views import biometric_privacy_dashboard
-        response = biometric_privacy_dashboard(RequestFactory().get("/privacy/biometrics/"))
+        request = RequestFactory().get("/privacy/biometrics/")
+        request.user = AnonymousUser()
+        response = biometric_privacy_dashboard(request)
         self.assertEqual(response.status_code, 302)
