@@ -84,3 +84,36 @@ class MultiFaceRecognitionTests(SimpleTestCase):
         result = recognize_faces(photo_bytes())
         self.assertIsNone(result[0]["member_id"])
         self.assertEqual(result[0]["status"], "ambiguous")
+
+    @patch("crm.services.face_recognition.ensure_collection", return_value="test")
+    @patch("crm.services.face_recognition.get_rekognition_client")
+    def test_no_faces_does_not_search_or_check_in(self, client_factory, _):
+        client = Mock()
+        client_factory.return_value = client
+        client.detect_faces.return_value = {"FaceDetails": []}
+        self.assertEqual(recognize_faces(photo_bytes()), [])
+        client.search_faces_by_image.assert_not_called()
+
+    @patch("crm.services.face_recognition.ensure_collection", return_value="test")
+    @patch("crm.services.face_recognition.get_rekognition_client")
+    def test_excessive_group_size_rejected_before_search(self, client_factory, _):
+        client = Mock()
+        client_factory.return_value = client
+        face = {"BoundingBox": {"Left": .1, "Top": .1, "Width": .3, "Height": .6}}
+        client.detect_faces.return_value = {"FaceDetails": [face, face, face]}
+        with self.assertRaisesRegex(ValueError, "Too many faces"):
+            recognize_faces(photo_bytes(), max_people=2)
+        client.search_faces_by_image.assert_not_called()
+
+    @patch("crm.services.face_recognition.ensure_collection", return_value="test")
+    @patch("crm.services.face_recognition.get_rekognition_client")
+    def test_unmatched_face_requires_manual_review(self, client_factory, _):
+        client = Mock()
+        client_factory.return_value = client
+        client.detect_faces.return_value = {"FaceDetails": [
+            {"BoundingBox": {"Left": .2, "Top": .1, "Width": .4, "Height": .7}},
+        ]}
+        client.search_faces_by_image.return_value = {"FaceMatches": []}
+        result = recognize_faces(photo_bytes())
+        self.assertEqual(result[0]["status"], "unmatched")
+        self.assertIsNone(result[0]["member_id"])
