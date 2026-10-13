@@ -297,3 +297,29 @@ class BiometricDashboardTests(SimpleTestCase):
         request.user = AnonymousUser()
         response = biometric_privacy_dashboard(request)
         self.assertEqual(response.status_code, 302)
+
+
+class BiometricInvitationTests(SimpleTestCase):
+    def test_signed_invitation_round_trip(self):
+        from types import SimpleNamespace
+        from crm.services.biometric_invitation import make_invitation, resolve_invitation
+        token = make_invitation(SimpleNamespace(pk=67))
+        self.assertEqual(resolve_invitation(token), 67)
+
+    def test_tampered_invitation_rejected(self):
+        from types import SimpleNamespace
+        from django.core.signing import BadSignature
+        from crm.services.biometric_invitation import make_invitation, resolve_invitation
+        token = make_invitation(SimpleNamespace(pk=67))
+        with self.assertRaises(BadSignature):
+            resolve_invitation(token + "x")
+
+    def test_unapproved_notice_blocks_invitations(self):
+        from django.test import override_settings
+        from crm.services.biometric_invitation import notice_configuration
+        with override_settings(
+            BIOMETRIC_CONSENT_NOTICE_VERSION="2026-10-draft",
+            BIOMETRIC_CONSENT_NOTICE_TEXT="Draft text",
+            BIOMETRIC_APPROVED_NOTICE_VERSIONS=("2026-10-draft",),
+        ):
+            self.assertFalse(notice_configuration()[2])
