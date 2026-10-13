@@ -255,3 +255,41 @@ class BeltPromotionAdmin(admin.ModelAdmin):
     list_filter = ("new_rank", "promotion_date")
     search_fields = ("member__user__username",)
     autocomplete_fields = ("member", "promoted_by")
+
+
+from .models import BiometricNoticeVersion, BiometricConsentRecord
+
+
+@admin.register(BiometricNoticeVersion)
+class BiometricNoticeVersionAdmin(admin.ModelAdmin):
+    list_display = ("version", "title", "is_approved", "is_active", "effective_date", "approved_at")
+    list_filter = ("is_approved", "is_active")
+    search_fields = ("version", "title")
+    readonly_fields = ("created_at", "approved_at", "approved_by")
+
+    def save_model(self, request, obj, form, change):
+        from django.utils import timezone
+        if obj.is_active and not obj.is_approved:
+            from django.core.exceptions import ValidationError
+            raise ValidationError("Only a reviewed and approved notice may be activated.")
+        if obj.is_approved and not obj.approved_at:
+            obj.approved_at = timezone.now()
+            obj.approved_by = request.user
+        super().save_model(request, obj, form, change)
+
+
+@admin.register(BiometricConsentRecord)
+class BiometricConsentRecordAdmin(admin.ModelAdmin):
+    list_display = ("id", "member", "decision", "notice_version", "signer_name", "signed_at")
+    list_filter = ("decision", "notice_version")
+    search_fields = ("signer_name", "member__first_name", "member__last_name")
+    readonly_fields = [field.name for field in BiometricConsentRecord._meta.fields]
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
