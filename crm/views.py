@@ -2533,3 +2533,31 @@ def attendance_report(request):
         "member_type": member_type,
         "members": members if 'members' in locals() else [],
     })
+
+
+@login_required
+@crm_staff_required
+@require_POST
+def revoke_member_biometric_consent(request, member_id):
+    """Staff-assisted revocation; preserves signed waiver and manual attendance.
+
+    Consent is disabled before attempting AWS deletion so failure cannot
+    silently permit further recognition. Retrying the endpoint is safe.
+    """
+    from crm.aws_utils import delete_member_biometrics
+    member = get_object_or_404(Member, pk=member_id)
+    with transaction.atomic():
+        signatures = list(WaiverSignature.objects.select_for_update().filter(
+            member=member, is_void=False, agreed=True, biometric_consent=True
+        ))
+        for signature in signatures:
+            signature.biometric_consent = False
+            signature.save(update_fields=["biometric_consent"])
+    try:
+        deleted = delete_member_biometrics(member)
+    except Exception:
+        logger.exception("Biometric deletion failed for member %s", member.pk)
+        messages.error(request, "Consent revoked; AWS deletion could not be confirmed. Retry deletion and investigate immediately.")
+    else:
+        messages.success(request, f"Biometric consent revoked; {deleted} indexed face(s) deleted.")
+    return redirect("viewMember", member_id=member.pk)
