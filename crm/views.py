@@ -2585,3 +2585,68 @@ def biometric_privacy_dashboard(request):
         context["selected_category"] = category
         context["page"] = Paginator(context["rows"], 25).get_page(request.GET.get("page"))
     return render(request, "crm/biometric_privacy_dashboard.html", context)
+
+
+@login_required
+@require_POST
+def biometric_consent_invite(request, member_id):
+    """Staff generates an expiring link; it is never emailed automatically."""
+    from django.core.exceptions import PermissionDenied
+    from crm.services.biometric_invitation import make_invitation, notice_configuration
+    if not (request.user.is_staff or request.user.is_superuser):
+        raise PermissionDenied
+    member = get_object_or_404(Member, pk=member_id)
+    version, notice, ready = notice_configuration()
+    if not ready:
+        messages.error(request, "An approved biometric notice must be configured before invitations can be created.")
+        return redirect("biometric_privacy_dashboard")
+    url = request.build_absolute_uri(reverse("biometric_consent_sign", args=[make_invitation(member)]))
+    return render(request, "crm/biometric_consent_invitation.html", {"member": member, "invitation_url": url})
+
+
+def biometric_consent_sign(request, token):
+    """Public link: optional decision, never automatic enrollment or recognition."""
+    from django.core import signing
+    from django.views.decorators.cache import never_cache
+    from crm.services.biometric_invitation import resolve_invitation, notice_configuration
+    from crm.models import BiometricConsentRecord
+    from django.core.exceptions import PermissionDenied
+    try:
+        member_id = resolve_invitation(token)
+    except (signing.BadSignature, ValueError, KeyError, TypeError):
+        raise Http404("This consent invitation has expired or is invalid.")
+    member = get_object_or_404(Member, pk=member_id)
+    version, notice, ready = notice_configuration()
+    if not ready:
+        return HttpResponse("Biometric consent is not currently available.", status=503)
+    is_minor = member.member_type == "child"
+    if request.method == "POST":
+        decision = request.POST.get("decision", "")
+        signer = request.POST.get("signer_name", "").strip()
+        signature = request.POST.get("signature", "").strip()
+        relationship = request.POST.get("guardian_relationship", "").strip()
+        if (decision not in ("grant", "decline") or not signer or len(signer) > 200
+                or signature.casefold() != signer.casefold() or len(signature) > 200
+                or (is_minor and (not relationship or len(relationship) > 100))
+                or request.POST.get("acknowledged") != "on"):
+            messages.error(request, "Please complete every required field and sign using your full legal name.")
+        else:
+            BiometricConsentRecord.objects.create(
+                member=member, decision=decision, notice_version=version, notice_text=notice,
+                signer_name=signer, guardian_relationship=relationship if is_minor else "",
+                signature=signature, ip_address=request.META.get("REMOTE_ADDR"),
+                user_agent=request.META.get("HTTP_USER_AGENT", "")[:2000],
+            )
+            return redirect("biometric_consent_done")
+    response = render(request, "crm/biometric_consent_form.html", {
+        "member": member, "notice_version": version, "notice": notice, "is_minor": is_minor,
+    })
+    response["Cache-Control"] = "no-store"
+    response["Referrer-Policy"] = "no-referrer"
+    return response
+
+
+def biometric_consent_done(request):
+    response = render(request, "crm/biometric_consent_done.html")
+    response["Cache-Control"] = "no-store"
+    return response
