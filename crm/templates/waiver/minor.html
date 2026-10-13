@@ -120,6 +120,23 @@
             </div>
         {% endif %}
 
+        <section class="card border-info mb-4" aria-labelledby="biometric-heading">
+          <div class="card-body">
+            <h3 id="biometric-heading" class="h5">Optional biometric facial recognition consent</h3>
+            <p>Lake Zurich Brazilian Jiu-Jitsu offers optional facial recognition for class attendance. With permission, facial images are processed using Amazon Web Services (AWS Rekognition) to create facial templates and compare them during attendance check-in. Facial templates are stored in AWS Rekognition. Face enrollment is not required to attend classes; manual attendance is available.</p>
+            <p><strong>Important:</strong> The written retention schedule, permanent destruction policy, disclosure recipients, and revocation procedure must be finalized and approved before this consent is used for live enrollment. This text is a draft and is not a complete Illinois BIPA notice.</p>
+            <p>As the parent or legal guardian, choose whether to authorize this processing for the child named above. Declining does not affect class eligibility.</p>
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="biometric_consent" value="yes" id="bio-yes" required>
+              <label class="form-check-label" for="bio-yes">I voluntarily consent to biometric facial recognition for attendance.</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="biometric_consent" value="no" id="bio-no" required>
+              <label class="form-check-label" for="bio-no">I decline biometric facial recognition; use manual attendance.</label>
+            </div>
+          </div>
+        </section>
+
         <button type="submit" class="btn btn-primary">
             Sign Waiver
         </button>
