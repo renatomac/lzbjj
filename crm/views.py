@@ -1239,37 +1239,41 @@ def attendanceRecord(request, session_id):
 @login_required
 @crm_staff_required
 def attendance_enroll(request, member_id):
+    from crm.aws_utils import index_member_face_sequence
+    from PIL import Image, ImageOps
+
     member = get_object_or_404(Member, pk=member_id)
     if request.method == "POST":
-        image_file = request.FILES.get("face_image")
-        if not image_file:
-            image_data = request.POST.get("face_image_data")
-            if image_data:
-                try:
-                    _, encoded = image_data.split(",", 1) if "," in image_data else (None, image_data)
-                    image_bytes = base64.b64decode(encoded)
-                    image_file = io.BytesIO(image_bytes)
-                    image_file.name = f"face_capture_{member.id}.jpg"
-                    image_file.content_type = "image/jpeg"
-                except (TypeError, ValueError):
-                    image_file = None
-
-        if not image_file:
-            messages.error(request, "Please select a face image to enroll.")
+        if request.POST.get("biometric_consent_confirmed") != "yes":
+            messages.error(request, "Document the student's or guardian's biometric consent before enrolling.")
         else:
             try:
-                face_id, _, image_key = index_member_face(member, image_file)
-                member.face_image_s3_key = image_key
+                captures = request.POST.getlist("pose_images")
+                if len(captures) != 5:
+                    raise ValueError("Capture all five guided poses before enrolling.")
+                images = []
+                for capture in captures:
+                    if not capture.startswith("data:image/jpeg;base64,"):
+                        raise ValueError("Invalid capture format.")
+                    raw = base64.b64decode(capture.partition(",")[2], validate=True)
+                    if len(raw) > 4 * 1024 * 1024:
+                        raise ValueError("One of the images exceeds the size limit.")
+                    image = ImageOps.exif_transpose(Image.open(io.BytesIO(raw))).convert("RGB")
+                    if image.width * image.height > 12_000_000:
+                        raise ValueError("Image dimensions are too large.")
+                    output = io.BytesIO()
+                    image.save(output, format="JPEG", quality=88)
+                    images.append(output.getvalue())
+                face_id = index_member_face_sequence(member, images)
                 member.rekognition_face_id = face_id
-                member.save(update_fields=["face_image_s3_key", "rekognition_face_id"])
-                messages.success(request, "Face enrolled successfully.")
-            except Exception as exc:
-                logger.exception("Face enrollment failed")
-                messages.error(request, str(exc))
-
-    return render(request, "attendance/enroll.html", {
-        "member": member,
-    })
+                member.face_image_s3_key = ""
+                member.save(update_fields=["rekognition_face_id", "face_image_s3_key"])
+                messages.success(request, "Five face angles enrolled successfully.")
+                return redirect("viewMember", member_id=member.pk)
+            except Exception:
+                logger.exception("Guided face enrollment failed")
+                messages.error(request, "Enrollment failed. Please retry with clear face images.")
+    return render(request, "attendance/enroll.html", {"member": member})
 
 
 @login_required
