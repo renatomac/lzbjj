@@ -1,3 +1,4 @@
+from django.test import override_settings
 """Mocked tests for multi-face recognition; no AWS calls or biometric fixtures."""
 import io
 from unittest.mock import Mock, patch
@@ -184,6 +185,7 @@ class BiometricConsentPolicyTests(SimpleTestCase):
         )
         self.assertFalse(has_biometric_consent(SimpleNamespace(pk=5, member_type="adult")))
 
+    @override_settings(BIOMETRIC_APPROVED_NOTICE_VERSIONS=("approved-v1",))
     @patch("crm.services.biometric_consent.WaiverSignature")
     def test_approved_explicit_adult_consent_authorizes(self, signature_model):
         from types import SimpleNamespace
@@ -193,3 +195,36 @@ class BiometricConsentPolicyTests(SimpleTestCase):
             participant_type="adult", biometric_consent=True, biometric_notice_version="approved-v1"
         )
         self.assertTrue(has_biometric_consent(SimpleNamespace(pk=5, member_type="adult")))
+
+
+class BiometricDeletionTests(SimpleTestCase):
+    @patch("crm.aws_utils.get_rekognition_client")
+    @patch("crm.aws_utils.ensure_collection", return_value="test-collection")
+    def test_delete_all_guided_poses(self, collection, get_client):
+        from types import SimpleNamespace
+        from crm.aws_utils import delete_member_biometrics
+        member = SimpleNamespace(pk=42, rekognition_face_id="old", save=Mock())
+        client = get_client.return_value
+        client.list_faces.return_value = {"Faces": [
+            {"FaceId": "one", "ExternalImageId": "42"},
+            {"FaceId": "two", "ExternalImageId": "42"},
+            {"FaceId": "other", "ExternalImageId": "7"},
+        ]}
+        client.delete_faces.return_value = {"DeletedFaces": ["one", "two"]}
+        self.assertEqual(delete_member_biometrics(member), 2)
+        client.delete_faces.assert_called_once_with(CollectionId="test-collection", FaceIds=["one", "two"])
+        self.assertIsNone(member.rekognition_face_id)
+
+    @patch("crm.aws_utils.get_rekognition_client")
+    @patch("crm.aws_utils.ensure_collection", return_value="test-collection")
+    def test_unconfirmed_deletion_keeps_local_marker(self, collection, get_client):
+        from types import SimpleNamespace
+        from crm.aws_utils import delete_member_biometrics
+        member = SimpleNamespace(pk=42, rekognition_face_id="old", save=Mock())
+        client = get_client.return_value
+        client.list_faces.return_value = {"Faces": [{"FaceId": "one", "ExternalImageId": "42"}]}
+        client.delete_faces.return_value = {"DeletedFaces": []}
+        with self.assertRaises(RuntimeError):
+            delete_member_biometrics(member)
+        self.assertEqual(member.rekognition_face_id, "old")
+        member.save.assert_not_called()
