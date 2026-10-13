@@ -2638,7 +2638,7 @@ def biometric_consent_sign(request, token):
     """Public link: optional decision, never automatic enrollment or recognition."""
     from django.core import signing
     from django.views.decorators.cache import never_cache
-    from crm.services.biometric_invitation import resolve_invitation, notice_configuration
+    from crm.services.biometric_invitation import resolve_invitation, notice_configuration, active_notice
     from crm.models import BiometricConsentRecord
     from django.core.exceptions import PermissionDenied
     try:
@@ -2662,7 +2662,7 @@ def biometric_consent_sign(request, token):
             messages.error(request, "Please complete every required field and sign using your full legal name.")
         else:
             BiometricConsentRecord.objects.create(
-                member=member, decision=decision, notice_version=version, notice_text=notice,
+                member=member, decision=decision, notice=active_notice(), notice_version=version, notice_text=notice,
                 signer_name=signer, guardian_relationship=relationship if is_minor else "",
                 signature=signature, ip_address=request.META.get("REMOTE_ADDR"),
                 user_agent=request.META.get("HTTP_USER_AGENT", "")[:2000],
