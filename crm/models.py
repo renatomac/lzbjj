@@ -1264,6 +1264,8 @@ class BiometricConsentRecord(models.Model):
     decision = models.CharField(max_length=10, choices=[("grant", "Grant"), ("decline", "Decline")])
     notice_version = models.CharField(max_length=60)
     notice_text = models.TextField()
+    notice = models.ForeignKey("BiometricNoticeVersion", null=True, blank=True, on_delete=models.PROTECT)
+    waiver_signature = models.OneToOneField("WaiverSignature", null=True, blank=True, on_delete=models.PROTECT, related_name="biometric_decision")
     signer_name = models.CharField(max_length=200)
     guardian_relationship = models.CharField(max_length=100, blank=True)
     signature = models.CharField(max_length=200)
@@ -1273,3 +1275,22 @@ class BiometricConsentRecord(models.Model):
 
     class Meta:
         ordering = ["-signed_at", "-pk"]
+
+
+class BiometricNoticeVersion(models.Model):
+    """Versioned biometric notice; legal approval must be independently documented."""
+    version = models.CharField(max_length=60, unique=True)
+    title = models.CharField(max_length=200, default="Biometric Information Privacy Notice and Consent")
+    content = models.TextField()
+    effective_date = models.DateField(null=True, blank=True)
+    is_approved = models.BooleanField(default=False)
+    is_active = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    approved_at = models.DateTimeField(null=True, blank=True)
+    approved_by = models.ForeignKey("crm.User", null=True, blank=True, on_delete=models.SET_NULL)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return self.version
