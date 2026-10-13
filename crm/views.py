@@ -1304,13 +1304,28 @@ def attendance_bulk(request):
             valid_ids = {str(item["member_id"]) for item in pending["candidates"]}
             approved &= valid_ids
             saved = 0
+            already_present = 0
+            # Revalidate each member at confirmation time; the session review is
+            # only a proposal, never authorization to bypass check-in rules.
             for member in Member.objects.filter(pk__in=approved):
                 try:
+                    validate_checkin(selected_session, member)
+                    was_present = SessionAttendance.objects.filter(
+                        session=selected_session, member=member, present=True
+                    ).exists()
                     record_member_attendance(selected_session, member)
-                    saved += 1
+                    if was_present:
+                        already_present += 1
+                    else:
+                        saved += 1
                 except ValidationError as exc:
                     messages.warning(request, f"{member}: {exc.messages[0]}")
-            messages.success(request, f"{saved} student(s) checked in.") if saved else messages.warning(request, "No check-ins saved.")
+            if saved:
+                messages.success(request, f"{saved} new student check-in(s) recorded.")
+            if already_present:
+                messages.info(request, f"{already_present} student(s) were already checked in.")
+            if not saved and not already_present:
+                messages.warning(request, "No check-ins saved.")
             return redirect("attendanceRecord", session_id=selected_session.pk)
 
     elif request.method == "POST":
