@@ -1,0 +1,51 @@
+{% extends "layout.html" %}
+{% block title %}Biometric Privacy | LZBJJ CRM{% endblock %}
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
+    <div><h1 class="h3 mb-1"><i class="fa-solid fa-shield-halved me-2"></i>Biometric Privacy</h1><p class="text-muted mb-0">Restricted administrator view · Read-only · No deletion controls</p></div>
+    <div class="d-flex gap-2">
+      <a href="{% url 'biometric_privacy_dashboard' %}" class="btn btn-outline-secondary">CRM overview</a>
+      <a href="{% url 'biometric_privacy_dashboard' %}?scan=1" class="btn btn-dark"><i class="fa-solid fa-magnifying-glass me-1"></i>Scan AWS now</a>
+    </div>
+  </div>
+  <div class="alert alert-warning"><strong>Privacy safeguard:</strong> No record shown here is approved for deletion. Consent status reflects linked CRM waivers only. Verify against production records and legal requirements before any action. This page does not delete S3 photos or Rekognition faces.</div>
+  <div class="row g-3 mb-4">
+    <div class="col-sm-6 col-xl-3"><div class="card h-100"><div class="card-body"><div class="text-muted small">CRM members</div><div class="display-6">{{ members_total }}</div></div></div></div>
+    <div class="col-sm-6 col-xl-3"><div class="card h-100"><div class="card-body"><div class="text-muted small">Stored face markers</div><div class="display-6">{{ indexed_members }}</div></div></div></div>
+    <div class="col-sm-6 col-xl-3"><div class="card h-100"><div class="card-body"><div class="text-muted small">Historical S3 objects</div><div class="display-6">{% if aws_scanned %}{{ s3_total }}{% else %}—{% endif %}</div></div></div></div>
+    <div class="col-sm-6 col-xl-3"><div class="card h-100"><div class="card-body"><div class="text-muted small">AWS Rekognition vectors</div><div class="display-6">{% if aws_scanned %}{{ face_total }}{% else %}—{% endif %}</div></div></div></div>
+  </div>
+  <div class="row g-3 mb-4">
+    <div class="col-lg-6"><div class="card h-100"><div class="card-header fw-semibold">Consent status · CRM members</div><div class="card-body">
+      <table class="table table-sm mb-0"><thead><tr><th>Status</th><th class="text-end">Members</th></tr></thead><tbody>{% for status, count in consent_counts.items %}<tr><td>{{ status }}</td><td class="text-end">{{ count }}</td></tr>{% empty %}<tr><td colspan="2">No members</td></tr>{% endfor %}</tbody></table>
+    </div></div></div>
+    <div class="col-lg-6"><div class="card h-100"><div class="card-header fw-semibold">Deletion job status · CRM</div><div class="card-body">
+      <table class="table table-sm mb-0"><thead><tr><th>Status</th><th class="text-end">Jobs</th></tr></thead><tbody>{% for status, count in job_counts.items %}<tr><td>{{ status }}</td><td class="text-end">{{ count }}</td></tr>{% empty %}<tr><td colspan="2">No deletion jobs recorded</td></tr>{% endfor %}</tbody></table>
+    </div></div></div>
+  </div>
+  {% if aws_scanned %}
+  <div class="card mb-4"><div class="card-header fw-semibold">AWS inventory classifications</div><div class="card-body">
+    <div class="d-flex flex-wrap gap-2 mb-3"><a class="btn btn-sm btn-outline-dark" href="?scan=1">All records</a>
+    {% for name, count in counts.items %}<a class="btn btn-sm btn-outline-secondary" href="?scan=1&amp;category={{ name|urlencode }}">{{ name }} <span class="badge text-bg-secondary">{{ count }}</span></a>{% endfor %}</div>
+    <div class="table-responsive"><table class="table table-sm table-hover align-middle">
+      <thead><tr><th>Member</th><th>S3 object key</th><th>Consent</th><th>Face vectors</th><th>Classification</th></tr></thead>
+      <tbody>{% for row in page %}
+      <tr><td>{% if row.member %}<a href="{% url 'viewMember' row.member.pk %}">#{{ row.member.pk }}</a>{% else %}{{ row.member_id|default:"Unknown" }}{% endif %}</td>
+      <td class="small text-break" style="max-width:330px">{{ row.key|default:"Rekognition only" }}</td>
+      <td><span class="badge text-bg-light border">{{ row.consent }}</span></td><td>{{ row.faces }}</td>
+      <td><span class="badge {% if row.classification == 'PROTECT_PROFILE_PHOTO' %}text-bg-primary{% else %}text-bg-warning{% endif %}">{{ row.classification }}</span><div class="small text-muted">{{ row.note }}</div></td></tr>
+      {% empty %}<tr><td colspan="5">No records match this filter.</td></tr>{% endfor %}</tbody>
+    </table></div>
+    <nav class="d-flex justify-content-between align-items-center"><span class="text-muted small">Page {{ page.number }} of {{ page.paginator.num_pages }}</span><div class="d-flex gap-2">
+    {% if page.has_previous %}<a class="btn btn-sm btn-outline-secondary" href="?scan=1&amp;category={{ selected_category|urlencode }}&amp;page={{ page.previous_page_number }}">Previous</a>{% endif %}
+    {% if page.has_next %}<a class="btn btn-sm btn-outline-secondary" href="?scan=1&amp;category={{ selected_category|urlencode }}&amp;page={{ page.next_page_number }}">Next</a>{% endif %}
+    </div></nav>
+  </div></div>
+  {% else %}<div class="alert alert-secondary">AWS has not been scanned for this page. Select <strong>Scan AWS now</strong> to retrieve S3 and Rekognition inventories. No AWS changes will be made.</div>{% endif %}
+  <div class="card"><div class="card-header fw-semibold">Recent deletion jobs · Audit and retry status</div><div class="table-responsive"><table class="table table-sm mb-0"><thead><tr><th>Requested</th><th>Member</th><th>Reason</th><th>Status</th><th>Attempts</th><th>Faces deleted</th><th>Error</th></tr></thead><tbody>
+  {% for job in jobs %}<tr><td>{{ job.requested_at|date:"M j, Y H:i" }}</td><td>#{{ job.member_id }}</td><td>{{ job.get_reason_display }}</td><td>{{ job.status }}</td><td>{{ job.attempts }}</td><td>{{ job.deleted_face_count }}</td><td class="small">{{ job.last_error|truncatechars:120 }}</td></tr>
+  {% empty %}<tr><td colspan="7" class="text-muted p-3">No deletion jobs have been recorded.</td></tr>{% endfor %}
+  </tbody></table></div></div>
+</div>
+{% endblock %}
