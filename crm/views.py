@@ -2275,16 +2275,19 @@ def adult_waiver(request, member_id=None):
     if not waiver:
         return render(request, "waiver/no_waiver.html")  # handle case with no active waiver
 
+    from crm.services.biometric_invitation import active_notice
+    from crm.models import BiometricConsentRecord
+    notice = active_notice()
     if request.method == "POST":
         form = AdultWaiverForm(request.POST)
-        if request.POST.get("biometric_consent") not in ("yes", "no"):
+        if notice and request.POST.get("biometric_consent") not in ("yes", "no"):
             form.add_error(None, "Choose whether to accept or decline optional biometric processing.")
-        if form.is_valid() and request.POST.get("biometric_consent") in ("yes", "no"):
+        if form.is_valid() and (not notice or request.POST.get("biometric_consent") in ("yes", "no")):
             sig = form.save(commit=False)
             sig.participant_type = WaiverSignature.ADULT
             sig.waiver_version = waiver
-            sig.biometric_consent = request.POST.get("biometric_consent") == "yes"
-            sig.biometric_notice_version = "2026-10-draft"
+            sig.biometric_consent = None
+            sig.biometric_notice_version = ""
             sig.ip_address = request.META.get("REMOTE_ADDR")
             sig.user_agent = request.META.get("HTTP_USER_AGENT", "")
             if member_id:
@@ -2292,6 +2295,17 @@ def adult_waiver(request, member_id=None):
             try:
                 with transaction.atomic():
                     sig.save()
+                    if notice and sig.member_id:
+                        signer = (f"{sig.guardian_first_name} {sig.guardian_last_name}".strip()
+                                  if sig.participant_type == WaiverSignature.MINOR
+                                  else f"{sig.participant_first_name} {sig.participant_last_name}".strip())
+                        BiometricConsentRecord.objects.create(
+                            member=sig.member, waiver_signature=sig,
+                            decision="grant" if request.POST["biometric_consent"] == "yes" else "decline",
+                            notice=notice, notice_version=notice.version, notice_text=notice.content,
+                            signer_name=signer, guardian_relationship=sig.guardian_relationship if sig.participant_type == WaiverSignature.MINOR else "",
+                            signature=sig.signature, ip_address=sig.ip_address, user_agent=sig.user_agent,
+                        )
                     start_trial_from_waiver(sig)
             except ValueError as exc:
                 form.add_error(None, str(exc))
@@ -2303,6 +2317,7 @@ def adult_waiver(request, member_id=None):
     return render(request, "waiver/adult.html", {
         "form": form,
         "waiver": waiver,
+        "biometric_notice": notice,
     })
 
 
@@ -2316,16 +2331,19 @@ def minor_waiver(request, member_id=None):
     if not waiver:
         return render(request, "waiver/no_waiver.html")  # handle case with no active waiver
 
+    from crm.services.biometric_invitation import active_notice
+    from crm.models import BiometricConsentRecord
+    notice = active_notice()
     if request.method == "POST":
         form = MinorWaiverForm(request.POST)
-        if request.POST.get("biometric_consent") not in ("yes", "no"):
+        if notice and request.POST.get("biometric_consent") not in ("yes", "no"):
             form.add_error(None, "Choose whether to accept or decline optional biometric processing.")
-        if form.is_valid() and request.POST.get("biometric_consent") in ("yes", "no"):
+        if form.is_valid() and (not notice or request.POST.get("biometric_consent") in ("yes", "no")):
             sig = form.save(commit=False)
             sig.participant_type = WaiverSignature.MINOR
             sig.waiver_version = waiver
-            sig.biometric_consent = request.POST.get("biometric_consent") == "yes"
-            sig.biometric_notice_version = "2026-10-draft"
+            sig.biometric_consent = None
+            sig.biometric_notice_version = ""
             sig.ip_address = request.META.get("REMOTE_ADDR")
             sig.user_agent = request.META.get("HTTP_USER_AGENT", "")
             if member_id:
@@ -2333,6 +2351,17 @@ def minor_waiver(request, member_id=None):
             try:
                 with transaction.atomic():
                     sig.save()
+                    if notice and sig.member_id:
+                        signer = (f"{sig.guardian_first_name} {sig.guardian_last_name}".strip()
+                                  if sig.participant_type == WaiverSignature.MINOR
+                                  else f"{sig.participant_first_name} {sig.participant_last_name}".strip())
+                        BiometricConsentRecord.objects.create(
+                            member=sig.member, waiver_signature=sig,
+                            decision="grant" if request.POST["biometric_consent"] == "yes" else "decline",
+                            notice=notice, notice_version=notice.version, notice_text=notice.content,
+                            signer_name=signer, guardian_relationship=sig.guardian_relationship if sig.participant_type == WaiverSignature.MINOR else "",
+                            signature=sig.signature, ip_address=sig.ip_address, user_agent=sig.user_agent,
+                        )
                     start_trial_from_waiver(sig)
             except ValueError as exc:
                 form.add_error(None, str(exc))
@@ -2348,6 +2377,7 @@ def minor_waiver(request, member_id=None):
     return render(request, "waiver/minor.html", {
         "form": form,
         "waiver": waiver,
+        "biometric_notice": notice,
     })
 
 def waiver_success(request):
