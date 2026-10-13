@@ -1275,90 +1275,86 @@ def attendance_enroll(request, member_id):
 @login_required
 @crm_staff_required
 def attendance_bulk(request):
-    if not request.user.is_staff:
-        return HttpResponse("Staff access only", status=403)
+    """Two-step, staff-confirmed attendance from individual or group photographs."""
+    from django.core.exceptions import ValidationError
+    from crm.services.face_recognition import recognize_faces
+    from crm.services.attendance import validate_checkin
 
-    sessions = (
-        ClassSession.objects
-        .filter(date__gte=timezone.localdate())
-        .annotate(
-            effective_start_time_db=Coalesce(
-                "start_time",
-                F("class_template__start_time")
-            )
-        )
-        .order_by("date", "effective_start_time_db")
-    )
-
-    recognized_members = []
-    face_matches = None
+    today = timezone.localdate()
+    sessions = ClassSession.objects.filter(date=today, is_canceled=False).select_related("class_template").order_by("class_template__start_time")
     selected_session = None
+    candidates = []
+    token_key = "face_checkin_pending"
+    session_id = request.POST.get("session_id") or request.GET.get("session_id")
+    if session_id:
+        selected_session = sessions.filter(pk=session_id).first()
 
-    if request.method == "POST":
-        session_id = request.POST.get("session_id") or request.GET.get("session_id")
-        image_file = request.FILES.get("attendance_image")
-
-        if not image_file:
-            image_data = request.POST.get("attendance_image_data")
-            if image_data:
-                try:
-                    _, encoded = image_data.split(",", 1) if "," in image_data else (None, image_data)
-                    image_bytes = base64.b64decode(encoded)
-                    image_file = io.BytesIO(image_bytes)
-                    image_file.name = f"bulk_attendance_{session_id or 'photo'}.jpg"
-                    image_file.content_type = "image/jpeg"
-                except (TypeError, ValueError):
-                    image_file = None
-
-        if session_id:
-            selected_session = ClassSession.objects.filter(pk=session_id).first()
-
-        if not session_id:
-            messages.error(request, "Please select a class session.")
-        elif not image_file:
-            messages.error(request, "Please upload a class photo or use the camera.")
+    if request.method == "POST" and request.POST.get("action") == "confirm":
+        pending = request.session.pop(token_key, None)
+        if not pending or not selected_session or pending.get("session_id") != selected_session.pk:
+            messages.error(request, "Review expired or class changed. Please scan again.")
+        elif timezone.now().timestamp() - pending["created_at"] > 600:
+            messages.error(request, "Review expired after 10 minutes. Please scan again.")
         else:
-            session = get_object_or_404(ClassSession, pk=session_id)
-            selected_session = session
-            try:
-                matches, _ = search_faces_by_image(image_file)
-                face_matches = matches
-                member_ids = set()
-                for match in matches:
-                    external_id = match["Face"].get("ExternalImageId")
-                    if external_id:
-                        member_ids.add(int(external_id))
+            approved = set(request.POST.getlist("member_ids"))
+            valid_ids = {str(item["member_id"]) for item in pending["candidates"]}
+            approved &= valid_ids
+            saved = 0
+            for member in Member.objects.filter(pk__in=approved):
+                try:
+                    record_member_attendance(selected_session, member)
+                    saved += 1
+                except ValidationError as exc:
+                    messages.warning(request, f"{member}: {exc.messages[0]}")
+            messages.success(request, f"{saved} student(s) checked in.") if saved else messages.warning(request, "No check-ins saved.")
+            return redirect("attendanceRecord", session_id=selected_session.pk)
 
-                for member_id in member_ids:
-                    member = Member.objects.filter(pk=member_id).first()
+    elif request.method == "POST":
+        image_file = request.FILES.get("attendance_image")
+        if not image_file:
+            image_data = request.POST.get("attendance_image_data", "")
+            if image_data.startswith("data:image/jpeg;base64,"):
+                try:
+                    image_file = io.BytesIO(base64.b64decode(image_data.partition(",")[2], validate=True))
+                except (ValueError, TypeError):
+                    image_file = None
+        if not selected_session:
+            messages.error(request, "Choose a valid class scheduled for today.")
+        elif not image_file:
+            messages.error(request, "Choose or capture a JPEG photo.")
+        else:
+            try:
+                detected = recognize_faces(image_file)
+                seen = set()
+                for face in detected:
+                    member = Member.objects.filter(pk=face["member_id"]).first() if face["member_id"] else None
                     if member:
-                        record_member_attendance(session, member)
-                        face_confidence = next(
-                            (match["Similarity"] for match in matches
-                             if match["Face"].get("ExternalImageId") == str(member_id)),
-                            0,
-                        )
-                        recognized_members.append({
-                            "member": member,
-                            "confidence": face_confidence,
-                        })
-                if not recognized_members:
-                    messages.warning(request, "No enrolled members were recognized in the photo.")
-                else:
-                    messages.success(request, "Attendance updated for recognized members.")
-            except Exception as exc:
-                logger.exception("Bulk attendance failed")
-                messages.error(request, str(exc))
-    else:
-        session_id = request.GET.get("session_id")
-        if session_id:
-            selected_session = ClassSession.objects.filter(pk=session_id).first()
+                        try:
+                            validate_checkin(selected_session, member)
+                            if member.pk in seen:
+                                face["status"] = "duplicate"
+                                member = None
+                            else:
+                                seen.add(member.pk)
+                        except ValidationError:
+                            face["status"] = "ineligible"
+                            member = None
+                    candidates.append({"face_number": face["face_number"], "member": member,
+                                       "confidence": face["confidence"], "status": face["status"]})
+                request.session[token_key] = {
+                    "session_id": selected_session.pk,
+                    "created_at": timezone.now().timestamp(),
+                    "candidates": [{"member_id": item["member"].pk} for item in candidates if item["member"]],
+                }
+                if not candidates:
+                    messages.warning(request, "No faces detected. Try brighter lighting and a closer photo.")
+            except Exception:
+                logger.exception("Face scan failed")
+                messages.error(request, "Unable to process this photo. Please retry or use manual check-in.")
 
     return render(request, "attendance/bulk.html", {
-        "sessions": sessions,
-        "recognized_members": recognized_members,
-        "face_matches": face_matches,
-        "selected_session": selected_session,
+        "sessions": sessions, "selected_session": selected_session,
+        "candidates": candidates, "review_ready": bool(request.method == "POST" and request.POST.get("action") != "confirm" and candidates),
     })
 
 
