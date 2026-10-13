@@ -42,22 +42,30 @@ def recognize_faces(image_file, *, threshold=90, max_people=25):
                 CollectionId=collection,
                 Image={"Bytes": face_bytes.getvalue()},
                 FaceMatchThreshold=threshold,
-                MaxFaces=2,
+                MaxFaces=20,
             )
         except client.exceptions.InvalidParameterException:
             results.append({"face_number": index + 1, "member_id": None, "confidence": 0, "status": "low_quality"})
             continue
         matches = response.get("FaceMatches", [])
-        best = matches[0] if matches else None
-        second = matches[1] if len(matches) > 1 else None
-        external_id = best["Face"].get("ExternalImageId", "") if best else ""
-        # Do not automatically select a person if the match is close to another candidate.
-        ambiguous = bool(second and best["Similarity"] - second["Similarity"] < 5)
-        member_id = int(external_id) if external_id.isdigit() and not ambiguous else None
+        # Each member can have several enrolled poses with the same ExternalImageId.
+        # Compare distinct members, not individual Rekognition face records.
+        candidates = {}
+        for match in matches:
+            external_id = str(match.get("Face", {}).get("ExternalImageId", ""))
+            if not external_id.isdigit():
+                continue
+            similarity = float(match["Similarity"])
+            candidates[external_id] = max(candidates.get(external_id, 0), similarity)
+        ranked = sorted(candidates.items(), key=lambda item: item[1], reverse=True)
+        best_id, best_score = ranked[0] if ranked else (None, 0)
+        second_score = ranked[1][1] if len(ranked) > 1 else None
+        ambiguous = second_score is not None and best_score - second_score < 5
+        member_id = int(best_id) if best_id is not None and not ambiguous else None
         results.append({
             "face_number": index + 1,
             "member_id": member_id,
-            "confidence": round(float(best["Similarity"]), 1) if best else 0,
+            "confidence": round(best_score, 1),
             "status": "candidate" if member_id else ("ambiguous" if ambiguous else "unmatched"),
         })
     return results
