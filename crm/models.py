@@ -1260,7 +1260,7 @@ class BiometricDeletionJob(models.Model):
 
 class BiometricConsentRecord(models.Model):
     """Append-only signed decision, independent from historical liability waivers."""
-    member = models.ForeignKey("Member", on_delete=models.PROTECT, related_name="biometric_consent_records")
+    member = models.ForeignKey("Member", null=True, blank=True, on_delete=models.PROTECT, related_name="biometric_consent_records")
     decision = models.CharField(max_length=10, choices=[("grant", "Grant"), ("decline", "Decline")])
     notice_version = models.CharField(max_length=60)
     notice_text = models.TextField()
