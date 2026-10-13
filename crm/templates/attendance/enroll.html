@@ -1,134 +1,69 @@
 {% extends "layout.html" %}
-
-{% block title %}Face Enrollment{% endblock %}
-
-{% block header_title %}Face Enrollment{% endblock %}
-
+{% block title %}Guided Face Enrollment{% endblock %}
+{% block header_title %}Guided Face Enrollment{% endblock %}
 {% block content %}
-<div class="container-fluid py-4">
-  <div class="row justify-content-center">
-    <div class="col-lg-6">
-      <div class="card p-4 mb-4">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-          <div>
-            <h3 class="h5 fw-bold">Enroll {{ member.first_name }} {{ member.last_name }}</h3>
-            <p class="text-muted mb-0">Upload a clear face photo to register this member with AWS Rekognition.</p>
-          </div>
-          <a href="{% url 'viewMember' member.id %}" class="btn btn-sm btn-outline-secondary">Back</a>
-        </div>
-
-        <div class="text-center mb-4">
-          {% if member.get_photo_url %}
-            <img src="{{ member.get_photo_url }}" alt="Member Photo" class="rounded-circle" style="width: 160px; height: 160px; object-fit: cover;" />
-          {% else %}
-            <div class="rounded-circle bg-secondary text-white d-inline-flex align-items-center justify-content-center" style="width: 160px; height: 160px;">
-              <i class="fa-solid fa-face-smile fa-3x"></i>
-            </div>
-          {% endif %}
-        </div>
-
-        <form method="POST" enctype="multipart/form-data">
-          {% csrf_token %}
-          <div class="mb-3">
-            <label for="face_image" class="form-label fw-semibold">Face Photo</label>
-            <input class="form-control" type="file" id="face_image" name="face_image" accept="image/*" capture="user">
-            <div class="form-text">Use a front-facing photo with the member's face clearly visible.</div>
-          </div>
-          <div class="mb-3">
-            <button type="button" id="open_camera_btn" class="btn btn-outline-secondary me-2">Take Photo with Camera</button>
-            <span class="text-muted">Or choose an existing photo above.</span>
-          </div>
-          <input type="hidden" id="face_image_data" name="face_image_data" value="">
-          <div id="camera_container" class="mb-3 d-none">
-            <div class="ratio ratio-16x9 mb-3">
-              <video id="camera_video" class="w-100 rounded" autoplay playsinline muted></video>
-            </div>
-            <button type="button" id="capture_photo_btn" class="btn btn-primary me-2">Capture Photo</button>
-            <button type="button" id="cancel_camera_btn" class="btn btn-secondary">Cancel</button>
-            <div id="camera_error" class="form-text text-danger mt-2 d-none"></div>
-          </div>
-          <div id="captured_preview" class="mb-3 d-none">
-            <label class="form-label fw-semibold">Captured Photo Preview</label>
-            <div class="border rounded p-2">
-              <img id="photo_preview" src="" alt="Captured face preview" class="img-fluid rounded" />
-            </div>
-            <div class="form-text">This image will be used to register the member's face.</div>
-          </div>
-          <button type="submit" class="btn btn-primary">Register Face</button>
-        </form>
-      </div>
-    </div>
-  </div>
+<div class="container-fluid py-4" style="max-width:900px">
+ <div class="d-flex justify-content-between align-items-center mb-4"><div><h1 class="h3 fw-bold">Face Enrollment</h1><p class="text-muted mb-0">{{ member.first_name }} {{ member.last_name }} · Five guided angles</p></div><a href="{% url 'viewMember' member.pk %}" class="btn btn-outline-secondary">Back to member</a></div>
+ <div class="card shadow-sm border-0"><div class="card-body p-4">
+ <div class="alert alert-info"><strong>Before scanning:</strong> Obtain and retain the required written biometric notice, consent and retention disclosures. For minors, obtain the appropriate parent or guardian authorization. This screen does not replace that documentation.</div>
+ <div class="progress mb-3" style="height:9px"><div id="progress" class="progress-bar" style="width:0%"></div></div>
+ <div class="d-flex justify-content-between mb-3"><strong id="stepTitle">1 of 5 · Look straight ahead</strong><span id="count" class="text-muted">0 / 5 captured</span></div>
+ <div class="position-relative bg-dark rounded overflow-hidden mb-3" style="min-height:240px">
+   <video id="video" autoplay muted playsinline class="w-100" style="max-height:500px;object-fit:contain"></video>
+   <div class="position-absolute top-50 start-50 translate-middle rounded-circle" style="width:50%;height:75%;max-width:280px;border:3px dashed rgba(255,255,255,.85);pointer-events:none" aria-hidden="true"></div>
+ </div>
+ <p id="instruction" class="text-center fw-semibold">Keep your face centered inside the oval, with even lighting.</p>
+ <div id="status" class="text-muted small mb-3" role="status">Open the camera to begin. On a phone or tablet, use HTTPS.</div>
+ <div class="d-flex flex-wrap gap-2 mb-3">
+   <button id="open" type="button" class="btn btn-outline-primary">Open camera</button>
+   <button id="capture" type="button" class="btn btn-primary" disabled>Capture this angle</button>
+   <button id="retake" type="button" class="btn btn-outline-secondary" disabled>Retake last</button>
+   <button id="close" type="button" class="btn btn-outline-secondary">Close camera</button>
+ </div>
+ <div class="d-flex flex-wrap gap-2 mb-3" id="thumbnails" aria-label="Captured poses"></div>
+ <form method="post" id="enrollForm">{% csrf_token %}<div id="poseInputs"></div>
+   <div class="form-check mb-3"><input type="checkbox" id="consent" name="biometric_consent_confirmed" value="yes" class="form-check-input" required><label class="form-check-label" for="consent">I confirm the required written biometric notice and consent have been obtained and retained separately.</label></div>
+   <button id="submit" type="submit" class="btn btn-success btn-lg" disabled>Save face enrollment</button>
+ </form>
+ <p class="text-muted small mt-3 mb-0">Capture straight ahead, chin slightly up, chin slightly down, turn slightly left and turn slightly right. Keep both eyes visible. Captures are sent only when you save. The server indexes the faces without retaining these photos.</p>
+ </div></div>
 </div>
 <script>
-document.addEventListener("DOMContentLoaded", function() {
-  const openCameraBtn = document.getElementById("open_camera_btn");
-  const cameraContainer = document.getElementById("camera_container");
-  const cameraVideo = document.getElementById("camera_video");
-  const capturePhotoBtn = document.getElementById("capture_photo_btn");
-  const cancelCameraBtn = document.getElementById("cancel_camera_btn");
-  const cameraError = document.getElementById("camera_error");
-  const capturedPreview = document.getElementById("captured_preview");
-  const photoPreview = document.getElementById("photo_preview");
-  const faceImageDataInput = document.getElementById("face_image_data");
-  const faceImageInput = document.getElementById("face_image");
-  let stream = null;
-
-  function stopCamera() {
-    if (stream) {
-      stream.getTracks().forEach(track => track.stop());
-      stream = null;
-    }
-    cameraVideo.pause();
-    cameraVideo.srcObject = null;
-    cameraContainer.classList.add("d-none");
-    cameraError.classList.add("d-none");
-  }
-
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    openCameraBtn?.classList.add("d-none");
-  }
-
-  openCameraBtn?.addEventListener("click", async function() {
-    cameraError.classList.add("d-none");
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
-      cameraVideo.srcObject = stream;
-      cameraContainer.classList.remove("d-none");
-      cameraVideo.play();
-    } catch (err) {
-      cameraError.textContent = "Unable to access the camera. Please ensure the page is served securely and camera permissions are allowed.";
-      cameraError.classList.remove("d-none");
-    }
-  });
-
-  capturePhotoBtn?.addEventListener("click", function() {
-    if (!stream) {
-      return;
-    }
-    const videoTrack = stream.getVideoTracks()[0];
-    const settings = videoTrack.getSettings ? videoTrack.getSettings() : null;
-    let width = settings?.width || cameraVideo.videoWidth || 640;
-    let height = settings?.height || cameraVideo.videoHeight || 480;
-    const maxDimension = 1024;
-    const scale = Math.min(1, maxDimension / Math.max(width, height));
-    width = Math.round(width * scale);
-    height = Math.round(height * scale);
-    const canvas = document.createElement("canvas");
-    canvas.width = width;
-    canvas.height = height;
-    canvas.getContext("2d").drawImage(cameraVideo, 0, 0, width, height);
-    const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
-    faceImageDataInput.value = dataUrl;
-    photoPreview.src = dataUrl;
-    capturedPreview.classList.remove("d-none");
-    stopCamera();
-    if (faceImageInput) {
-      faceImageInput.value = "";
-    }
-  });
-
-  cancelCameraBtn?.addEventListener("click", stopCamera);
-});
+(() => {
+ const steps=[
+  ['Look straight ahead','Keep your face centered, looking directly at the camera.'],
+  ['Move your chin up','Tilt your chin slightly upward; keep your eyes visible.'],
+  ['Move your chin down','Tilt your chin slightly downward; keep your eyes visible.'],
+  ['Turn slightly left','Turn your face a little to your left, not all the way sideways.'],
+  ['Turn slightly right','Turn your face a little to your right, not all the way sideways.']
+ ];
+ const el=id=>document.getElementById(id),video=el('video'),shots=[];let stream=null;
+ function render(){
+   const step=shots.length;
+   el('progress').style.width=(step*20)+'%';el('count').textContent=step+' / 5 captured';
+   el('stepTitle').textContent=step<5?(step+1)+' of 5 · '+steps[step][0]:'All five angles captured';
+   el('instruction').textContent=step<5?steps[step][1]:'Review the thumbnails, then save the enrollment.';
+   el('capture').disabled=!stream||step===5;el('retake').disabled=!shots.length;el('submit').disabled=step!==5;
+   el('poseInputs').replaceChildren();el('thumbnails').replaceChildren();
+   shots.forEach((data,i)=>{
+     const input=document.createElement('input');input.type='hidden';input.name='pose_images';input.value=data;el('poseInputs').append(input);
+     const img=document.createElement('img');img.src=data;img.alt=steps[i][0];img.style.cssText='width:84px;height:84px;object-fit:cover;border-radius:10px';el('thumbnails').append(img);
+   });
+ }
+ function close(){if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}video.srcObject=null;render();}
+ el('open').addEventListener('click',async()=>{close();try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:1280}},audio:false});video.srcObject=stream;el('status').textContent='Camera ready. Follow each instruction and capture manually.';}catch(e){el('status').textContent='Camera unavailable. Check browser permissions and HTTPS.';}render();});
+ el('capture').addEventListener('click',()=>{
+   if(!stream||!video.videoWidth||shots.length>=5)return;
+   const canvas=document.createElement('canvas'),scale=Math.min(1,1024/Math.max(video.videoWidth,video.videoHeight));
+   canvas.width=Math.round(video.videoWidth*scale);canvas.height=Math.round(video.videoHeight*scale);
+   canvas.getContext('2d').drawImage(video,0,0,canvas.width,canvas.height);
+   shots.push(canvas.toDataURL('image/jpeg',.86));render();
+   if(shots.length===5){close();el('status').textContent='Five angles ready. Confirm consent and save.';}
+ });
+ el('retake').addEventListener('click',()=>{shots.pop();render();});
+ el('close').addEventListener('click',close);
+ el('enrollForm').addEventListener('submit',e=>{if(shots.length!==5){e.preventDefault();return;}el('submit').disabled=true;el('submit').textContent='Saving enrollment…';});
+ window.addEventListener('pagehide',close);render();
+})();
 </script>
 {% endblock %}
