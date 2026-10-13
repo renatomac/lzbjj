@@ -281,3 +281,17 @@ class BiometricReconciliationTests(SimpleTestCase):
         member = SimpleNamespace(face_image_s3_key=None, photo="")
         status, _ = classify(member, "face-enrollments/member-9-other.jpg", 3, 0, "approved_consent")
         self.assertEqual(status, "REVIEW_MULTIPLE_IMAGES")
+
+
+class BiometricDashboardTests(SimpleTestCase):
+    def test_inventory_classifies_missing_member_without_deleting(self):
+        from crm.management.commands.reconcile_biometric_assets import classify
+        status, _ = classify(None, "face-enrollments/member-999-test.jpg", 1, 0, "member_missing")
+        self.assertEqual(status, "INVESTIGATE_MISSING_MEMBER")
+
+    def test_dashboard_requires_staff_access(self):
+        from django.test import RequestFactory
+        from django.contrib.auth.models import AnonymousUser
+        from crm.views import biometric_privacy_dashboard
+        response = biometric_privacy_dashboard(RequestFactory().get("/privacy/biometrics/"))
+        self.assertEqual(response.status_code, 302)
