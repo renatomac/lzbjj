@@ -117,3 +117,48 @@ class MultiFaceRecognitionTests(SimpleTestCase):
         result = recognize_faces(photo_bytes())
         self.assertEqual(result[0]["status"], "unmatched")
         self.assertIsNone(result[0]["member_id"])
+
+
+class CheckinValidationTests(SimpleTestCase):
+    def test_canceled_session_is_rejected(self):
+        from types import SimpleNamespace
+        from django.core.exceptions import ValidationError
+        from crm.services.attendance import validate_checkin
+        session = SimpleNamespace(is_canceled=True)
+        with self.assertRaises(ValidationError):
+            validate_checkin(session, SimpleNamespace(is_active=True))
+
+    def test_inactive_member_is_rejected(self):
+        from types import SimpleNamespace
+        from django.core.exceptions import ValidationError
+        from crm.services.attendance import validate_checkin
+        session = SimpleNamespace(is_canceled=False)
+        with self.assertRaises(ValidationError):
+            validate_checkin(session, SimpleNamespace(is_active=False))
+
+    def test_wrong_class_type_is_rejected(self):
+        from types import SimpleNamespace
+        from django.core.exceptions import ValidationError
+        from crm.services.attendance import validate_checkin
+        session = SimpleNamespace(
+            is_canceled=False,
+            class_template=SimpleNamespace(type="adult"),
+        )
+        member = SimpleNamespace(is_active=True, member_type="child")
+        with self.assertRaises(ValidationError):
+            validate_checkin(session, member)
+
+    def test_past_session_is_rejected(self):
+        from datetime import timedelta
+        from types import SimpleNamespace
+        from django.core.exceptions import ValidationError
+        from django.utils import timezone
+        from crm.services.attendance import validate_checkin
+        session = SimpleNamespace(
+            is_canceled=False,
+            class_template=SimpleNamespace(type="open"),
+            date=timezone.localdate() - timedelta(days=1),
+        )
+        member = SimpleNamespace(is_active=True, member_type="adult")
+        with self.assertRaises(ValidationError):
+            validate_checkin(session, member)
