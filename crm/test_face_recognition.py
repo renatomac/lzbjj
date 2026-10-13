@@ -252,3 +252,32 @@ class BiometricDeletionQueueTests(SimpleTestCase):
         self.assertEqual(result.status, "failed")
         self.assertEqual(result.attempts, 1)
         self.assertIn("AWS unavailable", result.last_error)
+
+
+class BiometricReconciliationTests(SimpleTestCase):
+    def test_protects_profile_photo_reference(self):
+        from types import SimpleNamespace
+        from crm.management.commands.reconcile_biometric_assets import classify
+        member = SimpleNamespace(face_image_s3_key="face-enrollments/member-9-photo.jpg", photo="")
+        status, _ = classify(member, member.face_image_s3_key, 1, 0, "not_consented")
+        self.assertEqual(status, "PROTECT_PROFILE_PHOTO")
+
+    def test_protects_legacy_photo_url(self):
+        from types import SimpleNamespace
+        from crm.management.commands.reconcile_biometric_assets import classify
+        key = "face-enrollments/member-9-photo.jpg"
+        member = SimpleNamespace(face_image_s3_key=None, photo="https://bucket.s3.amazonaws.com/" + key)
+        status, _ = classify(member, key, 1, 0, "not_consented")
+        self.assertEqual(status, "PROTECT_PROFILE_PHOTO")
+
+    def test_missing_member_is_not_safe_to_delete(self):
+        from crm.management.commands.reconcile_biometric_assets import classify
+        status, _ = classify(None, "face-enrollments/member-9-photo.jpg", 1, 0, "member_missing")
+        self.assertEqual(status, "INVESTIGATE_MISSING_MEMBER")
+
+    def test_duplicate_images_require_review(self):
+        from types import SimpleNamespace
+        from crm.management.commands.reconcile_biometric_assets import classify
+        member = SimpleNamespace(face_image_s3_key=None, photo="")
+        status, _ = classify(member, "face-enrollments/member-9-other.jpg", 3, 0, "approved_consent")
+        self.assertEqual(status, "REVIEW_MULTIPLE_IMAGES")
