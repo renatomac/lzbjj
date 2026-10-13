@@ -64,6 +64,7 @@ urlpatterns = [
     path("create_sessions", views.create_sessions, name="create_sessions"),
     path("sessions", views.sessions, name="sessions"),
     path("waivers/", views.waivers, name="waivers"),
+    path("privacy/biometrics/", views.biometric_privacy_dashboard, name="biometric_privacy_dashboard"),
     path("members/<int:member_id>/biometrics/revoke/", views.revoke_member_biometric_consent, name="revoke_member_biometric_consent"),
     path("waivers/adult/", views.adult_waiver, name="adult_waiver"),
     path("waivers/minor/", views.minor_waiver, name="minor_waiver"),
