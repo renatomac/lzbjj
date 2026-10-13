@@ -10,7 +10,7 @@ from crm.models import WaiverSignature
 
 def approved_notice_versions():
     """No biometric use until an approved notice is explicitly configured."""
-    return frozenset(getattr(settings, "BIOMETRIC_APPROVED_NOTICE_VERSIONS", ()))
+    return frozenset(getattr(settings, "BIOMETRIC_APPROVED_NOTICE_VERSIONS", ())) - {"2026-10-draft", ""}
 
 
 def has_biometric_consent(member):
