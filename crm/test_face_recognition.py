@@ -162,3 +162,34 @@ class CheckinValidationTests(SimpleTestCase):
         member = SimpleNamespace(is_active=True, member_type="adult")
         with self.assertRaises(ValidationError):
             validate_checkin(session, member)
+
+
+class BiometricConsentPolicyTests(SimpleTestCase):
+    @patch("crm.services.biometric_consent.WaiverSignature")
+    def test_legacy_waiver_does_not_authorize_recognition(self, signature_model):
+        from types import SimpleNamespace
+        from crm.services.biometric_consent import has_biometric_consent
+        signature_model.objects.filter.return_value.order_by.return_value.first.return_value = SimpleNamespace(
+            participant_type="adult", biometric_consent=None, biometric_notice_version=""
+        )
+        self.assertFalse(has_biometric_consent(SimpleNamespace(pk=5, member_type="adult")))
+
+    @patch("crm.services.biometric_consent.WaiverSignature")
+    def test_draft_notice_cannot_authorize_recognition(self, signature_model):
+        from types import SimpleNamespace
+        from crm.services.biometric_consent import has_biometric_consent
+        signature_model.ADULT = "adult"
+        signature_model.objects.filter.return_value.order_by.return_value.first.return_value = SimpleNamespace(
+            participant_type="adult", biometric_consent=True, biometric_notice_version="2026-10-draft"
+        )
+        self.assertFalse(has_biometric_consent(SimpleNamespace(pk=5, member_type="adult")))
+
+    @patch("crm.services.biometric_consent.WaiverSignature")
+    def test_approved_explicit_adult_consent_authorizes(self, signature_model):
+        from types import SimpleNamespace
+        from crm.services.biometric_consent import has_biometric_consent
+        signature_model.ADULT = "adult"
+        signature_model.objects.filter.return_value.order_by.return_value.first.return_value = SimpleNamespace(
+            participant_type="adult", biometric_consent=True, biometric_notice_version="approved-v1"
+        )
+        self.assertTrue(has_biometric_consent(SimpleNamespace(pk=5, member_type="adult")))
