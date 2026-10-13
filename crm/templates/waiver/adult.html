@@ -79,22 +79,20 @@
             </div>
         {% endif %}
 
+        {% if biometric_notice %}
         <section class="card border-info mb-4" aria-labelledby="biometric-heading">
           <div class="card-body">
-            <h3 id="biometric-heading" class="h5">Optional biometric facial recognition consent</h3>
-            <p>Lake Zurich Brazilian Jiu-Jitsu offers optional facial recognition for class attendance. With permission, facial images are processed using Amazon Web Services (AWS Rekognition) to create facial templates and compare them during attendance check-in. Facial templates are stored in AWS Rekognition. Face enrollment is not required to attend classes; manual attendance is available.</p>
-            <p><strong>Draft notice — not yet approved for live biometric enrollment.</strong> Proposed purpose: optional attendance check-in. Proposed retention: permanently destroy biometric identifiers when the original purpose has been satisfied or within three years of the last interaction, whichever occurs first, subject to applicable law. AWS Rekognition processes and stores facial templates on behalf of the academy. No biometric enrollment is permitted until the written policy and notice have been legally approved.</p><p>You may withdraw biometric permission by contacting academy staff and requesting removal of enrolled facial templates. Staff will record the request and initiate deletion; failures require follow-up. You can always check in manually. Profile photographs and historical enrollment images require separate data review.</p>
-            <p>Choose whether to authorize this processing. Declining does not affect class eligibility.</p>
-            <div class="form-check">
-              <input class="form-check-input" type="radio" name="biometric_consent" value="yes" id="bio-yes" required>
-              <label class="form-check-label" for="bio-yes">I voluntarily consent to biometric facial recognition for attendance.</label>
-            </div>
-            <div class="form-check">
-              <input class="form-check-input" type="radio" name="biometric_consent" value="no" id="bio-no" required>
-              <label class="form-check-label" for="bio-no">I decline biometric facial recognition; use manual attendance.</label>
-            </div>
+            <h3 id="biometric-heading" class="h5">Section 2 — Optional biometric consent</h3>
+            <p class="text-muted">The following is a separate, voluntary choice. Declining will not affect class participation. Manual attendance is available.</p>
+            <div class="border rounded p-3 mb-3" style="white-space:pre-wrap;max-height:420px;overflow-y:auto">{{ biometric_notice.content }}</div>
+            <p class="small">Notice version: {{ biometric_notice.version }}. Your decision and the exact notice are preserved alongside this signed waiver.</p>
+            <div class="form-check mb-2"><input class="form-check-input" type="radio" name="biometric_consent" value="yes" id="bio-yes" required {% if request.POST.biometric_consent == "yes" %}checked{% endif %}><label class="form-check-label" for="bio-yes">I voluntarily consent to biometric facial recognition for attendance.</label></div>
+            <div class="form-check"><input class="form-check-input" type="radio" name="biometric_consent" value="no" id="bio-no" required {% if request.POST.biometric_consent == "no" %}checked{% endif %}><label class="form-check-label" for="bio-no">I decline biometric processing; I prefer manual check-in.</label></div>
           </div>
         </section>
+        {% else %}
+        <div class="alert alert-secondary">Biometric facial recognition enrollment is currently unavailable. Signing this participation waiver does not authorize biometric processing.</div>
+        {% endif %}
 
         <button type="submit" class="btn btn-primary">
             Sign Waiver
