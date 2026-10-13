@@ -35,7 +35,7 @@
           <td>{% if item.waiver %}<a href="{% url 'waiver_detail' item.waiver.pk %}">#{{ item.waiver.pk }} · {{ item.waiver.participant_type }}</a>{% else %}None linked{% endif %}</td>
           <td><span class="badge text-bg-warning">{{ item.status }}</span></td>
           <td>{% if item.has_face_marker %}Yes{% else %}No{% endif %}</td>
-          <td class="small">Verify member type, signer, guardian (if minor), waiver version, and explicit opt-in</td></tr>
+          <td class="small">Verify member type, signer, guardian (if minor), waiver version, and explicit opt-in<form method="post" action="{% url 'biometric_consent_invite' item.member.pk %}" class="mt-2">{% csrf_token %}<button type="submit" class="btn btn-sm btn-outline-primary">Prepare consent link</button></form></td></tr>
         {% empty %}<tr><td colspan="7" class="text-muted">No linked waiver mismatches or explicit refusals identified.</td></tr>{% endfor %}</tbody>
       </table></div>
     </div>
