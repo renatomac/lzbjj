@@ -1268,7 +1268,7 @@ class BiometricConsentRecord(models.Model):
     waiver_signature = models.OneToOneField("WaiverSignature", null=True, blank=True, on_delete=models.PROTECT, related_name="biometric_decision")
     signer_name = models.CharField(max_length=200)
     guardian_relationship = models.CharField(max_length=100, blank=True)
-    signature = models.CharField(max_length=200)
+    signature = models.TextField()
     signed_at = models.DateTimeField(auto_now_add=True)
     ip_address = models.GenericIPAddressField(null=True, blank=True)
     user_agent = models.TextField(blank=True)
