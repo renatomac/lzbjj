@@ -1266,8 +1266,8 @@ def attendance_enroll(request, member_id):
                     images.append(output.getvalue())
                 face_id = index_member_face_sequence(member, images)
                 member.rekognition_face_id = face_id
-                member.face_image_s3_key = ""
-                member.save(update_fields=["rekognition_face_id", "face_image_s3_key"])
+                # Preserve the existing S3 key: Member.get_photo_url() uses it for the profile photo.
+                member.save(update_fields=["rekognition_face_id"])
                 messages.success(request, "Five face angles enrolled successfully.")
                 return redirect("viewMember", member_id=member.pk)
             except Exception:
