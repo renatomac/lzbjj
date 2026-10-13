@@ -48,3 +48,39 @@ class MultiFaceRecognitionTests(SimpleTestCase):
         result = recognize_faces(photo_bytes())
         self.assertIsNone(result[0]["member_id"])
         self.assertEqual(result[0]["status"], "ambiguous")
+
+    @patch("crm.services.face_recognition.ensure_collection", return_value="test")
+    @patch("crm.services.face_recognition.get_rekognition_client")
+    def test_multiple_enrolled_poses_of_same_student_are_not_ambiguous(self, client_factory, _):
+        client = Mock()
+        client_factory.return_value = client
+        client.detect_faces.return_value = {"FaceDetails": [
+            {"BoundingBox": {"Left": .2, "Top": .1, "Width": .4, "Height": .7}},
+        ]}
+        client.search_faces_by_image.return_value = {"FaceMatches": [
+            {"Similarity": 100, "Face": {"ExternalImageId": "98"}},
+            {"Similarity": 99.8, "Face": {"ExternalImageId": "98"}},
+            {"Similarity": 99.1, "Face": {"ExternalImageId": "98"}},
+        ]}
+        result = recognize_faces(photo_bytes())
+        self.assertEqual(result[0]["member_id"], 98)
+        self.assertEqual(result[0]["status"], "candidate")
+        self.assertEqual(result[0]["confidence"], 100)
+        self.assertEqual(client.search_faces_by_image.call_args.kwargs["MaxFaces"], 20)
+
+    @patch("crm.services.face_recognition.ensure_collection", return_value="test")
+    @patch("crm.services.face_recognition.get_rekognition_client")
+    def test_distinct_student_with_close_similarity_remains_ambiguous(self, client_factory, _):
+        client = Mock()
+        client_factory.return_value = client
+        client.detect_faces.return_value = {"FaceDetails": [
+            {"BoundingBox": {"Left": .2, "Top": .1, "Width": .4, "Height": .7}},
+        ]}
+        client.search_faces_by_image.return_value = {"FaceMatches": [
+            {"Similarity": 100, "Face": {"ExternalImageId": "98"}},
+            {"Similarity": 99.9, "Face": {"ExternalImageId": "98"}},
+            {"Similarity": 98.5, "Face": {"ExternalImageId": "20"}},
+        ]}
+        result = recognize_faces(photo_bytes())
+        self.assertIsNone(result[0]["member_id"])
+        self.assertEqual(result[0]["status"], "ambiguous")
