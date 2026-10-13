@@ -1256,3 +1256,20 @@ class BiometricDeletionJob(models.Model):
 
     class Meta:
         ordering = ["-requested_at"]
+
+
+class BiometricConsentRecord(models.Model):
+    """Append-only signed decision, independent from historical liability waivers."""
+    member = models.ForeignKey("Member", on_delete=models.PROTECT, related_name="biometric_consent_records")
+    decision = models.CharField(max_length=10, choices=[("grant", "Grant"), ("decline", "Decline")])
+    notice_version = models.CharField(max_length=60)
+    notice_text = models.TextField()
+    signer_name = models.CharField(max_length=200)
+    guardian_relationship = models.CharField(max_length=100, blank=True)
+    signature = models.CharField(max_length=200)
+    signed_at = models.DateTimeField(auto_now_add=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["-signed_at", "-pk"]
