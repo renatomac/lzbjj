@@ -21,5 +21,6 @@ def has_biometric_consent(member):
     return (
         latest.participant_type == expected_type
         and latest.biometric_consent is True
-        and latest.biometric_notice_version != "2026-10-draft"\n        and bool(latest.biometric_notice_version)
+        and latest.biometric_notice_version != "2026-10-draft"
+        and bool(latest.biometric_notice_version)
     )
