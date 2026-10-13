@@ -1,5 +1,5 @@
 """Read-only biometric privacy inventory for staff review. No deletion APIs."""
-from collections import Counter, defaultdict
+from collections import Counter
 from crm.aws_utils import get_bucket_name, get_collection_id, get_rekognition_client, get_s3_client
 from crm.management.commands.reconcile_biometric_assets import KEY_PATTERN, PREFIX, classify, latest_consent_status
 from crm.models import BiometricDeletionJob, Member, WaiverSignature
@@ -12,8 +12,22 @@ def build_privacy_inventory(include_aws=False):
         signatures.setdefault(sig.member_id, sig)
     statuses = {pk: latest_consent_status(signatures, m) for pk, m in members.items()}
     jobs = list(BiometricDeletionJob.objects.select_related("member").order_by("-requested_at")[:30])
+    attention = []
+    for pk, status in statuses.items():
+        if status not in ("waiver_type_mismatch", "not_consented", "notice_not_approved"):
+            continue
+        member = members[pk]
+        attention.append({
+            "member": member,
+            "status": status,
+            "expected_type": "minor" if member.member_type == "child" else "adult",
+            "waiver": signatures.get(pk),
+            "has_face_marker": bool(member.rekognition_face_id),
+        })
+    attention.sort(key=lambda row: (row["status"], row["member"].pk))
     result = {
         "members_total": len(members),
+        "attention": attention,
         "consent_counts": dict(Counter(statuses.values())),
         "indexed_members": sum(bool(m.rekognition_face_id) for m in members.values()),
         "jobs": jobs, "job_counts": dict(Counter(BiometricDeletionJob.objects.values_list("status", flat=True))),
