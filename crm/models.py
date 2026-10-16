@@ -1294,3 +1294,20 @@ class BiometricNoticeVersion(models.Model):
 
     def __str__(self):
         return self.version
+
+
+class BiometricConsentVerification(models.Model):
+    """Separate staff attestation; signed consent record remains unchanged."""
+    consent = models.OneToOneField("BiometricConsentRecord", on_delete=models.PROTECT, related_name="verification")
+    verified_by = models.ForeignKey("crm.User", on_delete=models.PROTECT)
+    verified_at = models.DateTimeField(auto_now_add=True)
+    method = models.CharField(max_length=120)
+    notes = models.TextField(blank=True)
+
+
+class BiometricConsentWithdrawal(models.Model):
+    """Append-only withdrawal. Do not rewrite the original signed consent."""
+    member = models.ForeignKey("Member", on_delete=models.PROTECT, related_name="biometric_withdrawals")
+    requested_by = models.ForeignKey("crm.User", on_delete=models.PROTECT)
+    requested_at = models.DateTimeField(auto_now_add=True)
+    reason = models.CharField(max_length=200, default="Member or guardian request")
