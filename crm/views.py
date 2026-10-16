@@ -2569,27 +2569,18 @@ def attendance_report(request):
 @crm_staff_required
 @require_POST
 def revoke_member_biometric_consent(request, member_id):
-    """Staff-assisted revocation; preserves signed waiver and manual attendance.
-
-    Consent is disabled before attempting AWS deletion so failure cannot
-    silently permit further recognition. Retrying the endpoint is safe.
-    """
-    from crm.services.biometric_deletion import queue_biometric_deletion, execute_biometric_deletion
+    """Append-only revocation. Queue deletion, never modify signed documents."""
+    from django.core.exceptions import PermissionDenied
+    from crm.models import BiometricConsentWithdrawal
+    from crm.services.biometric_deletion import queue_biometric_deletion
+    if not (request.user.is_staff or request.user.is_superuser):
+        raise PermissionDenied
     member = get_object_or_404(Member, pk=member_id)
     with transaction.atomic():
-        signatures = list(WaiverSignature.objects.select_for_update().filter(
-            member=member, is_void=False, agreed=True, biometric_consent=True
-        ))
-        for signature in signatures:
-            signature.biometric_consent = False
-            signature.save(update_fields=["biometric_consent"])
-    job = execute_biometric_deletion(queue_biometric_deletion(member))
-    if job.status == "completed":
-        messages.success(request, f"Biometric consent revoked; {job.deleted_face_count} indexed face(s) deleted.")
-    else:
-        messages.error(request, "Consent revoked; AWS deletion is queued for retry. Contact an administrator.")
+        BiometricConsentWithdrawal.objects.create(member=member, requested_by=request.user)
+        queue_biometric_deletion(member)
+    messages.warning(request, "Biometric processing disabled. Deletion request queued for administrator review; AWS data has not been deleted.")
     return redirect("viewMember", member_id=member.pk)
-
 
 @crm_staff_required
 def biometric_privacy_dashboard(request):
