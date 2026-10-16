@@ -1,0 +1,61 @@
+{% load belt_images %}
+<div class="mb-4" data-belt-picker>
+  <label class="form-label fw-semibold" for="{{ form.reported_belt_rank.id_for_label }}">Current BJJ belt rank (optional)</label>
+  <p class="text-muted small mb-2">Choose the belt that best represents your current rank. The academy will verify it.</p>
+  <div class="visually-hidden">
+    {{ form.reported_belt_rank }}
+  </div>
+  <div class="row g-2" role="group" aria-label="Choose current BJJ belt rank">
+    {% for value, label in form.reported_belt_rank.field.choices %}
+      {% if value %}
+      <div class="col-6 col-sm-4 col-lg-3">
+        <button type="button" class="btn btn-outline-secondary w-100 h-100 py-3 belt-choice"
+                data-belt-value="{{ value }}" aria-pressed="false">
+          <span class="d-block mb-2">{% belt_image value 0 "adult" 125 %}</span>
+          <span class="d-block small fw-semibold">{{ label }}</span>
+        </button>
+      </div>
+      {% endif %}
+    {% endfor %}
+  </div>
+  <button type="button" class="btn btn-link btn-sm px-0 mt-2" data-clear-belt>Clear selection</button>
+  {% if form.reported_belt_rank.errors %}
+    <div class="text-danger">{{ form.reported_belt_rank.errors }}</div>
+  {% endif %}
+</div>
+<style>
+  [data-belt-picker] .belt-choice { min-height: 105px; white-space: normal; }
+  [data-belt-picker] .belt-choice[aria-pressed="true"] {
+    border: 2px solid var(--bs-primary, #0d6efd);
+    background: var(--bs-primary-bg-subtle, #e7f1ff);
+    color: var(--bs-body-color, #212529);
+    box-shadow: 0 0 0 2px rgba(13,110,253,.12);
+  }
+  [data-belt-picker] .belt-choice img { max-width: 100%; height: auto; }
+</style>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  document.querySelectorAll("[data-belt-picker]").forEach(function (picker) {
+    const select = picker.querySelector("select");
+    const buttons = Array.from(picker.querySelectorAll("[data-belt-value]"));
+    if (!select) return;
+    function update() {
+      buttons.forEach(function (button) {
+        button.setAttribute("aria-pressed", String(button.dataset.beltValue === select.value));
+      });
+    }
+    buttons.forEach(function (button) {
+      button.addEventListener("click", function () {
+        select.value = button.dataset.beltValue;
+        select.dispatchEvent(new Event("change", {bubbles: true}));
+        update();
+      });
+    });
+    picker.querySelector("[data-clear-belt]").addEventListener("click", function () {
+      select.value = "";
+      update();
+    });
+    update();
+  });
+});
+</script>
