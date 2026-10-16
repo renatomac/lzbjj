@@ -1,31 +1,44 @@
-"""Biometric processing requires explicit, current, non-void waiver consent.
-
-Legacy signatures have NULL consent and are never treated as opt-in.
-Only a signature explicitly linked to the member is accepted; matching
-names alone is not reliable enough to authorize biometric processing.
-"""
+"""Fail-closed biometric authorization based on verified consent records."""
 from django.conf import settings
-from crm.models import WaiverSignature
+from crm.models import BiometricConsentRecord, BiometricConsentWithdrawal, WaiverSignature
 
 
 def approved_notice_versions():
-    """No biometric use until an approved notice is explicitly configured."""
-    return frozenset(getattr(settings, "BIOMETRIC_APPROVED_NOTICE_VERSIONS", ())) - {"2026-10-draft", ""}
+    from crm.models import BiometricNoticeVersion
+    return frozenset(BiometricNoticeVersion.objects.filter(
+        is_approved=True, is_active=True, approved_at__isnull=False,
+        effective_date__isnull=False,
+    ).exclude(version="2026-10-draft").values_list("version", flat=True))
 
 
 def has_biometric_consent(member):
     if not member or not member.pk or not getattr(settings, "BIOMETRIC_RECOGNITION_ENABLED", False):
         return False
-    latest = (
-        WaiverSignature.objects.filter(member_id=member.pk, is_void=False, agreed=True)
-        .order_by("-signed_at", "-pk")
-        .first()
-    )
-    if not latest:
+    decision = (BiometricConsentRecord.objects.filter(member_id=member.pk)
+                .select_related("notice", "waiver_signature", "verification")
+                .order_by("-signed_at", "-pk").first())
+    if not decision or decision.decision != "grant":
         return False
-    expected_type = WaiverSignature.MINOR if member.member_type == "child" else WaiverSignature.ADULT
-    return (
-        latest.participant_type == expected_type
-        and latest.biometric_consent is True
-        and latest.biometric_notice_version in approved_notice_versions()
-    )
+    if BiometricConsentWithdrawal.objects.filter(
+        member_id=member.pk, requested_at__gte=decision.signed_at
+    ).exists():
+        return False
+    notice = decision.notice
+    if not (notice and notice.is_approved and notice.is_active and notice.approved_at
+            and notice.effective_date and notice.version != "2026-10-draft"
+            and decision.notice_version == notice.version
+            and decision.notice_text == notice.content):
+        return False
+    if not hasattr(decision, "verification"):
+        return False
+    if not decision.signer_name.strip() or not decision.signature.strip():
+        return False
+    if member.member_type == "child" and not decision.guardian_relationship.strip():
+        return False
+    waiver = decision.waiver_signature
+    if waiver:
+        expected = WaiverSignature.MINOR if member.member_type == "child" else WaiverSignature.ADULT
+        if (waiver.is_void or not waiver.agreed or waiver.member_id != member.pk
+                or waiver.participant_type != expected):
+            return False
+    return True
