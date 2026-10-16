@@ -38,6 +38,15 @@
         </div>
 
         <div class="mb-3">
+            <label for="{{ form.reported_belt_rank.id_for_label }}">Current BJJ belt rank (optional)</label>
+            {{ form.reported_belt_rank }}
+            <div class="form-text">Select your current rank. The academy will verify it.</div>
+            {% if form.reported_belt_rank.errors %}
+                <div class="text-danger">{{ form.reported_belt_rank.errors }}</div>
+            {% endif %}
+        </div>
+
+        <div class="mb-3">
             <label for="{{ form.participant_dob.id_for_label }}">
                 {{ form.participant_dob.label }}
             </label>
