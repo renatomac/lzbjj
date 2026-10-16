@@ -1282,6 +1282,15 @@ def attendance_enroll(request, member_id):
 @crm_staff_required
 def attendance_bulk(request):
     """Two-step, staff-confirmed attendance from individual or group photographs."""
+    # Group images may include non-consenting bystanders; do not upload them
+    # to AWS until a separate collection/privacy workflow is approved.
+    from django.conf import settings
+    if request.method == "POST" and not (
+        getattr(settings, "BIOMETRIC_RECOGNITION_ENABLED", False)
+        and getattr(settings, "BIOMETRIC_BULK_SCANNING_ENABLED", False)
+    ):
+        return HttpResponse("Group biometric scanning is disabled.", status=403)
+
     from django.core.exceptions import ValidationError
     from crm.services.face_recognition import recognize_faces
     from crm.services.biometric_consent import has_biometric_consent
