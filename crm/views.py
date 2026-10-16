@@ -1236,6 +1236,48 @@ def attendanceRecord(request, session_id):
     })
 
 
+@crm_staff_required
+def attendance_visitor_search(request, session_id):
+    """Search former waiver signers, without activating a membership or trial."""
+    session = get_object_or_404(ClassSession.objects.select_related("class_template"), pk=session_id)
+    term = request.GET.get("q", "").strip()
+    if len(term) < 2:
+        return JsonResponse({"results": []})
+    from django.db.models import Q
+    members = (Member.objects.filter(plan__isnull=True, waivers__agreed=True, waivers__is_void=False)
+               .filter(Q(first_name__icontains=term) | Q(last_name__icontains=term))
+               .distinct().order_by("first_name", "last_name")[:20])
+    from crm.services.attendance import eligible_for_session
+    results = [
+        {"id": m.pk, "name": f"{m.first_name} {m.last_name}",
+         "type": m.member_type}
+        for m in members
+        if eligible_for_session(m, session) and m.has_valid_waiver
+    ]
+    return JsonResponse({"results": results})
+
+
+@crm_staff_required
+@require_POST
+def attendance_add_visitor(request, session_id):
+    """Add a previously waived visitor to exactly one class session."""
+    session = get_object_or_404(ClassSession.objects.select_related("class_template"), pk=session_id)
+    if session.is_canceled:
+        return JsonResponse({"error": "Canceled sessions cannot accept visitors."}, status=400)
+    try:
+        member_id = int(request.POST.get("member_id", ""))
+    except (TypeError, ValueError):
+        return JsonResponse({"error": "Select a visitor."}, status=400)
+    member = get_object_or_404(Member, pk=member_id, plan__isnull=True)
+    from crm.services.attendance import eligible_for_session
+    if not member.has_valid_waiver or not eligible_for_session(member, session):
+        return JsonResponse({"error": "A valid waiver and matching class type are required."}, status=400)
+    SessionAttendance.objects.get_or_create(
+        session=session, member=member, defaults={"present": False}
+    )
+    return redirect("attendanceRecord", session_id=session.pk)
+
+
 @login_required
 @crm_staff_required
 def attendance_enroll(request, member_id):
