@@ -14,7 +14,7 @@ def approved_notice_versions():
 
 
 def has_biometric_consent(member):
-    if not member or not member.pk:
+    if not member or not member.pk or not getattr(settings, "BIOMETRIC_RECOGNITION_ENABLED", False):
         return False
     latest = (
         WaiverSignature.objects.filter(member_id=member.pk, is_void=False, agreed=True)
