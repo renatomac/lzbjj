@@ -185,7 +185,7 @@
                 const token = document.createElement("input");
                 token.type = "hidden"; token.name = "csrfmiddlewaretoken"; token.value = csrf;
                 const id = document.createElement("input");
-                id.type = "hidden"; id.name = "member_id"; id.value = person.id;
+                id.type = "hidden"; id.name = "signature_id"; id.value = person.id;
                 const name = document.createElement("span");
                 name.textContent = person.name + " (" + person.type + ")";
                 const button = document.createElement("button");
