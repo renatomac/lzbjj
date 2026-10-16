@@ -293,3 +293,39 @@ class BiometricConsentRecordAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+from .models import BiometricConsentVerification, BiometricConsentWithdrawal
+
+
+@admin.register(BiometricConsentVerification)
+class BiometricConsentVerificationAdmin(admin.ModelAdmin):
+    list_display = ("consent", "verified_by", "verified_at", "method")
+    readonly_fields = ("verified_at", "verified_by")
+    fields = ("consent", "method", "notes", "verified_by", "verified_at")
+
+    def save_model(self, request, obj, form, change):
+        if not change:
+            obj.verified_by = request.user
+        super().save_model(request, obj, form, change)
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(BiometricConsentWithdrawal)
+class BiometricConsentWithdrawalAdmin(admin.ModelAdmin):
+    list_display = ("member", "requested_by", "requested_at", "reason")
+    readonly_fields = [f.name for f in BiometricConsentWithdrawal._meta.fields]
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
