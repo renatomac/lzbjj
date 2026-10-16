@@ -532,6 +532,7 @@ class BaseWaiverForm(forms.ModelForm):
         fields = [
             "participant_first_name",
             "participant_last_name",
+            "reported_belt_rank",
             "participant_dob",
             "guardian_first_name",
             "guardian_last_name",
@@ -541,6 +542,7 @@ class BaseWaiverForm(forms.ModelForm):
         widgets = {
             "participant_first_name": forms.TextInput(attrs={"class": "form-control"}),
             "participant_last_name": forms.TextInput(attrs={"class": "form-control"}),
+            "reported_belt_rank": forms.Select(attrs={"class": "form-select"}),
             "participant_dob": forms.DateInput(
                 attrs={"class": "form-control", "type": "date"}
             ),
