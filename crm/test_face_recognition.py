@@ -166,35 +166,80 @@ class CheckinValidationTests(SimpleTestCase):
 
 
 class BiometricConsentPolicyTests(SimpleTestCase):
-    @patch("crm.services.biometric_consent.WaiverSignature")
-    def test_legacy_waiver_does_not_authorize_recognition(self, signature_model):
+    def _decision(self, *, choice="grant", version="approved-v1", verified=True, minor=False):
+        from types import SimpleNamespace
+        notice = SimpleNamespace(version=version, content="Full approved notice",
+                                 is_approved=True, is_active=True,
+                                 approved_at=object(), effective_date=object())
+        waiver = SimpleNamespace(is_void=False, agreed=True, member_id=5,
+                                 participant_type="minor" if minor else "adult")
+        decision = SimpleNamespace(
+            decision=choice, signed_at=object(), notice=notice,
+            notice_version=version, notice_text=notice.content,
+            signer_name="Parent Smith" if minor else "Student Smith",
+            signature="Signed", guardian_relationship="parent" if minor else "",
+            waiver_signature=waiver,
+        )
+        if verified:
+            decision.verification = SimpleNamespace(verified_by_id=1)
+        return decision
+
+    @override_settings(BIOMETRIC_RECOGNITION_ENABLED=False)
+    @patch("crm.services.biometric_consent.BiometricConsentRecord")
+    def test_disabled_feature_never_authorizes(self, model):
         from types import SimpleNamespace
         from crm.services.biometric_consent import has_biometric_consent
-        signature_model.objects.filter.return_value.order_by.return_value.first.return_value = SimpleNamespace(
-            participant_type="adult", biometric_consent=None, biometric_notice_version=""
-        )
+        model.objects.filter.return_value.select_related.return_value.order_by.return_value.first.return_value = self._decision()
         self.assertFalse(has_biometric_consent(SimpleNamespace(pk=5, member_type="adult")))
 
-    @patch("crm.services.biometric_consent.WaiverSignature")
-    def test_draft_notice_cannot_authorize_recognition(self, signature_model):
+    @override_settings(BIOMETRIC_RECOGNITION_ENABLED=True)
+    @patch("crm.services.biometric_consent.BiometricConsentWithdrawal")
+    @patch("crm.services.biometric_consent.BiometricConsentRecord")
+    def test_verified_approved_adult_authorizes(self, model, withdrawals):
         from types import SimpleNamespace
         from crm.services.biometric_consent import has_biometric_consent
-        signature_model.ADULT = "adult"
-        signature_model.objects.filter.return_value.order_by.return_value.first.return_value = SimpleNamespace(
-            participant_type="adult", biometric_consent=True, biometric_notice_version="2026-10-draft"
-        )
-        self.assertFalse(has_biometric_consent(SimpleNamespace(pk=5, member_type="adult")))
-
-    @override_settings(BIOMETRIC_APPROVED_NOTICE_VERSIONS=("approved-v1",))
-    @patch("crm.services.biometric_consent.WaiverSignature")
-    def test_approved_explicit_adult_consent_authorizes(self, signature_model):
-        from types import SimpleNamespace
-        from crm.services.biometric_consent import has_biometric_consent
-        signature_model.ADULT = "adult"
-        signature_model.objects.filter.return_value.order_by.return_value.first.return_value = SimpleNamespace(
-            participant_type="adult", biometric_consent=True, biometric_notice_version="approved-v1"
-        )
+        model.objects.filter.return_value.select_related.return_value.order_by.return_value.first.return_value = self._decision()
+        withdrawals.objects.filter.return_value.exists.return_value = False
         self.assertTrue(has_biometric_consent(SimpleNamespace(pk=5, member_type="adult")))
+
+    @override_settings(BIOMETRIC_RECOGNITION_ENABLED=True)
+    @patch("crm.services.biometric_consent.BiometricConsentWithdrawal")
+    @patch("crm.services.biometric_consent.BiometricConsentRecord")
+    def test_withdrawal_blocks_earlier_grant(self, model, withdrawals):
+        from types import SimpleNamespace
+        from crm.services.biometric_consent import has_biometric_consent
+        model.objects.filter.return_value.select_related.return_value.order_by.return_value.first.return_value = self._decision()
+        withdrawals.objects.filter.return_value.exists.return_value = True
+        self.assertFalse(has_biometric_consent(SimpleNamespace(pk=5, member_type="adult")))
+
+    @override_settings(BIOMETRIC_RECOGNITION_ENABLED=True)
+    @patch("crm.services.biometric_consent.BiometricConsentWithdrawal")
+    @patch("crm.services.biometric_consent.BiometricConsentRecord")
+    def test_unverified_decision_is_not_authorized(self, model, withdrawals):
+        from types import SimpleNamespace
+        from crm.services.biometric_consent import has_biometric_consent
+        model.objects.filter.return_value.select_related.return_value.order_by.return_value.first.return_value = self._decision(verified=False)
+        withdrawals.objects.filter.return_value.exists.return_value = False
+        self.assertFalse(has_biometric_consent(SimpleNamespace(pk=5, member_type="adult")))
+
+    @override_settings(BIOMETRIC_RECOGNITION_ENABLED=True)
+    @patch("crm.services.biometric_consent.BiometricConsentWithdrawal")
+    @patch("crm.services.biometric_consent.BiometricConsentRecord")
+    def test_draft_notice_cannot_authorize(self, model, withdrawals):
+        from types import SimpleNamespace
+        from crm.services.biometric_consent import has_biometric_consent
+        model.objects.filter.return_value.select_related.return_value.order_by.return_value.first.return_value = self._decision(version="2026-10-draft")
+        withdrawals.objects.filter.return_value.exists.return_value = False
+        self.assertFalse(has_biometric_consent(SimpleNamespace(pk=5, member_type="adult")))
+
+    @override_settings(BIOMETRIC_RECOGNITION_ENABLED=True)
+    @patch("crm.services.biometric_consent.BiometricConsentWithdrawal")
+    @patch("crm.services.biometric_consent.BiometricConsentRecord")
+    def test_declined_consent_never_authorizes(self, model, withdrawals):
+        from types import SimpleNamespace
+        from crm.services.biometric_consent import has_biometric_consent
+        model.objects.filter.return_value.select_related.return_value.order_by.return_value.first.return_value = self._decision(choice="decline")
+        self.assertFalse(has_biometric_consent(SimpleNamespace(pk=5, member_type="adult")))
 
 
 class BiometricDeletionTests(SimpleTestCase):
