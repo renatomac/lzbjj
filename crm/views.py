@@ -1238,43 +1238,85 @@ def attendanceRecord(request, session_id):
 
 @crm_staff_required
 def attendance_visitor_search(request, session_id):
-    """Search former waiver signers, without activating a membership or trial."""
+    """Find signed waiver participants, including signatures not linked to a profile."""
     session = get_object_or_404(ClassSession.objects.select_related("class_template"), pk=session_id)
     term = request.GET.get("q", "").strip()
     if len(term) < 2:
         return JsonResponse({"results": []})
     from django.db.models import Q
-    members = (Member.objects.filter(plan__isnull=True, waivers__agreed=True, waivers__is_void=False)
-               .filter(Q(first_name__icontains=term) | Q(last_name__icontains=term))
-               .distinct().order_by("first_name", "last_name")[:20])
     from crm.services.attendance import eligible_for_session
-    results = [
-        {"id": m.pk, "name": f"{m.first_name} {m.last_name}",
-         "type": m.member_type}
-        for m in members
-        if eligible_for_session(m, session) and m.has_valid_waiver
-    ]
+    signatures = (WaiverSignature.objects.filter(agreed=True, is_void=False)
+                  .filter(Q(participant_first_name__icontains=term) |
+                          Q(participant_last_name__icontains=term))
+                  .select_related("member", "waiver_version")
+                  .order_by("-signed_at")[:100])
+    results, seen = [], set()
+    for sig in signatures:
+        if sig.participant_type != sig.waiver_version.waiver_type:
+            continue
+        if sig.member_id:
+            member = sig.member
+            if member.plan_id or not member.has_valid_waiver or not eligible_for_session(member, session):
+                continue
+            key = ("member", member.pk)
+        else:
+            if session.class_template.type == "adult" and sig.participant_type != WaiverSignature.ADULT:
+                continue
+            if session.class_template.type == "kids" and sig.participant_type != WaiverSignature.MINOR:
+                continue
+            key = ("signature", sig.pk)
+        if key in seen:
+            continue
+        seen.add(key)
+        results.append({
+            "id": sig.pk, "name": f"{sig.participant_first_name} {sig.participant_last_name}",
+            "type": sig.participant_type,
+        })
+        if len(results) == 20:
+            break
     return JsonResponse({"results": results})
 
 
 @crm_staff_required
 @require_POST
 def attendance_add_visitor(request, session_id):
-    """Add a previously waived visitor to exactly one class session."""
+    """Enroll a valid waiver signer in one session, without restarting a trial."""
+    from django.db import transaction
+    from crm.services.attendance import eligible_for_session
     session = get_object_or_404(ClassSession.objects.select_related("class_template"), pk=session_id)
     if session.is_canceled:
         return JsonResponse({"error": "Canceled sessions cannot accept visitors."}, status=400)
     try:
-        member_id = int(request.POST.get("member_id", ""))
+        signature_id = int(request.POST.get("signature_id", ""))
     except (TypeError, ValueError):
         return JsonResponse({"error": "Select a visitor."}, status=400)
-    member = get_object_or_404(Member, pk=member_id, plan__isnull=True)
-    from crm.services.attendance import eligible_for_session
-    if not member.has_valid_waiver or not eligible_for_session(member, session):
-        return JsonResponse({"error": "A valid waiver and matching class type are required."}, status=400)
-    SessionAttendance.objects.get_or_create(
-        session=session, member=member, defaults={"present": False}
-    )
+    with transaction.atomic():
+        sig = get_object_or_404(
+            WaiverSignature.objects.select_for_update().select_related("member", "waiver_version"),
+            pk=signature_id, agreed=True, is_void=False,
+        )
+        if sig.participant_type != sig.waiver_version.waiver_type:
+            return JsonResponse({"error": "Waiver type mismatch."}, status=400)
+        if sig.member_id:
+            member = sig.member
+        else:
+            # A waiver without a linked profile needs one for SessionAttendance.
+            # Do not guess an existing person's identity from a name alone.
+            member = Member.objects.create(
+                first_name=sig.participant_first_name,
+                last_name=sig.participant_last_name,
+                date_of_birth=sig.participant_dob or timezone.localdate(),
+                member_type="child" if sig.participant_type == WaiverSignature.MINOR else "adult",
+                address="Not provided", city="Not provided", zip_code="00000",
+                is_active=False, lifecycle_status=Member.LifecycleStatus.INACTIVE,
+            )
+            sig.member = member
+            sig.save(update_fields=["member"])
+        if member.plan_id or not member.has_valid_waiver or not eligible_for_session(member, session):
+            return JsonResponse({"error": "Visitor is not eligible for this session."}, status=400)
+        SessionAttendance.objects.get_or_create(
+            session=session, member=member, defaults={"present": False}
+        )
     return redirect("attendanceRecord", session_id=session.pk)
 
 
