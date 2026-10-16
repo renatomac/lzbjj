@@ -1201,6 +1201,7 @@ class WaiverSignature(models.Model):
     participant_first_name = models.CharField(max_length=100)
     participant_last_name = models.CharField(max_length=100)
     participant_dob = models.DateField(null=True, blank=True)
+    reported_belt_rank = models.CharField(max_length=50, choices=BeltRank.choices, blank=True, default="")
 
     # Parent / Guardian (required for minors)
     guardian_first_name = models.CharField(max_length=100, blank=True)
