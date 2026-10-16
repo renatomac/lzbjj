@@ -433,7 +433,7 @@ class Member(models.Model):
                          if not self.plan_id and self.trial_started_on else None)
 
         # Optional: handle inactive members
-        if not self.is_active and not (visitor_until and today < visitor_until):
+        if not self.is_active:
             removed = SessionAttendance.objects.filter(
                 member=self,
                 session__date__gte=today,
