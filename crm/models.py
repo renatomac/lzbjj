@@ -1259,7 +1259,7 @@ class BiometricDeletionJob(models.Model):
 
 
 class BiometricConsentRecord(models.Model):
-    """Append-only signed decision, independent from historical liability waivers."""
+    id = models.BigAutoField(primary_key=True)\n    """Append-only signed decision, independent from historical liability waivers."""
     member = models.ForeignKey("Member", null=True, blank=True, on_delete=models.PROTECT, related_name="biometric_consent_records")
     decision = models.CharField(max_length=10, choices=[("grant", "Grant"), ("decline", "Decline")])
     notice_version = models.CharField(max_length=60)
@@ -1278,7 +1278,7 @@ class BiometricConsentRecord(models.Model):
 
 
 class BiometricNoticeVersion(models.Model):
-    """Versioned biometric notice; legal approval must be independently documented."""
+    id = models.BigAutoField(primary_key=True)\n    """Versioned biometric notice; legal approval must be independently documented."""
     version = models.CharField(max_length=60, unique=True)
     title = models.CharField(max_length=200, default="Biometric Information Privacy Notice and Consent")
     content = models.TextField()
@@ -1297,7 +1297,7 @@ class BiometricNoticeVersion(models.Model):
 
 
 class BiometricConsentVerification(models.Model):
-    """Separate staff attestation; signed consent record remains unchanged."""
+    id = models.BigAutoField(primary_key=True)\n    """Separate staff attestation; signed consent record remains unchanged."""
     consent = models.OneToOneField("BiometricConsentRecord", on_delete=models.PROTECT, related_name="verification")
     verified_by = models.ForeignKey("crm.User", on_delete=models.PROTECT)
     verified_at = models.DateTimeField(auto_now_add=True)
@@ -1306,7 +1306,7 @@ class BiometricConsentVerification(models.Model):
 
 
 class BiometricConsentWithdrawal(models.Model):
-    """Append-only withdrawal. Do not rewrite the original signed consent."""
+    id = models.BigAutoField(primary_key=True)\n    """Append-only withdrawal. Do not rewrite the original signed consent."""
     member = models.ForeignKey("Member", on_delete=models.PROTECT, related_name="biometric_withdrawals")
     requested_by = models.ForeignKey("crm.User", on_delete=models.PROTECT)
     requested_at = models.DateTimeField(auto_now_add=True)
