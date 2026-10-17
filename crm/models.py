@@ -428,6 +428,9 @@ class Member(models.Model):
         they are allowed to attend based on member_type and membership dates.
         """
         today = timezone.localdate()
+        from datetime import timedelta
+        visitor_until = (self.trial_started_on + timedelta(days=14)
+                         if not self.plan_id and self.trial_started_on else None)
 
         # Optional: handle inactive members
         if not self.is_active:
@@ -460,7 +463,9 @@ class Member(models.Model):
                 valid_attendance = valid_attendance.filter(session__date__gte=self.membership_start_date)
             if self.membership_end_date:
                 valid_attendance = valid_attendance.filter(session__date__lte=self.membership_end_date)
-            if self.trial_expires_on and not self.plan_id:
+            if visitor_until:
+                valid_attendance = valid_attendance.filter(session__date__gte=self.trial_started_on, session__date__lt=visitor_until)
+            elif self.trial_expires_on and not self.plan_id:
                 valid_attendance = valid_attendance.filter(session__date__lt=self.trial_expires_on)
             valid_ids = list(valid_attendance.values_list("pk", flat=True))
             removed_count = future_attendance.exclude(pk__in=valid_ids).delete()[0]
@@ -481,7 +486,9 @@ class Member(models.Model):
                 allowed_sessions = allowed_sessions.filter(
                     date__lte=self.membership_end_date
                 )
-            if self.trial_expires_on and not self.plan_id:
+            if visitor_until:
+                allowed_sessions = allowed_sessions.filter(date__gte=self.trial_started_on, date__lt=visitor_until)
+            elif self.trial_expires_on and not self.plan_id:
                 allowed_sessions = allowed_sessions.filter(date__lt=self.trial_expires_on)
 
             created_count = 0
@@ -1194,6 +1201,7 @@ class WaiverSignature(models.Model):
     participant_first_name = models.CharField(max_length=100)
     participant_last_name = models.CharField(max_length=100)
     participant_dob = models.DateField(null=True, blank=True)
+    reported_belt_rank = models.CharField(max_length=50, choices=BeltRank.choices, blank=True, default="")
 
     # Parent / Guardian (required for minors)
     guardian_first_name = models.CharField(max_length=100, blank=True)
@@ -1209,6 +1217,11 @@ class WaiverSignature(models.Model):
     )
 
     agreed = models.BooleanField(default=False)
+
+    # Optional biometric consent, independently recorded with the waiver.
+    # Null denotes legacy waivers: never infer consent from an old signature.
+    biometric_consent = models.BooleanField(null=True, blank=True, default=None)
+    biometric_notice_version = models.CharField(max_length=30, blank=True, default="")
 
     # Audit trail
     signed_at = models.DateTimeField(auto_now_add=True)
@@ -1235,3 +1248,78 @@ class WaiverSignature(models.Model):
         if self.guardian_first_name or self.guardian_last_name:
             return f"{self.guardian_first_name} {self.guardian_last_name}".strip()
         return ""
+
+
+class BiometricDeletionJob(models.Model):
+    """Persistent, auditable deletion request; AWS failures remain retryable."""
+    member = models.ForeignKey("Member", on_delete=models.PROTECT, related_name="biometric_deletion_jobs")
+    reason = models.CharField(max_length=32, choices=[("revocation", "Revocation"), ("retention", "Retention"), ("manual", "Manual")])
+    status = models.CharField(max_length=16, default="pending", choices=[("pending", "Pending"), ("completed", "Completed"), ("failed", "Failed")])
+    requested_at = models.DateTimeField(default=timezone.now)
+    last_attempt_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    attempts = models.PositiveIntegerField(default=0)
+    last_error = models.TextField(blank=True)
+    deleted_face_count = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ["-requested_at"]
+
+
+class BiometricConsentRecord(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    """Append-only signed decision, independent from historical liability waivers."""
+    member = models.ForeignKey("Member", null=True, blank=True, on_delete=models.PROTECT, related_name="biometric_consent_records")
+    decision = models.CharField(max_length=10, choices=[("grant", "Grant"), ("decline", "Decline")])
+    notice_version = models.CharField(max_length=60)
+    notice_text = models.TextField()
+    notice = models.ForeignKey("BiometricNoticeVersion", null=True, blank=True, on_delete=models.PROTECT)
+    waiver_signature = models.OneToOneField("WaiverSignature", null=True, blank=True, on_delete=models.PROTECT, related_name="biometric_decision")
+    signer_name = models.CharField(max_length=200)
+    guardian_relationship = models.CharField(max_length=100, blank=True)
+    signature = models.TextField()
+    signed_at = models.DateTimeField(auto_now_add=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["-signed_at", "-pk"]
+
+
+class BiometricNoticeVersion(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    """Versioned biometric notice; legal approval must be independently documented."""
+    version = models.CharField(max_length=60, unique=True)
+    title = models.CharField(max_length=200, default="Biometric Information Privacy Notice and Consent")
+    content = models.TextField()
+    effective_date = models.DateField(null=True, blank=True)
+    is_approved = models.BooleanField(default=False)
+    is_active = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    approved_at = models.DateTimeField(null=True, blank=True)
+    approved_by = models.ForeignKey("crm.User", null=True, blank=True, on_delete=models.SET_NULL)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return self.version
+
+
+class BiometricConsentVerification(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    """Separate staff attestation; signed consent record remains unchanged."""
+    consent = models.OneToOneField("BiometricConsentRecord", on_delete=models.PROTECT, related_name="verification")
+    verified_by = models.ForeignKey("crm.User", on_delete=models.PROTECT)
+    verified_at = models.DateTimeField(auto_now_add=True)
+    method = models.CharField(max_length=120)
+    notes = models.TextField(blank=True)
+
+
+class BiometricConsentWithdrawal(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    """Append-only withdrawal. Do not rewrite the original signed consent."""
+    member = models.ForeignKey("Member", on_delete=models.PROTECT, related_name="biometric_withdrawals")
+    requested_by = models.ForeignKey("crm.User", on_delete=models.PROTECT)
+    requested_at = models.DateTimeField(auto_now_add=True)
+    reason = models.CharField(max_length=200, default="Member or guardian request")
