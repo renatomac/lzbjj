@@ -27,8 +27,9 @@ def validate_checkin(session, member, *, allow_past=False):
         # they must have a valid signed waiver AND already be on this session's
         # roster. This does not restore automatic enrollment or membership.
         manually_enrolled_visitor = (
-            member.plan_id is None
-            and member.has_valid_waiver
+            getattr(member, "plan_id", None) is None
+            and getattr(member, "has_valid_waiver", False)
+            and getattr(member, "pk", None) is not None
             and SessionAttendance.objects.filter(session=session, member=member).exists()
         )
         if not manually_enrolled_visitor:
