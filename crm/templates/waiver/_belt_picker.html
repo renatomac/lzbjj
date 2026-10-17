@@ -1,61 +1,101 @@
 {% load belt_images %}
-<div class="mb-4" data-belt-picker>
-  <label class="form-label fw-semibold" for="{{ form.reported_belt_rank.id_for_label }}">Current BJJ belt rank (optional)</label>
-  <p class="text-muted small mb-2">Choose the belt that best represents your current rank. The academy will verify it.</p>
-  <div class="visually-hidden">
-    {{ form.reported_belt_rank }}
+<div class="mb-4 waiver-belt-picker" data-belt-picker>
+  <label class="form-label fw-semibold" for="waiver-belt-toggle">Current BJJ belt rank (optional)</label>
+  <p class="text-muted small mb-2">Select your current belt. The academy will verify it.</p>
+  <div class="visually-hidden">{{ form.reported_belt_rank }}</div>
+  <div class="dropdown">
+    <button id="waiver-belt-toggle" class="btn btn-outline-secondary w-100 d-flex align-items-center justify-content-between gap-3 text-start waiver-belt-toggle"
+            type="button" aria-haspopup="listbox" aria-expanded="false" aria-controls="waiver-belt-options">
+      <span class="d-flex align-items-center gap-3">
+        <span data-selected-image></span>
+        <span data-selected-label>Select belt (optional)</span>
+      </span>
+      <span aria-hidden="true">▾</span>
+    </button>
+    <div id="waiver-belt-options" class="waiver-belt-options border rounded shadow-sm bg-body" role="listbox"
+         aria-label="Current BJJ belt rank" hidden>
+      <button type="button" class="waiver-belt-option" role="option" aria-selected="true" data-value="">
+        <span>Select belt (optional)</span>
+      </button>
+      {% for value, label in form.reported_belt_rank.field.choices %}
+        {% if value %}
+          <button type="button" class="waiver-belt-option" role="option" aria-selected="false" data-value="{{ value }}">
+            <span class="waiver-belt-art">{% belt_image value 0 "adult" 110 %}</span>
+            <span>{{ label }}</span>
+          </button>
+        {% endif %}
+      {% endfor %}
+    </div>
   </div>
-  <div class="row g-2" role="group" aria-label="Choose current BJJ belt rank">
-    {% for value, label in form.reported_belt_rank.field.choices %}
-      {% if value %}
-      <div class="col-6 col-sm-4 col-lg-3">
-        <button type="button" class="btn btn-outline-secondary w-100 h-100 py-3 belt-choice"
-                data-belt-value="{{ value }}" aria-pressed="false">
-          <span class="d-block mb-2">{% belt_image value 0 "adult" 125 %}</span>
-          <span class="d-block small fw-semibold">{{ label }}</span>
-        </button>
-      </div>
-      {% endif %}
-    {% endfor %}
-  </div>
-  <button type="button" class="btn btn-link btn-sm px-0 mt-2" data-clear-belt>Clear selection</button>
   {% if form.reported_belt_rank.errors %}
     <div class="text-danger">{{ form.reported_belt_rank.errors }}</div>
   {% endif %}
 </div>
 <style>
-  [data-belt-picker] .belt-choice { min-height: 105px; white-space: normal; }
-  [data-belt-picker] .belt-choice[aria-pressed="true"] {
-    border: 2px solid var(--bs-primary, #0d6efd);
-    background: var(--bs-primary-bg-subtle, #e7f1ff);
-    color: var(--bs-body-color, #212529);
-    box-shadow: 0 0 0 2px rgba(13,110,253,.12);
-  }
-  [data-belt-picker] .belt-choice img { max-width: 100%; height: auto; }
+.waiver-belt-picker .dropdown { position:relative; }
+.waiver-belt-toggle { min-height:64px; }
+.waiver-belt-options {
+  position:absolute; left:0; right:0; top:100%; z-index:1060;
+  max-height:340px; overflow-y:auto; overscroll-behavior:contain;
+  padding:5px; margin-top:3px;
+}
+.waiver-belt-options[hidden] { display:none; }
+.waiver-belt-option {
+  display:flex; align-items:center; gap:16px; width:100%; padding:9px 14px;
+  border:0; border-radius:5px; background:transparent; color:inherit; text-align:left;
+  cursor:pointer; min-height:52px;
+}
+.waiver-belt-option:hover, .waiver-belt-option:focus-visible,
+.waiver-belt-option[aria-selected="true"] {
+  background:var(--bs-primary,#0d6efd); color:white; outline:none;
+}
+.waiver-belt-art { display:inline-flex; width:115px; flex-shrink:0; align-items:center; }
+.waiver-belt-art img { max-width:100%; height:auto; }
 </style>
 <script>
 document.addEventListener("DOMContentLoaded", function () {
   document.querySelectorAll("[data-belt-picker]").forEach(function (picker) {
     const select = picker.querySelector("select");
-    const buttons = Array.from(picker.querySelectorAll("[data-belt-value]"));
+    const toggle = picker.querySelector(".waiver-belt-toggle");
+    const menu = picker.querySelector(".waiver-belt-options");
+    const options = Array.from(menu.querySelectorAll("[data-value]"));
+    const label = picker.querySelector("[data-selected-label]");
+    const image = picker.querySelector("[data-selected-image]");
     if (!select) return;
-    function update() {
-      buttons.forEach(function (button) {
-        button.setAttribute("aria-pressed", String(button.dataset.beltValue === select.value));
-      });
+    function render() {
+      const chosen = options.find(o => o.dataset.value === select.value) || options[0];
+      label.textContent = chosen.textContent.trim();
+      image.replaceChildren();
+      const art = chosen.querySelector(".waiver-belt-art");
+      if (art) image.appendChild(art.cloneNode(true));
+      options.forEach(o => o.setAttribute("aria-selected", String(o === chosen)));
     }
-    buttons.forEach(function (button) {
-      button.addEventListener("click", function () {
-        select.value = button.dataset.beltValue;
-        select.dispatchEvent(new Event("change", {bubbles: true}));
-        update();
+    function close() { menu.hidden = true; toggle.setAttribute("aria-expanded", "false"); }
+    function open() { menu.hidden = false; toggle.setAttribute("aria-expanded", "true");
+      (options.find(o => o.dataset.value === select.value) || options[0]).focus(); }
+    toggle.addEventListener("click", function () { menu.hidden ? open() : close(); });
+    options.forEach(function (option, i) {
+      option.addEventListener("click", function () {
+        select.value = option.dataset.value;
+        select.dispatchEvent(new Event("change", {bubbles:true}));
+        render(); close(); toggle.focus();
+      });
+      option.addEventListener("keydown", function (event) {
+        if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+          event.preventDefault();
+          options[(i + (event.key === "ArrowDown" ? 1 : -1) + options.length) % options.length].focus();
+        } else if (event.key === "Escape") { close(); toggle.focus(); }
+        else if (event.key === "Home") { event.preventDefault(); options[0].focus(); }
+        else if (event.key === "End") { event.preventDefault(); options[options.length-1].focus(); }
       });
     });
-    picker.querySelector("[data-clear-belt]").addEventListener("click", function () {
-      select.value = "";
-      update();
+    document.addEventListener("click", e => { if (!picker.contains(e.target)) close(); });
+    toggle.addEventListener("keydown", e => {
+      if (e.key === "ArrowDown" || e.key === "Enter" || e.key === " ") {
+        e.preventDefault(); open();
+      } else if (e.key === "Escape") close();
     });
-    update();
+    render();
   });
 });
 </script>
