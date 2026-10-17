@@ -569,7 +569,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <div class="dropdown ms-2">
                   <button class="btn btn-light dropdown-toggle d-flex align-items-center gap-2" type="button" id="userMenu" data-bs-toggle="dropdown" aria-expanded="false">
                     <i class="fas fa-user-circle" aria-hidden="true"></i>
-                    <span class="text-truncate" style="max-width: 180px;">{{ user.username }}</span>
+                    <span class="text-truncate" style="max-width: 180px;">{% if user.member and user.member.first_name %}{{ user.member.first_name }}{% elif user.first_name %}{{ user.first_name }}{% else %}{{ user.username }}{% endif %}</span>
                   </button>
                   <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userMenu">
                     <li><a class="dropdown-item" href="{% url 'change_password' %}"><i class="fas fa-key me-2" aria-hidden="true"></i>Change Password</a></li>
