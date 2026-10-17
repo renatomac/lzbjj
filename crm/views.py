@@ -1314,9 +1314,12 @@ def attendance_add_visitor(request, session_id):
             sig.save(update_fields=["member"])
         if member.plan_id or not member.has_valid_waiver or not eligible_for_session(member, session):
             return JsonResponse({"error": "Visitor is not eligible for this session."}, status=400)
-        SessionAttendance.objects.get_or_create(
-            session=session, member=member, defaults={"present": False}
+        attendance, _ = SessionAttendance.objects.get_or_create(
+            session=session, member=member, defaults={"present": False, "is_automatic": False}
         )
+        if attendance.is_automatic:
+            attendance.is_automatic = False
+            attendance.save(update_fields=["is_automatic"])
     return redirect("attendanceRecord", session_id=session.pk)
 
 
