@@ -428,9 +428,8 @@ class Member(models.Model):
         they are allowed to attend based on member_type and membership dates.
         """
         today = timezone.localdate()
-        from datetime import timedelta
-        visitor_until = (self.trial_started_on + timedelta(days=14)
-                         if not self.plan_id and self.trial_started_on else None)
+        # Trial visitors are automatically listed only during the free-trial period.
+        visitor_until = self.trial_expires_on if not self.plan_id else None
 
         # Optional: handle inactive members
         if not self.is_active:
@@ -464,7 +463,7 @@ class Member(models.Model):
             if self.membership_end_date:
                 valid_attendance = valid_attendance.filter(session__date__lte=self.membership_end_date)
             if visitor_until:
-                valid_attendance = valid_attendance.filter(session__date__gte=self.trial_started_on, session__date__lt=visitor_until)
+                valid_attendance = valid_attendance.filter(session__date__lt=visitor_until)
             elif self.trial_expires_on and not self.plan_id:
                 valid_attendance = valid_attendance.filter(session__date__lt=self.trial_expires_on)
             valid_ids = list(valid_attendance.values_list("pk", flat=True))
@@ -487,7 +486,7 @@ class Member(models.Model):
                     date__lte=self.membership_end_date
                 )
             if visitor_until:
-                allowed_sessions = allowed_sessions.filter(date__gte=self.trial_started_on, date__lt=visitor_until)
+                allowed_sessions = allowed_sessions.filter(date__lt=visitor_until)
             elif self.trial_expires_on and not self.plan_id:
                 allowed_sessions = allowed_sessions.filter(date__lt=self.trial_expires_on)
 
