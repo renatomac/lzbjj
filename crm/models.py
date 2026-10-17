@@ -435,6 +435,8 @@ class Member(models.Model):
         if not self.is_active:
             removed = SessionAttendance.objects.filter(
                 member=self,
+                is_automatic=True,
+                present=False,
                 session__date__gte=today,
             ).delete()[0]
             return {"added": 0, "removed": removed}
@@ -451,6 +453,8 @@ class Member(models.Model):
             # Remove invalid future attendance
             future_attendance = SessionAttendance.objects.filter(
                 member=self,
+                is_automatic=True,
+                present=False,
                 session__date__gte=today,
             )
 
@@ -495,7 +499,7 @@ class Member(models.Model):
                 _, created = SessionAttendance.objects.get_or_create(
                     session=session,
                     member=self,
-                    defaults={"present": False},
+                    defaults={"present": False, "is_automatic": True},
                 )
                 if created:
                     created_count += 1
@@ -930,6 +934,7 @@ class SessionAttendance(models.Model):
     session = models.ForeignKey(ClassSession, on_delete=models.CASCADE)
     member = models.ForeignKey(Member, on_delete=models.CASCADE)
     present = models.BooleanField(default=True)
+    is_automatic = models.BooleanField(default=False, help_text="Automatically generated roster entry; staff-added entries are preserved.")
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=["session", "member"], name="unique_session_member_attendance")]
