@@ -7,18 +7,18 @@
 
 {% block content %}
 <div class="row justify-content-center">
-  <div class="col-lg-6 col-sm-12">
+  <div class="col-12 col-xl-10">
     <div class="card main-card mb-4">
       <div class="card-body d-flex justify-content-between align-items-center flex-wrap gap-3">
         <div>
-          <h1 class="fw-bold fs-2 mb-1">Class Session View</h1>
+          <h1 class="fw-bold fs-2 mb-1">{{ session.class_template.name }} · Attendance</h1>
           <p class="text-muted mb-0">
-            Check in members, track attendance
+            {{ session.date|date:"D, M j, Y" }} · {{ session.effective_start_time|time:"g:i A" }} · {{ session.effective_instructor|default:"Instructor TBD" }}
           </p>
         </div>
-        <div class="d-flex gap-2 align-items-center">
+        <div class="d-flex gap-2 align-items-center flex-wrap">
           {% if request.user.is_staff %}
-            <a href="{% url 'attendance_bulk' %}?session_id={{ sessionSelected }}" class="btn btn-sm btn-primary">Bulk attendance</a>
+            <a href="{% url 'attendance_bulk' %}?session_id={{ sessionSelected }}" class="btn btn-sm btn-primary"><i class="fa-solid fa-camera me-2"></i>Phone / tablet camera</a>
           {% endif %}
           <a href="{{ request.META.HTTP_REFERER|default:'/' }}" class="btn btn-custom-ghost">
             <i class="fa-solid fa-arrow-left me-2"></i> Back
@@ -30,22 +30,22 @@
 </div>
 
 <div class="row justify-content-center">
-  <div class="col-lg-6 col-sm-12">
+  <div class="col-12 col-xl-10">
     <div class="card main-card mb-4">
       <div class="card-body">
 
         <div class="card mb-4">
           <div class="card-body">
 
-            <form method="GET" class="row g-3 mb-4 px-5 w-100" >
+            <form method="GET" class="row g-3 mb-4 px-2 px-md-4 w-100" >
               <div class="col-12 col-lg-4">
                   <label for="sessionDate" class="form-label fw-semibold">Date</label>
-                  <input name="sessionDate" id="sessionDate" type="date" class="form-control m-0 w-100"  value={{session.date|date:'Y-m-d'}}>
+                  <input name="sessionDate" id="sessionDate" type="date" class="form-control m-0 w-100"  value="{{session.date|date:'Y-m-d'}}">
               </div>
 
               <div class="col-12 col-lg-8 mb-4">
-                <label for="sessionSelect" class="form-label fw-semibold">Class {{sessionSelect}}</label>
-                <select name="sessionSelect" id="sessionSelect" class="form-select w-75" >
+                <label for="sessionSelect" class="form-label fw-semibold">Class </label>
+                <select name="sessionSelect" id="sessionSelect" class="form-select w-100" >
                   <option value=0>Select Class</option>
                   {% for Session in todaySessions %}
 
@@ -60,7 +60,7 @@
             </form>
 
             <div class="row g-3 mb-2">
-              <div class="mb-4 px-5 w-100">
+              <div class="mb-4 px-2 px-md-4 w-100">
                 <div class="d-flex flex-wrap gap-1 mb-1">
                   <form method="GET">
 
@@ -70,7 +70,7 @@
                   <a href="{% url 'attendanceRecord' sessionSelected %}?filter=checked" class="btn btn-outline-secondary {% if filter == 'checked' %}active{%endif%}">
                     Checked-in
                   </a>
-                  <a href="{% url 'attendanceRecord' sessionSelected %}?filter=not" class="btn btn-outline-secondary {% if filter == 'not' %}active{%endif%}">
+                  <a href="{% url 'attendanceRecord' sessionSelected %}?filter=unchecked" class="btn btn-outline-secondary {% if filter == 'unchecked' %}active{%endif%}">
                     Not checked-in
                   </a>
                 </form>
@@ -81,7 +81,7 @@
 
             {% csrf_token %}
             <div class="row g-3 mb-2">
-              <div class="mb-4 px-5 w-100 ">
+              <div class="mb-4 px-2 px-md-4 w-100 ">
                 <label for="techSelect" class="form-label fw-semibold">Technique</label>
                 <select multiple name="techSelect" id="techSelect" class="form-select" {% if session.is_canceled == True  %}disabled{%endif%}>
                   {% for technique in technics %}
@@ -92,7 +92,7 @@
             </div>
 
             <div class="row g-3 mb-2">
-              <div class="mb-4 px-5 w-100 ">
+              <div class="mb-4 px-2 px-md-4 w-100 ">
                 <label for="comment">Comments:</label>
                 <textarea class="form-control fw-semibold m-0 " rows="2" id="comment-id" name="comment" {% if session.is_canceled == True  %}disabled{%endif%}>{{comment}} </textarea>
               </div>
@@ -142,9 +142,68 @@
           </div>
 
         </div>
+        <!-- Staff-only waiver visitor lookup -->
+        {% if not session.is_canceled %}
+        <div class="card mb-4">
+          <div class="card-body">
+            <h5 class="fw-semibold mb-2"><i class="fa-solid fa-user-plus me-2"></i>Add a previous visitor</h5>
+            <p class="text-muted small">Search people who previously signed a valid waiver. Adding someone here does not restart their free trial or membership.</p>
+            <label for="visitorSearch" class="form-label">Search visitor by name</label>
+            <input id="visitorSearch" class="form-control" type="search" autocomplete="off" placeholder="Enter at least two letters">
+            <div id="visitorSearchResults" class="list-group mt-2" aria-live="polite"></div>
+          </div>
+        </div>
+        <script>
+        document.addEventListener("DOMContentLoaded", function () {
+          const input = document.getElementById("visitorSearch");
+          const results = document.getElementById("visitorSearchResults");
+          const searchUrl = "{% url 'attendance_visitor_search' session.id %}";
+          const addUrl = "{% url 'attendance_add_visitor' session.id %}";
+          const csrf = document.querySelector('input[name="csrfmiddlewaretoken"]')?.value || "";
+          let requestId = 0;
+          input.addEventListener("input", async function () {
+            const q = input.value.trim();
+            const current = ++requestId;
+            results.replaceChildren();
+            if (q.length < 2) return;
+            try {
+              const response = await fetch(searchUrl + "?q=" + encodeURIComponent(q), {credentials: "same-origin"});
+              if (!response.ok) throw new Error("Search failed");
+              const data = await response.json();
+              if (current !== requestId) return;
+              if (!data.results.length) {
+                const empty = document.createElement("p");
+                empty.className = "text-muted small";
+                empty.textContent = "No eligible waiver visitors found.";
+                results.appendChild(empty);
+              }
+              data.results.forEach(person => {
+                const form = document.createElement("form");
+                form.method = "POST";
+                form.action = addUrl;
+                form.className = "list-group-item d-flex justify-content-between align-items-center gap-2";
+                const token = document.createElement("input");
+                token.type = "hidden"; token.name = "csrfmiddlewaretoken"; token.value = csrf;
+                const id = document.createElement("input");
+                id.type = "hidden"; id.name = "signature_id"; id.value = person.id;
+                const name = document.createElement("span");
+                name.textContent = person.name + " (" + person.type + ")";
+                const button = document.createElement("button");
+                button.type = "submit"; button.className = "btn btn-sm btn-outline-primary";
+                button.textContent = "Add to class";
+                form.append(token, id, name, button);
+                results.appendChild(form);
+              });
+            } catch (_) {
+              if (current === requestId) results.textContent = "Unable to search visitors right now.";
+            }
+          });
+        });
+        </script>
+        {% endif %}
         <!-- Roster -->
         <div class="card mb-4">
-          <div id='students' class="mb-4 px-5 w-100">
+          <div id='students' class="mb-4 px-2 px-md-4 w-100">
             {%if attending_list %}
             <div id="roster" class="d-grid gap-3 ">
               <div class="table-responsive">
@@ -190,7 +249,7 @@
                       </td>
                       <td>
                         {%if attendee.present%}
-                          <button class="btn btn-outline-secondary btn-sm toggle-attendance"  data-attendee-id = {{attendee.id}}>
+                          <button class="btn btn-outline-secondary btn-sm toggle-attendance" aria-label="Toggle student attendance"  data-attendee-id = {{attendee.id}}>
                             <i class="fa-solid fa-rotate-left me-1" id="btn_i{{attendee.id}}"></i>
                             <span id="labelBtn{{attendee.id}}">Undo</span>
                           </button>
@@ -220,8 +279,8 @@
         <div class="border-top pt-3">
           <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
             <div class="small text-muted">
-              <strong id="countChecked">{{ attending_list|length }}</strong> checked-in •
-              <strong id="countTotal">{{ attending_list|length }}</strong> total
+              <strong id="countChecked">{{ count_checked }}</strong> checked-in •
+              <strong id="countTotal">{{ count_total }}</strong> total
             </div>
 
             <div class="btn-group d-none">

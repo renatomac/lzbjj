@@ -10,6 +10,8 @@ from datetime import datetime, date
 
 from .models import APIToken  # your existing token model
 from .serializers import MemberSyncSerializer
+from crm.services.attendance import set_member_attendance
+from django.core.exceptions import ValidationError
 
 Member = apps.get_model('crm', 'Member')
 Class = apps.get_model('crm', 'Class')                # template model
@@ -94,31 +96,17 @@ class PiAttendanceCompat(APIView):
         notes = data.get('notes') or ''
         confidence = data.get('confidence')
 
-        # 1) find an existing session for that date
-        session = ClassSession.objects.filter(date=day, is_canceled=False).order_by('id').first()
-
-        # 2) if none, ensure an 'Open Check-ins' template + session for this day
+        session_id = data.get('session_id')
+        if not session_id:
+            return Response({'error': 'session_id is required; ambiguous date-only check-ins are not supported'}, status=400)
+        session = ClassSession.objects.filter(pk=session_id, date=day, is_canceled=False).first()
         if not session:
-            open_cls, _ = Class.objects.get_or_create(
-                name='Open Check-ins',
-                defaults={'type': 'open', 'is_active': True}
-            )
-            session, _ = ClassSession.objects.get_or_create(
-                class_template=open_cls,
-                date=day,
-                defaults={'start_time': None, 'end_time': None, 'instructor': None}
-            )
-
-        # 3) idempotent upsert by (member, session or date)
-        att, created = SessionAttendance.objects.get_or_create(
-            session=session,
-            member=member,
-            defaults={'present': True}
-        )
-        if not created:
-            att.present = True
-            att.save(update_fields=['present'])
-
+            return Response({'error': 'Invalid or canceled session for this date'}, status=400)
+        created = not SessionAttendance.objects.filter(session=session, member=member).exists()
+        try:
+            att = set_member_attendance(session, member, True)
+        except ValidationError as exc:
+            return Response({'error': exc.messages[0]}, status=400)
         # Optional: notify staff - Updated to use your existing notification structure
         try:
             from notifications.utils import create_notification
@@ -219,42 +207,22 @@ class SyncAttendance(APIView):
                 confidence = item.get('confidence')
                 local_id = item.get('local_attendance_id')
 
-                # --- find existing session for the date or ensure 'Open Check-ins'
-                session = ClassSession.objects.filter(date=day, is_canceled=False).order_by('id').first()
+                session_id = item.get('session_id')
+                if not session_id:
+                    raise ValueError("session_id is required")
+                session = ClassSession.objects.filter(pk=session_id, date=day, is_canceled=False).first()
                 if not session:
-                    open_cls, _ = Class.objects.get_or_create(
-                        name='Open Check-ins',
-                        defaults={'type': 'open', 'is_active': True}
-                    )
-                    session, _ = ClassSession.objects.get_or_create(
-                        class_template=open_cls,
-                        date=day,
-                        defaults={'start_time': None, 'end_time': None, 'instructor': None}
-                    )
-
-                # --- upsert attendance (idempotent)
-                att, created = SessionAttendance.objects.get_or_create(
-                    session=session,
-                    member=member,
-                    defaults={
-                        'present': True,
-                        'check_in_time': ts or timezone.now(),
-                        'check_in_method': method,
-                        'notes': notes
-                    }
-                )
-                if not created:
-                    att.present = True
-                    if hasattr(att, 'check_in_method'):
-                        att.check_in_method = method
-                    if ts:
-                        att.check_in_time = ts
-                    if hasattr(att, 'notes'):
-                        att.notes = notes
-                    att.save()
-                    updated_count += 1
-                else:
+                    raise ValueError("Invalid or canceled session for this date")
+                existing = SessionAttendance.objects.filter(session=session, member=member).exists()
+                try:
+                    att = set_member_attendance(session, member, True)
+                except ValidationError as exc:
+                    raise ValueError(exc.messages[0])
+                created = not existing
+                if created:
                     created_count += 1
+                else:
+                    updated_count += 1
 
                 results.append({
                     'index': idx,
