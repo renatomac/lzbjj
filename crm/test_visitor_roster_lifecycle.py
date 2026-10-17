@@ -52,6 +52,41 @@ class VisitorRosterLifecycleTests(TestCase):
         self.visitor.sync_future_sessions()
         self.assertEqual(SessionAttendance.objects.filter(member=self.visitor).count(), 2)
 
+    def test_manual_future_visit_survives_trial_expiration_sync(self):
+        future = self.sessions[8]
+        manual = SessionAttendance.objects.create(
+            session=future, member=self.visitor, present=False, is_automatic=False
+        )
+        self.visitor.sync_future_sessions()
+        self.assertTrue(SessionAttendance.objects.filter(pk=manual.pk).exists())
+        self.assertFalse(SessionAttendance.objects.get(pk=manual.pk).is_automatic)
+
+    def test_checked_in_future_entry_is_not_deleted(self):
+        future = self.sessions[8]
+        checked = SessionAttendance.objects.create(
+            session=future, member=self.visitor, present=True, is_automatic=True
+        )
+        self.visitor.sync_future_sessions()
+        self.assertTrue(SessionAttendance.objects.filter(pk=checked.pk, present=True).exists())
+
+    def test_inactive_sync_preserves_manual_future_visit(self):
+        future = self.sessions[8]
+        manual = SessionAttendance.objects.create(
+            session=future, member=self.visitor, present=False, is_automatic=False
+        )
+        self.visitor.is_active = False
+        self.visitor.save(update_fields=["is_active"])
+        self.visitor.sync_future_sessions()
+        self.assertTrue(SessionAttendance.objects.filter(pk=manual.pk).exists())
+
+    def test_expired_auto_entry_is_removed(self):
+        future = self.sessions[8]
+        auto = SessionAttendance.objects.create(
+            session=future, member=self.visitor, present=False, is_automatic=True
+        )
+        self.visitor.sync_future_sessions()
+        self.assertFalse(SessionAttendance.objects.filter(pk=auto.pk).exists())
+
     def test_inactive_former_visitor_with_waiver_can_check_in_when_added(self):
         self.visitor.is_active = False
         self.visitor.save(update_fields=["is_active"])
