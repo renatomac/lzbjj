@@ -190,21 +190,13 @@ class MemberForm(forms.ModelForm):
         if self.instance.pk and self.instance.member_type == "child":
             self.fields.pop("user")
 
-        # Disable or hide phone if under 21
-        dob = self.initial.get("date_of_birth") or getattr(self.instance, "date_of_birth", None)
-        if isinstance(dob, str):
-            try:
-                dob = date.fromisoformat(dob)
-            except ValueError:
-                dob = None
-
-        if dob:
-            today = timezone.localdate()
-            age = today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
-            if age < 21:
-                # Option 1: disable the field
-                self.fields["phone"].widget.attrs["readonly"] = True
-                self.fields["phone"].widget.attrs["placeholder"] = "Optional for members under 21"
+        # Phone remains editable for all ages; requirement is checked on submit.
+        self.fields["phone"].widget.attrs.update({
+            "class": "form-control",
+            "inputmode": "tel",
+            "autocomplete": "tel-national",
+            "placeholder": "(847) 555-1234",
+        })
 
     def clean(self):
         cleaned_data = super().clean()
@@ -222,7 +214,7 @@ class MemberForm(forms.ModelForm):
 
         # Conditional phone validation (21+)
         if dob:
-            today = date.today()
+            today = timezone.localdate()
             age = today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
             if age >= 21 and not phone:
                 self.add_error("phone", "Phone number is required for members 21 or older.")
