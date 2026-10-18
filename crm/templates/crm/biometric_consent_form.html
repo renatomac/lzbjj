@@ -1,0 +1,16 @@
+{% extends "layout.html" %}
+{% block title %}Biometric Attendance Consent | LZBJJ{% endblock %}
+{% block content %}
+<div class="container py-4" style="max-width:760px">
+<h1 class="h3">Optional biometric attendance consent</h1>
+<p>Student: <strong>{{ member.first_name }} {{ member.last_name }}</strong></p>
+<div class="alert alert-info">Facial recognition is optional. Declining does not affect enrollment or access to classes. Manual attendance is available. This form does not authorize any collection before its submission.</div>
+<div class="card mb-3"><div class="card-header">Privacy notice · {{ notice_version }}</div><div class="card-body" style="white-space:pre-wrap">{{ notice }}</div></div>
+<form method="post">{% csrf_token %}
+<div class="mb-3"><label class="form-label" for="decision">Your choice</label><select class="form-select" id="decision" name="decision" required><option value="">Select an option</option><option value="grant">I voluntarily consent to biometric processing described above</option><option value="decline">I decline biometric processing; use manual check-in</option></select></div>
+<div class="mb-3"><label class="form-label" for="signer_name">Your full legal name</label><input class="form-control" name="signer_name" id="signer_name" maxlength="200" required></div>
+{% if is_minor %}<div class="mb-3"><label class="form-label" for="guardian_relationship">Your relationship to this child</label><input class="form-control" name="guardian_relationship" id="guardian_relationship" maxlength="100" required></div>{% endif %}
+<div class="mb-3"><label class="form-label" for="signature">Electronic signature (type full legal name again)</label><input class="form-control" name="signature" id="signature" maxlength="200" required></div>
+<div class="form-check mb-3"><input type="checkbox" class="form-check-input" name="acknowledged" id="acknowledged" required><label for="acknowledged" class="form-check-label">I have read the notice, understand that consent is optional, and confirm I am the student or an authorized parent/legal guardian.</label></div>
+<button class="btn btn-primary" type="submit">Submit signed decision</button></form></div>
+{% endblock %}
