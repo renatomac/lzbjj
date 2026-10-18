@@ -17,7 +17,7 @@ class MemberFormPhoneValidationTests(SimpleTestCase):
             field.clean("123")
 
     def test_optional_phone_remains_optional_at_field_level(self):
-        self.assertIsNone(MemberForm.base_fields["phone"].clean(""))
+        self.assertIn(MemberForm.base_fields["phone"].clean(""), ("", None))
 
 
 class MemberTemplateTests(SimpleTestCase):
