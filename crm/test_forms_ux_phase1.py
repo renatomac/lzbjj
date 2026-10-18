@@ -2,7 +2,7 @@
 from django.test import SimpleTestCase
 from django.template.loader import get_template
 from django.core.exceptions import ValidationError
-from crm.forms import MemberForm
+from crm.forms import MemberForm, validate_us_contact_phone
 
 
 class MemberFormPhoneValidationTests(SimpleTestCase):
@@ -23,3 +23,18 @@ class MemberFormPhoneValidationTests(SimpleTestCase):
 class MemberTemplateTests(SimpleTestCase):
     def test_member_template_is_available(self):
         self.assertIsNotNone(get_template("members/add.html"))
+
+class ContactPhoneValidationTests(SimpleTestCase):
+    def test_normalizes_contact_phone(self):
+        self.assertEqual(validate_us_contact_phone("8475551234"), "(847) 555-1234")
+
+    def test_accepts_blank_contact_phone(self):
+        self.assertEqual(validate_us_contact_phone(""), "")
+
+    def test_rejects_short_contact_phone(self):
+        with self.assertRaises(ValidationError):
+            validate_us_contact_phone("84755")
+
+    def test_rejects_invalid_area_code(self):
+        with self.assertRaises(ValidationError):
+            validate_us_contact_phone("1235551234")
