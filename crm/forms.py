@@ -10,6 +10,7 @@ from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 from datetime import timedelta, date
+import re
 from dateutil.relativedelta import relativedelta
 from localflavor.us.forms import USStateSelect
 from phonenumber_field.formfields import PhoneNumberField
@@ -74,7 +75,22 @@ class LoginForm(AuthenticationForm):
         widget=forms.PasswordInput(attrs={"class": "form-control"})
     )
 
+def validate_us_contact_phone(value):
+    """Allow blank contacts; reject malformed nonblank US numbers."""
+    if not value:
+        return value
+    digits = re.sub(r"\D", "", value)
+    if len(digits) == 11 and digits.startswith("1"):
+        digits = digits[1:]
+    if len(digits) != 10 or digits[0] in "01" or digits[3] in "01":
+        raise ValidationError("Enter a valid 10-digit US phone number.")
+    return f"({digits[:3]}) {digits[3:6]}-{digits[6:]}"
+
+
 class ContactForm(forms.ModelForm):
+    def clean_phone(self):
+        return validate_us_contact_phone(self.cleaned_data.get('phone'))
+
     class Meta:
         model = Contact
         fields = ['name', 'phone', 'email', 'relationship', 'contact_type']
@@ -211,6 +227,17 @@ class MemberForm(forms.ModelForm):
             if age >= 21 and not phone:
                 self.add_error("phone", "Phone number is required for members 21 or older.")
 
+        today = timezone.localdate()
+        if dob and dob > today:
+            self.add_error("date_of_birth", "Date of birth cannot be in the future.")
+        start = cleaned_data.get("membership_start_date")
+        end = cleaned_data.get("membership_end_date")
+        if start and end and end < start:
+            self.add_error("membership_end_date", "Membership end date cannot precede its start date.")
+        for name in ("current_belt_started_on", "ibjjf_rank_registered_on"):
+            value = cleaned_data.get(name)
+            if value and value > today:
+                self.add_error(name, "This date cannot be in the future.")
         return cleaned_data
 
     @transaction.atomic
