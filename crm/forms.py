@@ -526,12 +526,21 @@ class BeltPromotionForm(forms.ModelForm):
 # WAIVER FORMS
 
 class BaseWaiverForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from crm.models import BeltRank, ADULT_BELT_ORDER, KID_BELT_ORDER
+        ranks = KID_BELT_ORDER if isinstance(self, MinorWaiverForm) else ADULT_BELT_ORDER
+        self.fields["reported_belt_rank"].choices = [("", "Select belt (optional)")] + [
+            (rank, BeltRank(rank).label) for rank in ranks
+        ]
+
 
     class Meta:
         model = WaiverSignature
         fields = [
             "participant_first_name",
             "participant_last_name",
+            "reported_belt_rank",
             "participant_dob",
             "guardian_first_name",
             "guardian_last_name",
@@ -541,6 +550,7 @@ class BaseWaiverForm(forms.ModelForm):
         widgets = {
             "participant_first_name": forms.TextInput(attrs={"class": "form-control"}),
             "participant_last_name": forms.TextInput(attrs={"class": "form-control"}),
+            "reported_belt_rank": forms.Select(attrs={"class": "form-select"}),
             "participant_dob": forms.DateInput(
                 attrs={"class": "form-control", "type": "date"}
             ),

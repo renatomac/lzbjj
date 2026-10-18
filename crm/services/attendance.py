@@ -23,7 +23,17 @@ def validate_checkin(session, member, *, allow_past=False):
     if session.is_canceled:
         raise ValidationError("This class is canceled.")
     if not member.is_active:
-        raise ValidationError("This member is inactive.")
+        # Inactive former trial visitors may attend by staff invitation:
+        # they must have a valid signed waiver AND already be on this session's
+        # roster. This does not restore automatic enrollment or membership.
+        manually_enrolled_visitor = (
+            getattr(member, "plan_id", None) is None
+            and getattr(member, "has_valid_waiver", False)
+            and getattr(member, "pk", None) is not None
+            and SessionAttendance.objects.filter(session=session, member=member).exists()
+        )
+        if not manually_enrolled_visitor:
+            raise ValidationError("This member is inactive.")
     if not eligible_for_session(member, session):
         raise ValidationError("This member is not eligible for this class.")
     if not allow_past and session.date != timezone.localdate():

@@ -35,6 +35,7 @@ def start_trial_from_waiver(signature):
                 last_name=signature.participant_last_name,
                 date_of_birth=signature.participant_dob or timezone.localdate(),
                 member_type=member_type,
+                belt_rank=signature.reported_belt_rank or "white",
                 address="Not provided",
                 city="Not provided",
                 zip_code="00000",

@@ -38,6 +38,8 @@
             {% endif %}
         </div>
 
+        {% include "waiver/_belt_picker.html" %}
+
         <div class="mb-3">
             <label for="{{ form.participant_dob.id_for_label }}">
                 {{ form.participant_dob.label }}
@@ -118,6 +120,21 @@
             <div class="alert alert-danger">
                 {{ form.non_field_errors }}
             </div>
+        {% endif %}
+
+        {% if biometric_notice %}
+        <section class="card border-info mb-4" aria-labelledby="biometric-heading">
+          <div class="card-body">
+            <h3 id="biometric-heading" class="h5">Section 2 — Optional biometric consent</h3>
+            <p class="text-muted">The following is a separate, voluntary choice. Declining will not affect class participation. Manual attendance is available.</p>
+            <div class="border rounded p-3 mb-3" style="white-space:pre-wrap;max-height:420px;overflow-y:auto">{{ biometric_notice.content }}</div>
+            <p class="small">Notice version: {{ biometric_notice.version }}. Your decision and the exact notice are preserved alongside this signed waiver.</p>
+            <div class="form-check mb-2"><input class="form-check-input" type="radio" name="biometric_consent" value="yes" id="bio-yes" required {% if request.POST.biometric_consent == "yes" %}checked{% endif %}><label class="form-check-label" for="bio-yes">I voluntarily consent to biometric facial recognition for attendance.</label></div>
+            <div class="form-check"><input class="form-check-input" type="radio" name="biometric_consent" value="no" id="bio-no" required {% if request.POST.biometric_consent == "no" %}checked{% endif %}><label class="form-check-label" for="bio-no">I decline biometric processing; I prefer manual check-in.</label></div>
+          </div>
+        </section>
+        {% else %}
+        <div class="alert alert-secondary">Biometric facial recognition enrollment is currently unavailable. Signing this participation waiver does not authorize biometric processing.</div>
         {% endif %}
 
         <button type="submit" class="btn btn-primary">

@@ -142,6 +142,65 @@
           </div>
 
         </div>
+        <!-- Staff-only waiver visitor lookup -->
+        {% if not session.is_canceled %}
+        <div class="card mb-4">
+          <div class="card-body">
+            <h5 class="fw-semibold mb-2"><i class="fa-solid fa-user-plus me-2"></i>Add a previous visitor</h5>
+            <p class="text-muted small">Search people who previously signed a valid waiver. Adding someone here does not restart their free trial or membership.</p>
+            <label for="visitorSearch" class="form-label">Search visitor by name</label>
+            <input id="visitorSearch" class="form-control" type="search" autocomplete="off" placeholder="Enter at least two letters">
+            <div id="visitorSearchResults" class="list-group mt-2" aria-live="polite"></div>
+          </div>
+        </div>
+        <script>
+        document.addEventListener("DOMContentLoaded", function () {
+          const input = document.getElementById("visitorSearch");
+          const results = document.getElementById("visitorSearchResults");
+          const searchUrl = "{% url 'attendance_visitor_search' session.id %}";
+          const addUrl = "{% url 'attendance_add_visitor' session.id %}";
+          const csrf = document.querySelector('input[name="csrfmiddlewaretoken"]')?.value || "";
+          let requestId = 0;
+          input.addEventListener("input", async function () {
+            const q = input.value.trim();
+            const current = ++requestId;
+            results.replaceChildren();
+            if (q.length < 2) return;
+            try {
+              const response = await fetch(searchUrl + "?q=" + encodeURIComponent(q), {credentials: "same-origin"});
+              if (!response.ok) throw new Error("Search failed");
+              const data = await response.json();
+              if (current !== requestId) return;
+              if (!data.results.length) {
+                const empty = document.createElement("p");
+                empty.className = "text-muted small";
+                empty.textContent = "No eligible waiver visitors found.";
+                results.appendChild(empty);
+              }
+              data.results.forEach(person => {
+                const form = document.createElement("form");
+                form.method = "POST";
+                form.action = addUrl;
+                form.className = "list-group-item d-flex justify-content-between align-items-center gap-2";
+                const token = document.createElement("input");
+                token.type = "hidden"; token.name = "csrfmiddlewaretoken"; token.value = csrf;
+                const id = document.createElement("input");
+                id.type = "hidden"; id.name = "signature_id"; id.value = person.id;
+                const name = document.createElement("span");
+                name.textContent = person.name + " (" + person.type + ")";
+                const button = document.createElement("button");
+                button.type = "submit"; button.className = "btn btn-sm btn-outline-primary";
+                button.textContent = "Add to class";
+                form.append(token, id, name, button);
+                results.appendChild(form);
+              });
+            } catch (_) {
+              if (current === requestId) results.textContent = "Unable to search visitors right now.";
+            }
+          });
+        });
+        </script>
+        {% endif %}
         <!-- Roster -->
         <div class="card mb-4">
           <div id='students' class="mb-4 px-2 px-md-4 w-100">

@@ -1236,129 +1236,247 @@ def attendanceRecord(request, session_id):
     })
 
 
+@crm_staff_required
+def attendance_visitor_search(request, session_id):
+    """Find signed waiver participants, including signatures not linked to a profile."""
+    session = get_object_or_404(ClassSession.objects.select_related("class_template"), pk=session_id)
+    term = request.GET.get("q", "").strip()
+    if len(term) < 2:
+        return JsonResponse({"results": []})
+    from django.db.models import Q
+    from crm.services.attendance import eligible_for_session
+    signatures = (WaiverSignature.objects.filter(agreed=True, is_void=False)
+                  .filter(Q(participant_first_name__icontains=term) |
+                          Q(participant_last_name__icontains=term))
+                  .select_related("member", "waiver_version")
+                  .order_by("-signed_at")[:100])
+    results, seen = [], set()
+    for sig in signatures:
+        if sig.participant_type != sig.waiver_version.waiver_type:
+            continue
+        if sig.member_id:
+            member = sig.member
+            if member.plan_id or not member.has_valid_waiver or not eligible_for_session(member, session):
+                continue
+            key = ("member", member.pk)
+        else:
+            if session.class_template.type == "adult" and sig.participant_type != WaiverSignature.ADULT:
+                continue
+            if session.class_template.type == "kids" and sig.participant_type != WaiverSignature.MINOR:
+                continue
+            key = ("signature", sig.pk)
+        if key in seen:
+            continue
+        seen.add(key)
+        results.append({
+            "id": sig.pk, "name": f"{sig.participant_first_name} {sig.participant_last_name}",
+            "type": sig.participant_type,
+        })
+        if len(results) == 20:
+            break
+    return JsonResponse({"results": results})
+
+
+@crm_staff_required
+@require_POST
+def attendance_add_visitor(request, session_id):
+    """Enroll a valid waiver signer in one session, without restarting a trial."""
+    from django.db import transaction
+    from crm.services.attendance import eligible_for_session
+    session = get_object_or_404(ClassSession.objects.select_related("class_template"), pk=session_id)
+    if session.is_canceled:
+        return JsonResponse({"error": "Canceled sessions cannot accept visitors."}, status=400)
+    try:
+        signature_id = int(request.POST.get("signature_id", ""))
+    except (TypeError, ValueError):
+        return JsonResponse({"error": "Select a visitor."}, status=400)
+    with transaction.atomic():
+        sig = get_object_or_404(
+            WaiverSignature.objects.select_for_update().select_related("member", "waiver_version"),
+            pk=signature_id, agreed=True, is_void=False,
+        )
+        if sig.participant_type != sig.waiver_version.waiver_type:
+            return JsonResponse({"error": "Waiver type mismatch."}, status=400)
+        if sig.member_id:
+            member = sig.member
+        else:
+            # A waiver without a linked profile needs one for SessionAttendance.
+            # Do not guess an existing person's identity from a name alone.
+            member = Member.objects.create(
+                first_name=sig.participant_first_name,
+                last_name=sig.participant_last_name,
+                date_of_birth=sig.participant_dob or timezone.localdate(),
+                member_type="child" if sig.participant_type == WaiverSignature.MINOR else "adult",
+                address="Not provided", city="Not provided", zip_code="00000",
+                is_active=False, lifecycle_status=Member.LifecycleStatus.INACTIVE,
+            )
+            sig.member = member
+            sig.save(update_fields=["member"])
+        if member.plan_id or not member.has_valid_waiver or not eligible_for_session(member, session):
+            return JsonResponse({"error": "Visitor is not eligible for this session."}, status=400)
+        attendance, _ = SessionAttendance.objects.get_or_create(
+            session=session, member=member, defaults={"present": False, "is_automatic": False}
+        )
+        if attendance.is_automatic:
+            attendance.is_automatic = False
+            attendance.save(update_fields=["is_automatic"])
+    return redirect("attendanceRecord", session_id=session.pk)
+
+
 @login_required
 @crm_staff_required
 def attendance_enroll(request, member_id):
-    member = get_object_or_404(Member, pk=member_id)
-    if request.method == "POST":
-        image_file = request.FILES.get("face_image")
-        if not image_file:
-            image_data = request.POST.get("face_image_data")
-            if image_data:
-                try:
-                    _, encoded = image_data.split(",", 1) if "," in image_data else (None, image_data)
-                    image_bytes = base64.b64decode(encoded)
-                    image_file = io.BytesIO(image_bytes)
-                    image_file.name = f"face_capture_{member.id}.jpg"
-                    image_file.content_type = "image/jpeg"
-                except (TypeError, ValueError):
-                    image_file = None
+    from crm.aws_utils import index_member_face_sequence
+    from PIL import Image, ImageOps
 
-        if not image_file:
-            messages.error(request, "Please select a face image to enroll.")
+    member = get_object_or_404(Member, pk=member_id)
+    from crm.services.biometric_consent import has_biometric_consent
+    consent_valid = has_biometric_consent(member)
+    if request.method == "POST":
+        if not consent_valid:
+            messages.error(request, "An active, signed waiver with explicit biometric consent is required.")
         else:
             try:
-                face_id, _, image_key = index_member_face(member, image_file)
-                member.face_image_s3_key = image_key
+                captures = request.POST.getlist("pose_images")
+                if len(captures) != 5:
+                    raise ValueError("Capture all five guided poses before enrolling.")
+                images = []
+                for capture in captures:
+                    if not capture.startswith("data:image/jpeg;base64,"):
+                        raise ValueError("Invalid capture format.")
+                    raw = base64.b64decode(capture.partition(",")[2], validate=True)
+                    if len(raw) > 4 * 1024 * 1024:
+                        raise ValueError("One of the images exceeds the size limit.")
+                    image = ImageOps.exif_transpose(Image.open(io.BytesIO(raw))).convert("RGB")
+                    if image.width * image.height > 12_000_000:
+                        raise ValueError("Image dimensions are too large.")
+                    output = io.BytesIO()
+                    image.save(output, format="JPEG", quality=88)
+                    images.append(output.getvalue())
+                face_id = index_member_face_sequence(member, images)
                 member.rekognition_face_id = face_id
-                member.save(update_fields=["face_image_s3_key", "rekognition_face_id"])
-                messages.success(request, "Face enrolled successfully.")
-            except Exception as exc:
-                logger.exception("Face enrollment failed")
-                messages.error(request, str(exc))
-
-    return render(request, "attendance/enroll.html", {
-        "member": member,
-    })
+                # Preserve the existing S3 key: Member.get_photo_url() uses it for the profile photo.
+                member.save(update_fields=["rekognition_face_id"])
+                messages.success(request, "Five face angles enrolled successfully.")
+                return redirect("viewMember", member_id=member.pk)
+            except Exception:
+                logger.exception("Guided face enrollment failed")
+                messages.error(request, "Enrollment failed. Please retry with clear face images.")
+    return render(request, "attendance/enroll.html", {"member": member, "consent_valid": consent_valid})
 
 
 @login_required
 @crm_staff_required
 def attendance_bulk(request):
-    if not request.user.is_staff:
-        return HttpResponse("Staff access only", status=403)
+    """Two-step, staff-confirmed attendance from individual or group photographs."""
+    # Group images may include non-consenting bystanders; do not upload them
+    # to AWS until a separate collection/privacy workflow is approved.
+    from django.conf import settings
+    if request.method == "POST" and not (
+        getattr(settings, "BIOMETRIC_RECOGNITION_ENABLED", False)
+        and getattr(settings, "BIOMETRIC_BULK_SCANNING_ENABLED", False)
+    ):
+        return HttpResponse("Group biometric scanning is disabled.", status=403)
 
-    sessions = (
-        ClassSession.objects
-        .filter(date__gte=timezone.localdate())
-        .annotate(
-            effective_start_time_db=Coalesce(
-                "start_time",
-                F("class_template__start_time")
-            )
-        )
-        .order_by("date", "effective_start_time_db")
-    )
+    from django.core.exceptions import ValidationError
+    from crm.services.face_recognition import recognize_faces
+    from crm.services.biometric_consent import has_biometric_consent
+    from crm.services.attendance import validate_checkin
 
-    recognized_members = []
-    face_matches = None
+    today = timezone.localdate()
+    sessions = ClassSession.objects.filter(date=today, is_canceled=False).select_related("class_template").order_by("class_template__start_time")
     selected_session = None
+    candidates = []
+    token_key = "face_checkin_pending"
+    session_id = request.POST.get("session_id") or request.GET.get("session_id")
+    if session_id:
+        selected_session = sessions.filter(pk=session_id).first()
 
-    if request.method == "POST":
-        session_id = request.POST.get("session_id") or request.GET.get("session_id")
-        image_file = request.FILES.get("attendance_image")
-
-        if not image_file:
-            image_data = request.POST.get("attendance_image_data")
-            if image_data:
-                try:
-                    _, encoded = image_data.split(",", 1) if "," in image_data else (None, image_data)
-                    image_bytes = base64.b64decode(encoded)
-                    image_file = io.BytesIO(image_bytes)
-                    image_file.name = f"bulk_attendance_{session_id or 'photo'}.jpg"
-                    image_file.content_type = "image/jpeg"
-                except (TypeError, ValueError):
-                    image_file = None
-
-        if session_id:
-            selected_session = ClassSession.objects.filter(pk=session_id).first()
-
-        if not session_id:
-            messages.error(request, "Please select a class session.")
-        elif not image_file:
-            messages.error(request, "Please upload a class photo or use the camera.")
+    if request.method == "POST" and request.POST.get("action") == "confirm":
+        pending = request.session.pop(token_key, None)
+        if not pending or not selected_session or pending.get("session_id") != selected_session.pk:
+            messages.error(request, "Review expired or class changed. Please scan again.")
+        elif timezone.now().timestamp() - pending["created_at"] > 600:
+            messages.error(request, "Review expired after 10 minutes. Please scan again.")
         else:
-            session = get_object_or_404(ClassSession, pk=session_id)
-            selected_session = session
-            try:
-                matches, _ = search_faces_by_image(image_file)
-                face_matches = matches
-                member_ids = set()
-                for match in matches:
-                    external_id = match["Face"].get("ExternalImageId")
-                    if external_id:
-                        member_ids.add(int(external_id))
+            approved = set(request.POST.getlist("member_ids"))
+            valid_ids = {str(item["member_id"]) for item in pending["candidates"]}
+            approved &= valid_ids
+            saved = 0
+            already_present = 0
+            # Revalidate each member at confirmation time; the session review is
+            # only a proposal, never authorization to bypass check-in rules.
+            for member in Member.objects.filter(pk__in=approved):
+                try:
+                    validate_checkin(selected_session, member)
+                    if not has_biometric_consent(member):
+                        raise ValidationError("Biometric consent is not on file.")
+                    was_present = SessionAttendance.objects.filter(
+                        session=selected_session, member=member, present=True
+                    ).exists()
+                    record_member_attendance(selected_session, member)
+                    if was_present:
+                        already_present += 1
+                    else:
+                        saved += 1
+                except ValidationError as exc:
+                    messages.warning(request, f"{member}: {exc.messages[0]}")
+            if saved:
+                messages.success(request, f"{saved} new student check-in(s) recorded.")
+            if already_present:
+                messages.info(request, f"{already_present} student(s) were already checked in.")
+            if not saved and not already_present:
+                messages.warning(request, "No check-ins saved.")
+            return redirect("attendanceRecord", session_id=selected_session.pk)
 
-                for member_id in member_ids:
-                    member = Member.objects.filter(pk=member_id).first()
+    elif request.method == "POST":
+        image_file = request.FILES.get("attendance_image")
+        if not image_file:
+            image_data = request.POST.get("attendance_image_data", "")
+            if image_data.startswith("data:image/jpeg;base64,"):
+                try:
+                    image_file = io.BytesIO(base64.b64decode(image_data.partition(",")[2], validate=True))
+                except (ValueError, TypeError):
+                    image_file = None
+        if not selected_session:
+            messages.error(request, "Choose a valid class scheduled for today.")
+        elif not image_file:
+            messages.error(request, "Choose or capture a JPEG photo.")
+        else:
+            try:
+                detected = recognize_faces(image_file)
+                seen = set()
+                for face in detected:
+                    member = Member.objects.filter(pk=face["member_id"]).first() if face["member_id"] else None
                     if member:
-                        record_member_attendance(session, member)
-                        face_confidence = next(
-                            (match["Similarity"] for match in matches
-                             if match["Face"].get("ExternalImageId") == str(member_id)),
-                            0,
-                        )
-                        recognized_members.append({
-                            "member": member,
-                            "confidence": face_confidence,
-                        })
-                if not recognized_members:
-                    messages.warning(request, "No enrolled members were recognized in the photo.")
-                else:
-                    messages.success(request, "Attendance updated for recognized members.")
-            except Exception as exc:
-                logger.exception("Bulk attendance failed")
-                messages.error(request, str(exc))
-    else:
-        session_id = request.GET.get("session_id")
-        if session_id:
-            selected_session = ClassSession.objects.filter(pk=session_id).first()
+                        try:
+                            if not has_biometric_consent(member):
+                                raise ValidationError("Biometric consent is not on file.")
+                            validate_checkin(selected_session, member)
+                            if member.pk in seen:
+                                face["status"] = "duplicate"
+                                member = None
+                            else:
+                                seen.add(member.pk)
+                        except ValidationError:
+                            face["status"] = "ineligible"
+                            member = None
+                    candidates.append({"face_number": face["face_number"], "member": member,
+                                       "confidence": face["confidence"], "status": face["status"]})
+                request.session[token_key] = {
+                    "session_id": selected_session.pk,
+                    "created_at": timezone.now().timestamp(),
+                    "candidates": [{"member_id": item["member"].pk} for item in candidates if item["member"]],
+                }
+                if not candidates:
+                    messages.warning(request, "No faces detected. Try brighter lighting and a closer photo.")
+            except Exception:
+                logger.exception("Face scan failed")
+                messages.error(request, "Unable to process this photo. Please retry or use manual check-in.")
 
     return render(request, "attendance/bulk.html", {
-        "sessions": sessions,
-        "recognized_members": recognized_members,
-        "face_matches": face_matches,
-        "selected_session": selected_session,
+        "sessions": sessions, "selected_session": selected_session,
+        "candidates": candidates, "review_ready": bool(request.method == "POST" and request.POST.get("action") != "confirm" and candidates),
     })
 
 
@@ -2253,12 +2371,19 @@ def adult_waiver(request, member_id=None):
     if not waiver:
         return render(request, "waiver/no_waiver.html")  # handle case with no active waiver
 
+    from crm.services.biometric_invitation import active_notice
+    from crm.models import BiometricConsentRecord
+    notice = active_notice()
     if request.method == "POST":
         form = AdultWaiverForm(request.POST)
-        if form.is_valid():
+        if notice and request.POST.get("biometric_consent") not in ("yes", "no"):
+            form.add_error(None, "Choose whether to accept or decline optional biometric processing.")
+        if form.is_valid() and (not notice or request.POST.get("biometric_consent") in ("yes", "no")):
             sig = form.save(commit=False)
             sig.participant_type = WaiverSignature.ADULT
             sig.waiver_version = waiver
+            sig.biometric_consent = None
+            sig.biometric_notice_version = ""
             sig.ip_address = request.META.get("REMOTE_ADDR")
             sig.user_agent = request.META.get("HTTP_USER_AGENT", "")
             if member_id:
@@ -2266,6 +2391,17 @@ def adult_waiver(request, member_id=None):
             try:
                 with transaction.atomic():
                     sig.save()
+                    if notice:
+                        signer = (f"{sig.guardian_first_name} {sig.guardian_last_name}".strip()
+                                  if sig.participant_type == WaiverSignature.MINOR
+                                  else f"{sig.participant_first_name} {sig.participant_last_name}".strip())
+                        BiometricConsentRecord.objects.create(
+                            member=sig.member, waiver_signature=sig,
+                            decision="grant" if request.POST["biometric_consent"] == "yes" else "decline",
+                            notice=notice, notice_version=notice.version, notice_text=notice.content,
+                            signer_name=signer, guardian_relationship=sig.guardian_relationship if sig.participant_type == WaiverSignature.MINOR else "",
+                            signature=sig.signature, ip_address=sig.ip_address, user_agent=sig.user_agent,
+                        )
                     start_trial_from_waiver(sig)
             except ValueError as exc:
                 form.add_error(None, str(exc))
@@ -2277,6 +2413,7 @@ def adult_waiver(request, member_id=None):
     return render(request, "waiver/adult.html", {
         "form": form,
         "waiver": waiver,
+        "biometric_notice": notice,
     })
 
 
@@ -2290,12 +2427,19 @@ def minor_waiver(request, member_id=None):
     if not waiver:
         return render(request, "waiver/no_waiver.html")  # handle case with no active waiver
 
+    from crm.services.biometric_invitation import active_notice
+    from crm.models import BiometricConsentRecord
+    notice = active_notice()
     if request.method == "POST":
         form = MinorWaiverForm(request.POST)
-        if form.is_valid():
+        if notice and request.POST.get("biometric_consent") not in ("yes", "no"):
+            form.add_error(None, "Choose whether to accept or decline optional biometric processing.")
+        if form.is_valid() and (not notice or request.POST.get("biometric_consent") in ("yes", "no")):
             sig = form.save(commit=False)
             sig.participant_type = WaiverSignature.MINOR
             sig.waiver_version = waiver
+            sig.biometric_consent = None
+            sig.biometric_notice_version = ""
             sig.ip_address = request.META.get("REMOTE_ADDR")
             sig.user_agent = request.META.get("HTTP_USER_AGENT", "")
             if member_id:
@@ -2303,6 +2447,17 @@ def minor_waiver(request, member_id=None):
             try:
                 with transaction.atomic():
                     sig.save()
+                    if notice:
+                        signer = (f"{sig.guardian_first_name} {sig.guardian_last_name}".strip()
+                                  if sig.participant_type == WaiverSignature.MINOR
+                                  else f"{sig.participant_first_name} {sig.participant_last_name}".strip())
+                        BiometricConsentRecord.objects.create(
+                            member=sig.member, waiver_signature=sig,
+                            decision="grant" if request.POST["biometric_consent"] == "yes" else "decline",
+                            notice=notice, notice_version=notice.version, notice_text=notice.content,
+                            signer_name=signer, guardian_relationship=sig.guardian_relationship if sig.participant_type == WaiverSignature.MINOR else "",
+                            signature=sig.signature, ip_address=sig.ip_address, user_agent=sig.user_agent,
+                        )
                     start_trial_from_waiver(sig)
             except ValueError as exc:
                 form.add_error(None, str(exc))
@@ -2318,6 +2473,7 @@ def minor_waiver(request, member_id=None):
     return render(request, "waiver/minor.html", {
         "form": form,
         "waiver": waiver,
+        "biometric_notice": notice,
     })
 
 def waiver_success(request):
@@ -2503,3 +2659,111 @@ def attendance_report(request):
         "member_type": member_type,
         "members": members if 'members' in locals() else [],
     })
+
+
+@login_required
+@crm_staff_required
+@require_POST
+def revoke_member_biometric_consent(request, member_id):
+    """Append-only revocation. Queue deletion, never modify signed documents."""
+    from django.core.exceptions import PermissionDenied
+    from crm.models import BiometricConsentWithdrawal
+    from crm.services.biometric_deletion import queue_biometric_deletion
+    if not (request.user.is_staff or request.user.is_superuser):
+        raise PermissionDenied
+    member = get_object_or_404(Member, pk=member_id)
+    with transaction.atomic():
+        BiometricConsentWithdrawal.objects.create(member=member, requested_by=request.user)
+        queue_biometric_deletion(member)
+    messages.warning(request, "Biometric processing disabled. Deletion request queued for administrator review; AWS data has not been deleted.")
+    return redirect("viewMember", member_id=member.pk)
+
+@crm_staff_required
+def biometric_privacy_dashboard(request):
+    """Staff-only read-only biometric privacy overview; AWS inventory is opt-in."""
+    from crm.services.biometric_dashboard import build_privacy_inventory
+    from django.core.paginator import Paginator
+    from django.core.exceptions import PermissionDenied
+
+    # Biometric data is sensitive: restrict to superusers and Django staff.
+    if not (request.user.is_superuser or request.user.is_staff):
+        raise PermissionDenied
+    scan = request.GET.get("scan") == "1"
+    try:
+        context = build_privacy_inventory(include_aws=scan)
+    except Exception:
+        logger.exception("Biometric privacy dashboard AWS inventory failed")
+        messages.error(request, "AWS inventory could not be completed. No changes were made.")
+        context = build_privacy_inventory(include_aws=False)
+    if context["aws_scanned"]:
+        category = request.GET.get("category", "")
+        if category:
+            context["rows"] = [row for row in context["rows"] if row["classification"] == category]
+        context["selected_category"] = category
+        context["page"] = Paginator(context["rows"], 25).get_page(request.GET.get("page"))
+    return render(request, "crm/biometric_privacy_dashboard.html", context)
+
+
+@login_required
+@require_POST
+def biometric_consent_invite(request, member_id):
+    """Staff generates an expiring link; it is never emailed automatically."""
+    from django.core.exceptions import PermissionDenied
+    from crm.services.biometric_invitation import make_invitation, notice_configuration
+    if not (request.user.is_staff or request.user.is_superuser):
+        raise PermissionDenied
+    member = get_object_or_404(Member, pk=member_id)
+    version, notice, ready = notice_configuration()
+    if not ready:
+        messages.error(request, "An approved biometric notice must be configured before invitations can be created.")
+        return redirect("biometric_privacy_dashboard")
+    url = request.build_absolute_uri(reverse("biometric_consent_sign", args=[make_invitation(member)]))
+    return render(request, "crm/biometric_consent_invitation.html", {"member": member, "invitation_url": url})
+
+
+def biometric_consent_sign(request, token):
+    """Public link: optional decision, never automatic enrollment or recognition."""
+    from django.core import signing
+    from django.views.decorators.cache import never_cache
+    from crm.services.biometric_invitation import resolve_invitation, notice_configuration, active_notice
+    from crm.models import BiometricConsentRecord
+    from django.core.exceptions import PermissionDenied
+    try:
+        member_id = resolve_invitation(token)
+    except (signing.BadSignature, ValueError, KeyError, TypeError):
+        raise Http404("This consent invitation has expired or is invalid.")
+    member = get_object_or_404(Member, pk=member_id)
+    version, notice, ready = notice_configuration()
+    if not ready:
+        return HttpResponse("Biometric consent is not currently available.", status=503)
+    is_minor = member.member_type == "child"
+    if request.method == "POST":
+        decision = request.POST.get("decision", "")
+        signer = request.POST.get("signer_name", "").strip()
+        signature = request.POST.get("signature", "").strip()
+        relationship = request.POST.get("guardian_relationship", "").strip()
+        if (decision not in ("grant", "decline") or not signer or len(signer) > 200
+                or signature.casefold() != signer.casefold() or len(signature) > 200
+                or (is_minor and (not relationship or len(relationship) > 100))
+                or request.POST.get("acknowledged") != "on"):
+            messages.error(request, "Please complete every required field and sign using your full legal name.")
+        else:
+            BiometricConsentRecord.objects.create(
+                member=member, decision=decision, notice=active_notice(), notice_version=version, notice_text=notice,
+                signer_name=signer, guardian_relationship=relationship if is_minor else "",
+                signature=signature, ip_address=request.META.get("REMOTE_ADDR"),
+                user_agent=request.META.get("HTTP_USER_AGENT", "")[:2000],
+            )
+            return redirect("biometric_consent_done")
+    response = render(request, "crm/biometric_consent_form.html", {
+        "member": member, "notice_version": version, "notice": notice, "is_minor": is_minor,
+    })
+    response["Cache-Control"] = "no-store"
+    response["Referrer-Policy"] = "no-referrer"
+    return response
+
+
+def biometric_consent_done(request):
+    response = render(request, "crm/biometric_consent_done.html")
+    response["Cache-Control"] = "no-store"
+    return response
