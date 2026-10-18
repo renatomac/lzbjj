@@ -43,7 +43,7 @@ def belt_image_path(rank, stripes=0, member_type="adult"):
         suffix = YOUTH_SUFFIXES.get(stripes)
     elif rank in ADULT_PREFIXES and rank not in YOUTH_PREFIXES:
         prefix = ADULT_PREFIXES[rank]
-        suffix = str(stripes) if 0 <= stripes <= 4 else None
+        suffix = str(stripes) if 0 <= stripes <= (9 if rank == "black" else 4) else None
     elif rank == "white":
         # White is shared; monthly youth stripes 5-11 identify youth art.
         # For stripes 0-4, both systems use the same W*.svg artwork.

@@ -24,8 +24,8 @@
      inkscape:deskcolor="#d1d1d1"
      inkscape:document-units="mm"
      inkscape:zoom="16.791366"
-     inkscape:cx="24.327979"
-     inkscape:cy="12.357541"
+     inkscape:cx="25.876394"
+     inkscape:cy="11.642888"
      inkscape:window-width="1920"
      inkscape:window-height="1051"
      inkscape:window-x="-9"
@@ -47,7 +47,7 @@
      inkscape:groupmode="layer"
      id="layer1">
     <rect
-       style="fill:#010101;fill-opacity:1;stroke:#020405;stroke-width:0.0990772;stroke-dasharray:none;stroke-dashoffset:6.2;stroke-opacity:1"
+       style="fill:#000000;fill-opacity:1;stroke:#020405;stroke-width:0.0990772;stroke-dasharray:none;stroke-dashoffset:6.2;stroke-opacity:1"
        id="rect11"
        width="14.5119"
        height="2.4009228"
@@ -86,42 +86,49 @@
        id="rect1"
        width="0.59077936"
        height="2.4053161"
-       x="1.8678653"
-       y="-0.052658129" />
+       x="1.6787801"
+       y="-0.054854803" />
+    <rect
+       style="fill:#ff0000;fill-opacity:1;stroke:#020405;stroke-width:0.0946838;stroke-dasharray:none;stroke-dashoffset:6.2;stroke-opacity:1"
+       id="rect1-8"
+       width="0.59077936"
+       height="2.4053161"
+       x="2.5996809"
+       y="-0.052658077" />
     <rect
        style="fill:#ff0000;fill-opacity:1;stroke:#020405;stroke-width:0.0946838;stroke-dasharray:none;stroke-dashoffset:6.2;stroke-opacity:1"
        id="rect2"
        width="0.59077936"
        height="2.4053161"
-       x="2.865798"
+       x="3.5205817"
        y="-0.052658129" />
     <rect
        style="fill:#ff0000;fill-opacity:1;stroke:#020405;stroke-width:0.0946838;stroke-dasharray:none;stroke-dashoffset:6.2;stroke-opacity:1"
        id="rect1-3"
        width="0.59077936"
        height="2.4053161"
-       x="3.8637307"
+       x="4.4414825"
        y="-0.052657843" />
     <rect
        style="fill:#ff0000;fill-opacity:1;stroke:#020405;stroke-width:0.0946838;stroke-dasharray:none;stroke-dashoffset:6.2;stroke-opacity:1"
        id="rect2-8"
        width="0.59077936"
        height="2.4053161"
-       x="4.8616633"
+       x="5.3623834"
        y="-0.052657843" />
     <rect
        style="fill:#ff0000;fill-opacity:1;stroke:#020405;stroke-width:0.0946838;stroke-dasharray:none;stroke-dashoffset:6.2;stroke-opacity:1"
        id="rect1-3-7"
        width="0.59077936"
        height="2.4053161"
-       x="5.8595958"
+       x="6.2832842"
        y="-0.054854695" />
     <rect
        style="fill:#ff0000;fill-opacity:1;stroke:#020405;stroke-width:0.0946838;stroke-dasharray:none;stroke-dashoffset:6.2;stroke-opacity:1"
        id="rect2-8-9"
        width="0.59077936"
        height="2.4053161"
-       x="6.8575287"
-       y="-0.054854695" />
+       x="7.204185"
+       y="-0.077186741" />
   </g>
 </svg>

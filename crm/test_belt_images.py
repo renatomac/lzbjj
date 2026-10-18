@@ -25,6 +25,16 @@ class BeltImageTests(SimpleTestCase):
         self.assertEqual(belt_image_path("blue", 3, "adult"),
                          "crm/img/belts/B3.svg")
 
+    def test_black_belt_artwork_five_through_nine(self):
+        from django.contrib.staticfiles import finders
+        for stripes in range(5, 10):
+            with self.subTest(stripes=stripes):
+                path = belt_image_path("black", stripes, "adult")
+                self.assertEqual(path, f"crm/img/belts/Blk{stripes}.svg")
+                self.assertIsNotNone(finders.find(path))
+        self.assertIsNone(belt_image_path("black", 10, "adult"))
+        self.assertIsNone(belt_image_path("blue", 5, "adult"))
+
     def test_invalid_rank_and_stripes(self):
         self.assertIsNone(belt_image_path("not-a-belt", 0, "child"))
         self.assertIsNone(belt_image_path("gray", 12, "child"))

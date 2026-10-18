@@ -475,9 +475,9 @@ class BeltPromotionForm(forms.ModelForm):
             start_index = 0
 
         is_youth = order == KID_BELT_ORDER
-        stripe_max = 11 if is_youth else 4
         choices = []
         for rank in order[start_index:]:
+            stripe_max = 11 if is_youth else (9 if rank == BeltRank.BLACK else 4)
             for stripes in range(stripe_max + 1):
                 # No demotions or unchanged selections for a new promotion.
                 # On edit, retain the originally saved rank/stripe combination.
