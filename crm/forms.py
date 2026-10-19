@@ -113,17 +113,21 @@ ContactFormSet = inlineformset_factory(
 
 
 def member_belt_selection_choices():
-    """All member belt/stripe choices, grouped by rank family."""
+    """Present every stored belt rank with its existing promotion stripe ranges."""
     labels = dict(BeltRank.choices)
+
     def options(rank, maximum):
-        return [(f'{rank}|{n}', f"{labels[rank]} — {n} {'stripe' if n == 1 else 'stripes'}") for n in range(maximum + 1)]
-    adults = []
+        return [
+            (f"{rank}|{n}", f"{labels[rank]} — {n} {'stripe' if n == 1 else 'stripes'}")
+            for n in range(maximum + 1)
+        ]
+
+    groups = [("White belt", options(BeltRank.WHITE, 11))]
     for rank in ADULT_BELT_ORDER[1:]:
-        adults.extend(options(rank, 9 if rank == BeltRank.BLACK else 4))
-    kids = []
+        groups.append((f"Adult · {labels[rank]}", options(rank, 9 if rank == BeltRank.BLACK else 4)))
     for rank in KID_BELT_ORDER[1:]:
-        kids.extend(options(rank, 11))
-    return [('White belt', options(BeltRank.WHITE, 11)), ('Adult belts', adults), ('Youth belts', kids)]
+        groups.append((f"Youth · {labels[rank]}", options(rank, 11)))
+    return groups
 
 class MemberForm(forms.ModelForm):
     belt_selection = forms.ChoiceField(
