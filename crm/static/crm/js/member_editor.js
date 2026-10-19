@@ -4,6 +4,7 @@
   function init() {
     const root = document.getElementById("memberEditor");
     if (!root) return;
+    root.classList.add("js-enabled");
     const contactList = root.querySelector("#memberContacts");
     const addButton = root.querySelector("#addContact");
     const template = root.querySelector("#emptyContactTemplate");
