@@ -263,6 +263,60 @@ class MemberEditorViewTests(TestCase):
         member.refresh_from_db()
         self.assertEqual(member.first_name, "Sample")
 
+    @patch("crm.views.geocode_member")
+    def test_edit_post_can_remove_one_contact_and_keep_another(self, geocode):
+        form = MemberForm(data=self.member_payload())
+        self.assertTrue(form.is_valid(), form.errors.as_json())
+        member = form.save()
+        remove = Contact.objects.create(
+            member=member, name="Remove Me", email="remove@example.com",
+            phone="(847) 555-1111", relationship="parent", contact_type="responsible",
+        )
+        keep = Contact.objects.create(
+            member=member, name="Keep Me", email="keep@example.com",
+            phone="(847) 555-2222", relationship="friend", contact_type="emergency",
+        )
+        data = self.member_payload(**{
+            "contacts-TOTAL_FORMS": "3",
+            "contacts-INITIAL_FORMS": "2",
+            "contacts-0-id": str(remove.pk),
+            "contacts-0-name": remove.name,
+            "contacts-0-email": remove.email,
+            "contacts-0-phone": remove.phone,
+            "contacts-0-relationship": remove.relationship,
+            "contacts-0-contact_type": remove.contact_type,
+            "contacts-0-DELETE": "on",
+            "contacts-1-id": str(keep.pk),
+            "contacts-1-name": keep.name,
+            "contacts-1-email": keep.email,
+            "contacts-1-phone": keep.phone,
+            "contacts-1-relationship": keep.relationship,
+            "contacts-1-contact_type": keep.contact_type,
+            "contacts-2-name": "Added Contact",
+            "contacts-2-email": "added@example.com",
+            "contacts-2-phone": "8475553333",
+            "contacts-2-relationship": "guardian",
+            "contacts-2-contact_type": "responsible",
+        })
+        response = self.client.post(reverse("editMember", args=[member.pk]), data)
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(Contact.objects.filter(pk=remove.pk).exists())
+        self.assertTrue(Contact.objects.filter(pk=keep.pk).exists())
+        self.assertTrue(Contact.objects.filter(member=member, name="Added Contact").exists())
+
+    def test_invalid_contact_phone_blocks_create_and_renders_contact_error(self):
+        data = self.member_payload(**{
+            "contacts-0-name": "Emergency Person",
+            "contacts-0-phone": "123",
+            "contacts-0-email": "emergency@example.com",
+            "contacts-0-relationship": "friend",
+            "contacts-0-contact_type": "emergency",
+        })
+        response = self.client.post(reverse("addMember"), data)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Enter a valid 10-digit US phone number.")
+        self.assertEqual(Member.objects.count(), 0)
+
     def test_unauthorized_member_editor_redirects_to_login(self):
         self.client.logout()
         response = self.client.get(reverse("addMember"))
