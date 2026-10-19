@@ -118,7 +118,7 @@ def member_belt_selection_choices():
 
     def options(rank, maximum):
         return [
-            (f"{rank}|{n}", f"{labels[rank]} — {n} {'stripe' if n == 1 else 'stripes'}")
+            (f"{rank.value}|{n}", f"{labels[rank]} — {n} {'stripe' if n == 1 else 'stripes'}")
             for n in range(maximum + 1)
         ]
 
@@ -201,7 +201,7 @@ class MemberForm(forms.ModelForm):
             rank = str(self.instance.belt_rank or BeltRank.WHITE)
             stripes = int(self.instance.stripes or 0)
         else:
-            rank, stripes = str(BeltRank.WHITE), 0
+            rank, stripes = BeltRank.WHITE.value, 0
         selected = f"{rank}|{stripes}"
         offered = {value for _, group in choices for value, _ in group}
         if selected not in offered and rank in dict(BeltRank.choices):
