@@ -1,5 +1,8 @@
 """Focused form validation and UX regression checks for phase 1."""
 from django.test import SimpleTestCase, TestCase
+from django.urls import reverse
+from django.contrib.auth import get_user_model
+from unittest.mock import patch
 from django.template.loader import get_template
 from django.core.exceptions import ValidationError
 from crm.forms import MemberForm, ContactForm, ContactFormSet, validate_us_contact_phone
@@ -155,3 +158,113 @@ class MemberAndContactIntegrationTests(TestCase):
         self.assertFalse(Contact.objects.filter(pk=old.pk).exists())
         self.assertTrue(Contact.objects.filter(pk=keep.pk).exists())
         self.assertTrue(Contact.objects.filter(member=member, name="New Contact").exists())
+
+
+class MemberEditorViewTests(TestCase):
+    """Exercise actual rendered registration and edit endpoints."""
+
+    def setUp(self):
+        self.staff = get_user_model().objects.create_user(
+            username="member_editor_staff",
+            email="editor@example.com",
+            password="TestPassword_908!",
+            is_staff=True,
+        )
+        self.client.force_login(self.staff)
+
+    def member_payload(self, **overrides):
+        today = timezone.localdate()
+        payload = {
+            "first_name": "Sample",
+            "last_name": "Student",
+            "member_type": "adult",
+            "lifecycle_status": "active",
+            "is_active": "on",
+            "date_of_birth": "1991-06-12",
+            "email": "sample@example.com",
+            "phone": "(847) 555-1234",
+            "address": "575 N Rand Road",
+            "city": "Lake Zurich",
+            "state": "IL",
+            "zip_code": "60047",
+            "belt_rank": "white",
+            "stripes": "0",
+            "membership_start_date": today.isoformat(),
+            "membership_end_date": (today + timedelta(days=365)).isoformat(),
+            "contacts-TOTAL_FORMS": "1",
+            "contacts-INITIAL_FORMS": "0",
+            "contacts-MIN_NUM_FORMS": "0",
+            "contacts-MAX_NUM_FORMS": "1000",
+        }
+        payload.update(overrides)
+        return payload
+
+    def test_add_member_get_renders_all_panels_and_management_form(self):
+        response = self.client.get(reverse("addMember"))
+        self.assertEqual(response.status_code, 200)
+        for heading in (
+            "Personal information", "Address", "Training &amp; rank",
+            "Family &amp; emergency contacts", "Membership",
+        ):
+            self.assertContains(response, heading, html=False)
+        self.assertContains(response, 'id="memberEditor"')
+        self.assertContains(response, 'name="contacts-TOTAL_FORMS"')
+        self.assertContains(response, "crm/css/member_editor.css")
+        self.assertContains(response, "crm/js/member_editor.js")
+        self.assertContains(response, 'name="first_name"')
+        self.assertContains(response, 'name="membership_end_date"')
+
+    @patch("crm.views.geocode_member")
+    def test_add_member_post_saves_contact(self, geocode):
+        data = self.member_payload(**{
+            "contacts-0-name": "Responsible Parent",
+            "contacts-0-phone": "8475559999",
+            "contacts-0-email": "parent@example.com",
+            "contacts-0-relationship": "parent",
+            "contacts-0-contact_type": "responsible",
+        })
+        response = self.client.post(reverse("addMember"), data)
+        self.assertEqual(response.status_code, 302)
+        member = Member.objects.get(email="sample@example.com")
+        self.assertEqual(member.contacts.count(), 1)
+        self.assertEqual(member.contacts.get().phone, "(847) 555-9999")
+        geocode.assert_called_once()
+
+    def test_invalid_member_post_keeps_errors_and_does_not_save(self):
+        response = self.client.post(reverse("addMember"), self.member_payload(first_name=""))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Please review your entries.")
+        self.assertContains(response, "This field is required.")
+        self.assertEqual(Member.objects.count(), 0)
+
+    def test_edit_member_get_shows_edit_mode(self):
+        form = MemberForm(data=self.member_payload())
+        self.assertTrue(form.is_valid(), form.errors.as_json())
+        member = form.save()
+        Contact.objects.create(member=member, name="Emergency Person", email="em@example.com")
+        response = self.client.get(reverse("editMember", args=[member.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Edit member profile")
+        self.assertContains(response, "Save changes")
+        self.assertContains(response, 'name="contacts-INITIAL_FORMS"')
+        self.assertContains(response, "Emergency Person")
+
+    def test_invalid_edit_preserves_member_context_and_record(self):
+        form = MemberForm(data=self.member_payload())
+        self.assertTrue(form.is_valid(), form.errors.as_json())
+        member = form.save()
+        response = self.client.post(
+            reverse("editMember", args=[member.pk]),
+            self.member_payload(first_name=""),
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Edit member profile")
+        self.assertContains(response, "Save changes")
+        member.refresh_from_db()
+        self.assertEqual(member.first_name, "Sample")
+
+    def test_unauthorized_member_editor_redirects_to_login(self):
+        self.client.logout()
+        response = self.client.get(reverse("addMember"))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("login", response["Location"])
