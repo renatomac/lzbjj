@@ -516,80 +516,61 @@ def members(request):
 @transaction.atomic
 @crm_staff_required
 def addMember(request):
-    if request.method == 'POST':
+    """Create a member and their contacts using the same formset prefix as edit."""
+    if request.method == "POST":
         form = MemberForm(request.POST)
-        contact_formset = ContactFormSet(request.POST)
-        if form.is_valid() and contact_formset.is_valid():
+        contact_formset = ContactFormSet(request.POST, prefix="contacts")
+        form_valid = form.is_valid()
+        contacts_valid = contact_formset.is_valid()
+        if form_valid and contacts_valid:
             member = form.save()
             geocode_member(member)
             contact_formset.instance = member
             contact_formset.save()
             return redirect("members")
-        else:
-            if not form.is_valid():
-                print("Form is not valid.", form.errors)
-            if not contact_formset.is_valid():
-                print("Formset is not valid.", contact_formset.errors)
-            return render(request, "members/add.html" , {
-                "form": form,
-                "contact_formset": contact_formset,
-                'title':'Add Member',
-                "action_url": "addMember"
-            })
     else:
         form = MemberForm()
-        contact_formset = ContactFormSet()
-    return render(request, "members/add.html" , {
+        contact_formset = ContactFormSet(prefix="contacts")
+
+    return render(request, "members/add.html", {
         "form": form,
         "contact_formset": contact_formset,
-        'title':'Add Member',
-        "action_url": "addMember"
-        })
+        "title": "Add Member",
+        "action_url": "addMember",
+    })
 
+
+@transaction.atomic
 @crm_staff_required
 def editMember(request, member_id):
+    """Preserve the editing context after validation errors; save changes atomically."""
     member = get_object_or_404(Member, pk=member_id)
-    ContactFormSet = inlineformset_factory(
-        Member, Contact, form=ContactForm, extra=1, can_delete=True
-    )
-    #contact_formset = ContactFormSet(instance=member, prefix="contacts")
-
-    if request.method == 'POST':
+    if request.method == "POST":
         old_address = (member.address, member.city, member.state, member.zip_code)
         form = MemberForm(request.POST, instance=member)
         contact_formset = ContactFormSet(request.POST, instance=member, prefix="contacts")
-        if form.is_valid() and contact_formset.is_valid():
+        form_valid = form.is_valid()
+        contacts_valid = contact_formset.is_valid()
+        if form_valid and contacts_valid:
             member = form.save()
             new_address = (member.address, member.city, member.state, member.zip_code)
             if old_address != new_address or member.latitude is None or member.longitude is None:
                 geocode_member(member)
             contact_formset.instance = member
             contact_formset.save()
-            return redirect('members')
-        else:
-            print('Form invalid', member_id)
-            print("Form is not valid.", form.errors)
-            print("Formset is not valid.", contact_formset.errors)
-            if not form.is_valid():
-                print("Form is not valid.", form.errors)
-            if not contact_formset.is_valid():
-                print("Formset is not valid.", contact_formset.errors)
-            return render(request, "members/add.html" , {
-                "form": form,
-                "contact_formset": contact_formset,
-                'title':'Add Member',
-                "action_url": "addMember"
-            })
+            return redirect("members")
     else:
         form = MemberForm(instance=member)
-        contact_formset = ContactFormSet(instance=member)
-    return render(request, "members/add.html" , {
+        contact_formset = ContactFormSet(instance=member, prefix="contacts")
+
+    return render(request, "members/add.html", {
         "form": form,
         "contact_formset": contact_formset,
-        'title':'Edit member info',
+        "title": "Edit member info",
         "member": member,
         "action_url": "editMember",
-        })
+    })
+
 
 @crm_staff_required
 def deleteMember(request, member_id):
