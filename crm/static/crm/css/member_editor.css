@@ -140,11 +140,16 @@
 .member-editor-contact .member-editor-field.name-field { grid-column: span 6; }
 .member-editor-contact .member-editor-field.email-field { grid-column: span 12; }
 .member-editor-remove {
+  display: none;
   border: none; background: transparent; color: #9c263a;
   font-size: .79rem; font-weight: 700; padding: 5px 7px; border-radius: 7px;
 }
 .member-editor-remove:hover { background: #fff1f2; }
-.member-editor-contact-delete { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.member-editor-page.js-enabled .member-editor-remove { display: inline-flex; align-items: center; gap: 5px; }
+.member-editor-contact-delete { font-size: .8rem; color: #9c263a; margin-top: 12px; }
+.member-editor-contact-delete label { cursor: pointer; }
+.member-editor-page.js-enabled .member-editor-contact-delete { display: none; }
+
 .member-editor-add-contact {
   border: 1px dashed #94a3b8; background: #fff;
   width: 100%; border-radius: 10px; padding: 12px; color: #334155;
