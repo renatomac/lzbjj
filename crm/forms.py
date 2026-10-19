@@ -112,7 +112,26 @@ ContactFormSet = inlineformset_factory(
 )
 
 
+def member_belt_selection_choices():
+    """All member belt/stripe choices, grouped by rank family."""
+    labels = dict(BeltRank.choices)
+    def options(rank, maximum):
+        return [(f'{rank}|{n}', f"{labels[rank]} — {n} {'stripe' if n == 1 else 'stripes'}") for n in range(maximum + 1)]
+    adults = []
+    for rank in ADULT_BELT_ORDER[1:]:
+        adults.extend(options(rank, 9 if rank == BeltRank.BLACK else 4))
+    kids = []
+    for rank in KID_BELT_ORDER[1:]:
+        kids.extend(options(rank, 11))
+    return [('White belt', options(BeltRank.WHITE, 11)), ('Adult belts', adults), ('Youth belts', kids)]
+
 class MemberForm(forms.ModelForm):
+    belt_selection = forms.ChoiceField(
+        label="Belt / stripes",
+        widget=forms.Select(attrs={"class": "form-select"}),
+        help_text="Select the current belt and number of stripes.",
+    )
+
 
     user = forms.ModelChoiceField(
         queryset=User.objects.filter(is_active=True),
@@ -142,11 +161,9 @@ class MemberForm(forms.ModelForm):
             "zip_code",
             "gender",
             "date_of_birth",
-            "belt_rank",
-            "stripes",
+            "belt_selection",
             "photo",
             "current_belt_started_on",
-            "ibjjf_rank_registered_on",
             "membership_start_date",
             "membership_end_date",
             "plan",
@@ -154,12 +171,10 @@ class MemberForm(forms.ModelForm):
         ]
         widgets = {
             'phone': forms.TextInput(attrs={'class': 'form-control'}),
-            "belt_rank":  forms.Select(attrs={"class": "form-control"}),
             "lifecycle_status": forms.Select(attrs={"class": "form-control"}),
             "state": USStateSelect(attrs={"class": "form-control"}),
             "date_of_birth": forms.DateInput(attrs={"type": "date"}),
             "current_belt_started_on": forms.DateInput(attrs={"type": "date"}),
-            "ibjjf_rank_registered_on": forms.DateInput(attrs={"type": "date"}),
             "membership_start_date": forms.DateInput(attrs={"type": "date"}),
             "membership_end_date": forms.DateInput(attrs={"type": "date"}),
             "is_active": forms.HiddenInput(),
@@ -171,13 +186,25 @@ class MemberForm(forms.ModelForm):
 
         if not self.instance.pk:
             self.fields["state"].initial = "IL"
-            self.fields["belt_rank"].initial = "white"
-            self.fields["stripes"].initial = 0
             self.fields["is_active"].initial = True
             self.fields["lifecycle_status"].initial = Member.LifecycleStatus.ACTIVE
             self.fields["membership_start_date"].initial = timezone.localdate()
             self.fields["membership_end_date"].initial = timezone.localdate() + relativedelta(months=12)
 
+        # Preserve any existing historical rank/stripe combination on edit.
+        choices = member_belt_selection_choices()
+        if self.instance.pk:
+            rank = str(self.instance.belt_rank or BeltRank.WHITE)
+            stripes = int(self.instance.stripes or 0)
+        else:
+            rank, stripes = str(BeltRank.WHITE), 0
+        selected = f"{rank}|{stripes}"
+        offered = {value for _, group in choices for value, _ in group}
+        if selected not in offered and rank in dict(BeltRank.choices):
+            label = dict(BeltRank.choices)[rank]
+            choices.append(("Previously recorded", [(selected, f"{label} — {stripes} stripes (existing record)")]))
+        self.fields["belt_selection"].choices = choices
+        self.fields["belt_selection"].initial = selected
         available_users = User.objects.filter(is_active=True)
         if self.instance.pk and self.instance.user_id:
             available_users = available_users.filter(Q(pk=self.instance.user_id) | Q(member__isnull=True))
@@ -226,7 +253,7 @@ class MemberForm(forms.ModelForm):
         end = cleaned_data.get("membership_end_date")
         if start and end and end < start:
             self.add_error("membership_end_date", "Membership end date cannot precede its start date.")
-        for name in ("current_belt_started_on", "ibjjf_rank_registered_on"):
+        for name in ("current_belt_started_on",):
             value = cleaned_data.get(name)
             if value and value > today:
                 self.add_error(name, "This date cannot be in the future.")
@@ -235,6 +262,9 @@ class MemberForm(forms.ModelForm):
     @transaction.atomic
     def save(self, commit=True):
         member = super().save(commit=False)
+        rank, stripes = self.cleaned_data["belt_selection"].split("|", 1)
+        member.belt_rank = rank
+        member.stripes = int(stripes)
 
         selected_user = self.cleaned_data.get("user")
 
