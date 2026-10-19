@@ -5,8 +5,8 @@ from django.contrib.auth import get_user_model
 from unittest.mock import patch
 from django.template.loader import get_template
 from django.core.exceptions import ValidationError
-from crm.forms import MemberForm, ContactForm, ContactFormSet, validate_us_contact_phone
-from crm.models import Member, Contact
+from crm.forms import MemberForm, ContactForm, ContactFormSet, validate_us_contact_phone, member_belt_selection_choices
+from crm.models import Member, Contact, BeltRank
 from django.utils import timezone
 from datetime import timedelta
 
@@ -46,6 +46,27 @@ class ContactPhoneValidationTests(SimpleTestCase):
             validate_us_contact_phone("1235551234")
 
 
+class MemberBeltOptionTests(SimpleTestCase):
+    def test_options_cover_every_model_belt_rank(self):
+        values = [value for _, group in member_belt_selection_choices() for value, _ in group]
+        covered_ranks = {value.split("|")[0] for value in values}
+        self.assertEqual(covered_ranks, set(dict(BeltRank.choices)))
+
+    def test_youth_and_black_belt_stripes_are_available(self):
+        values = {value for _, group in member_belt_selection_choices() for value, _ in group}
+        self.assertIn("gray-white|11", values)
+        self.assertIn("black|9", values)
+        self.assertIn("red|0", values)
+        self.assertNotIn("black|10", values)
+
+    def test_form_uses_one_selection_and_does_not_offer_ibjjf_date(self):
+        form = MemberForm()
+        self.assertIn("belt_selection", form.fields)
+        self.assertNotIn("belt_rank", form.fields)
+        self.assertNotIn("stripes", form.fields)
+        self.assertNotIn("ibjjf_rank_registered_on", form.fields)
+        self.assertEqual(form.fields["belt_selection"].initial, "white|0")
+
 class MemberAndContactIntegrationTests(TestCase):
     def member_data(self, **overrides):
         today = timezone.localdate()
@@ -62,8 +83,7 @@ class MemberAndContactIntegrationTests(TestCase):
             "city": "Lake Zurich",
             "state": "IL",
             "zip_code": "60047",
-            "belt_rank": "white",
-            "stripes": "0",
+            "belt_selection": "white|0",
             "membership_start_date": today.isoformat(),
             "membership_end_date": (today + timedelta(days=365)).isoformat(),
         }
@@ -77,6 +97,66 @@ class MemberAndContactIntegrationTests(TestCase):
         self.assertEqual(member.first_name, "Test")
         self.assertEqual(Member.objects.count(), 1)
 
+    def test_combined_belt_selection_saves_both_columns(self):
+        form = MemberForm(data=self.member_data(belt_selection="black|9"))
+        self.assertTrue(form.is_valid(), form.errors.as_json())
+        member = form.save()
+        self.assertEqual(member.belt_rank, BeltRank.BLACK)
+        self.assertEqual(member.stripes, 9)
+
+    def test_youth_belt_and_stripes_save_correctly(self):
+        form = MemberForm(data=self.member_data(
+            member_type="child", date_of_birth="2014-05-10", belt_selection="gray-white|11",
+        ))
+        self.assertTrue(form.is_valid(), form.errors.as_json())
+        member = form.save()
+        self.assertEqual(member.belt_rank, BeltRank.GRAY_WHITE)
+        self.assertEqual(member.stripes, 11)
+
+    def test_invalid_combined_selection_is_rejected(self):
+        for selection in ("invalid|0", "black|10", "red|13", ""):
+            with self.subTest(selection=selection):
+                form = MemberForm(data=self.member_data(belt_selection=selection))
+                self.assertFalse(form.is_valid())
+                self.assertIn("belt_selection", form.errors)
+
+    def test_old_hidden_rank_fields_cannot_override_dropdown(self):
+        form = MemberForm(data=self.member_data(
+            belt_selection="white|0", belt_rank="black", stripes="9",
+        ))
+        self.assertTrue(form.is_valid(), form.errors.as_json())
+        member = form.save()
+        self.assertEqual(member.belt_rank, BeltRank.WHITE)
+        self.assertEqual(member.stripes, 0)
+
+    def test_edit_keeps_ibjjf_date_if_belt_unchanged(self):
+        form = MemberForm(data=self.member_data(belt_selection="blue|2"))
+        self.assertTrue(form.is_valid(), form.errors.as_json())
+        member = form.save()
+        member.ibjjf_rank_registered_on = timezone.localdate() - timedelta(days=75)
+        member.save()
+        initial = MemberForm(instance=member)
+        self.assertEqual(initial.fields["belt_selection"].initial, "blue|2")
+        edit = MemberForm(data=self.member_data(
+            belt_selection="blue|2", first_name="Updated",
+            ibjjf_rank_registered_on="2099-01-01",
+        ), instance=member)
+        self.assertTrue(edit.is_valid(), edit.errors.as_json())
+        edit.save()
+        member.refresh_from_db()
+        self.assertEqual(member.first_name, "Updated")
+        self.assertEqual(member.ibjjf_rank_registered_on, timezone.localdate() - timedelta(days=75))
+
+    def test_historical_12_stripe_value_remains_selectable_on_edit(self):
+        form = MemberForm(data=self.member_data())
+        self.assertTrue(form.is_valid(), form.errors.as_json())
+        member = form.save()
+        member.stripes = 12
+        member.save()
+        edit = MemberForm(instance=member)
+        self.assertEqual(edit.fields["belt_selection"].initial, "white|12")
+        options = {value for _, group in edit.fields["belt_selection"].choices for value, _ in group}
+        self.assertIn("white|12", options)
     def test_missing_required_name_rejected(self):
         form = MemberForm(data=self.member_data(first_name=""))
         self.assertFalse(form.is_valid())
@@ -187,8 +267,7 @@ class MemberEditorViewTests(TestCase):
             "city": "Lake Zurich",
             "state": "IL",
             "zip_code": "60047",
-            "belt_rank": "white",
-            "stripes": "0",
+            "belt_selection": "white|0",
             "membership_start_date": today.isoformat(),
             "membership_end_date": (today + timedelta(days=365)).isoformat(),
             "contacts-TOTAL_FORMS": "1",
@@ -212,6 +291,10 @@ class MemberEditorViewTests(TestCase):
         self.assertContains(response, "crm/css/member_editor.css")
         self.assertContains(response, "crm/js/member_editor.js")
         self.assertContains(response, 'name="first_name"')
+        self.assertContains(response, 'name="belt_selection"')
+        self.assertNotContains(response, 'name="belt_rank"')
+        self.assertNotContains(response, 'name="stripes"')
+        self.assertNotContains(response, 'name="ibjjf_rank_registered_on"')
         self.assertContains(response, 'name="membership_end_date"')
 
     @patch("crm.views.geocode_member")
