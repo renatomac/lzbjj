@@ -113,13 +113,29 @@ ContactFormSet = inlineformset_factory(
 )
 
 
+ADVANCED_BLACK_DEGREES = {
+    BeltRank.RED_BLACK: 7,
+    BeltRank.RED_WHITE: 8,
+    BeltRank.RED: 9,
+}
+
+
+def belt_selection_label(rank, stripes):
+    """Display coral/red ranks as black-belt degrees without changing stored values."""
+    if rank in ADVANCED_BLACK_DEGREES:
+        degree = ADVANCED_BLACK_DEGREES[rank]
+        return f"{dict(BeltRank.choices)[rank]} — Black belt, {degree}th degree"
+    label = dict(BeltRank.choices).get(rank, str(rank))
+    return f"{label} — {stripes} {'stripe' if stripes == 1 else 'stripes'}"
+
+
 def member_belt_selection_choices():
     """Present every stored belt rank with its existing promotion stripe ranges."""
     labels = dict(BeltRank.choices)
 
     def options(rank, maximum):
         return [
-            (f"{rank.value}|{n}", f"{labels[rank]} — {n} {'stripe' if n == 1 else 'stripes'}")
+            (f"{rank.value}|{n}", belt_selection_label(rank, n))
             for n in range(maximum + 1)
         ]
 
@@ -560,7 +576,7 @@ class BeltPromotionForm(forms.ModelForm):
                     continue
                 path = belt_image_path(rank, stripes, "child" if is_youth else "adult")
                 value = f"{rank}|{stripes}"
-                label = f"{dict(BeltRank.choices).get(rank, rank)} — {stripes} stripes"
+                label = belt_selection_label(rank, stripes)
                 choices.append((value, label))
                 self.belt_options.append({
                     "value": value, "label": label,
