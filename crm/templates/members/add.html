@@ -84,7 +84,9 @@
           </div>
           <div class="member-editor-card-body">
             <div class="member-editor-fields">
-              {% include "members/_editor_field.html" with field=form.belt_selection %}
+              <div class="member-editor-field full">
+                {% include "components/belt_image_picker.html" with field=form.belt_selection options=form.belt_options picker_label="Belt / stripes" %}
+              </div>
               {% include "members/_editor_field.html" with field=form.current_belt_started_on %}
             </div>
           </div>
