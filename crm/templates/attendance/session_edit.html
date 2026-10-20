@@ -1,42 +1,46 @@
 {% extends "layout.html" %}
+{% load static crispy_forms_tags %}
 {% block title %}Edit Session{% endblock %}
-
-{% block extra_head %}
-
-{% endblock %}
-
 {% block header_title %}Edit Session{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'crm/css/pro_forms.css' %}">{% endblock %}
 {% block content %}
-<div class="container-fluid py-4">
-
-    <div class="row justify-content-center">
-        <div class="col-12 col-lg-6">
-            <h3 class="text-center">{{session.class_template.name}}</h3>
-            <form method="post">
-                {% csrf_token %}
-
-                <h5>Session Details</h5>
-                {{ session_form.as_p }}
-
-                <h5>Attendance</h5>
-                {{ attendance_formset.management_form }}
-                {% for form in attendance_formset %}
-                    {{ form.id }}                <!-- hidden id for existing objects -->
-                    {{ form.member.as_hidden }}  <!-- member hidden field, so no select menu -->
-                    <div>
-                        <label>
-                            {{ form.present }} {{ form.instance.member }}  <!-- show checkbox + member name -->
-                        </label>
-                    </div>
-
-                    {% if form.errors %}
-                        <div class="text-danger">{{ form.errors }}</div>
-                    {% endif %}
-                {% endfor %}
-
-                <button type="submit" class="btn btn-primary mt-3">Save</button>
-            </form>
+<section class="crm-pro-form" aria-label="Session and attendance editor">
+  <div class="card crm-form-card">
+    <div class="card-body">
+      <header class="crm-form-heading">
+        <div><h1>Edit Session</h1><p class="crm-form-subtitle">{{ session.class_template.name }} · Update the session details and attendance.</p></div>
+      </header>
+      <form method="post">
+        {% csrf_token %}
+        <h2 class="h5 fw-bold mb-3">Session details</h2>
+        {% include "components/pro_form_fields.html" with form=session_form %}
+        <hr class="my-4">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+          <div><h2 class="h5 fw-bold mb-1">Attendance</h2><p class="text-muted small mb-0">Check members who attended this session.</p></div>
+          <span class="badge text-bg-light">{{ attendance_formset|length }} members</span>
         </div>
+        {{ attendance_formset.management_form }}
+        {% if attendance_formset.non_form_errors %}<div class="alert alert-danger" role="alert">{{ attendance_formset.non_form_errors }}</div>{% endif %}
+        <div class="row g-2">
+          {% for attendance in attendance_formset %}
+          <div class="col-12 col-sm-6 col-lg-4">
+            <div class="border rounded-3 p-3 h-100">
+              {% for hidden in attendance.hidden_fields %}{{ hidden }}{% endfor %}
+              <div class="form-check">
+                {{ attendance.present }}
+                <label class="form-check-label fw-semibold" for="{{ attendance.present.id_for_label }}">{{ attendance.instance.member }}</label>
+              </div>
+              {% if attendance.errors %}<div class="text-danger small mt-2" role="alert">{{ attendance.errors }}</div>{% endif %}
+            </div>
+          </div>
+          {% empty %}<p class="text-muted">No attendance entries are available for this session.</p>
+          {% endfor %}
+        </div>
+        <div class="crm-form-actions">
+          <button type="submit" class="btn btn-primary"><i class="fa-solid fa-check me-2" aria-hidden="true"></i>Save Session</button>
+        </div>
+      </form>
     </div>
-</div>
+  </div>
+</section>
 {% endblock %}
