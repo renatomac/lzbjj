@@ -45,3 +45,9 @@ class ProfessionalFormTemplateTests(SimpleTestCase):
 
     def test_class_editor_css_exists(self):
         self.assertIsNotNone(finders.find("crm/css/class_editor.css"))
+
+    def test_class_editor_does_not_inherit_legacy_narrow_django_form(self):
+        source = get_template("classes/add.html").template.source
+        self.assertIn('class="crm-class-form"', source)
+        self.assertNotIn('class="django-form"', source)
+        self.assertIn('class="crm-weekday-fieldset"', source)
