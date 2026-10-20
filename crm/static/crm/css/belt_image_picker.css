@@ -3,7 +3,8 @@
 .lzbjj-belt-picker .lzbjj-belt-ui[hidden] { display: none !important; }
 .lzbjj-belt-picker.is-enhanced .lzbjj-belt-native { display: none; }
 .lzbjj-belt-picker .lzbjj-belt-trigger {
-  min-height: 58px; padding: 10px 14px; border-radius: 10px;
+  min-height: 58px; width: 100%; padding: 10px 14px; border-radius: 10px;
+  border: 1px solid #b9c5d3; cursor: pointer; font: inherit;
   display: flex; align-items: center; justify-content: space-between;
   gap: 14px; text-align: left; white-space: normal;
   background: #fff; color: #273444; border-color: #b9c5d3;
