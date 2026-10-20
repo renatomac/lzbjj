@@ -172,6 +172,32 @@ class BeltPickerIntegrationTests(TestCase):
             self.assertIn(f"Blk{degree}.svg", options[f"black|{degree}"]["image_url"])
         self.assertFalse(any(value.startswith(("red-black|", "red-white|", "red|")) for value in options))
 
+class BeltDegreeMigrationTests(SimpleTestCase):
+    def test_legacy_rank_conversion_updates_every_relevant_table(self):
+        from importlib import import_module
+        from unittest.mock import Mock
+        migration = import_module("crm.migrations.0036_consolidate_black_belt_degrees")
+        models = {}
+        for name in ("Member", "Staff", "BeltPromotion", "WaiverSignature"):
+            model = Mock()
+            model.objects.using.return_value.filter.return_value.update.return_value = 1
+            models[name] = model
+        apps = Mock()
+        apps.get_model.side_effect = lambda app, name: models[name]
+        schema_editor = Mock()
+        schema_editor.connection.alias = "default"
+        migration.consolidate_degrees(apps, schema_editor)
+
+        for name, field in (("Member", "belt_rank"), ("Staff", "belt_rank"),
+                            ("BeltPromotion", "old_rank"), ("BeltPromotion", "new_rank"),
+                            ("WaiverSignature", "reported_belt_rank")):
+            calls = models[name].objects.using.return_value.filter.call_args_list
+            for legacy in ("red-black", "red-white", "red"):
+                self.assertTrue(any(c.kwargs.get(field) == legacy for c in calls), (name, field, legacy))
+        self.assertEqual(models["Member"].objects.using.return_value.filter.return_value.update.call_count, 3)
+        self.assertEqual(models["BeltPromotion"].objects.using.return_value.filter.return_value.update.call_count, 6)
+
+
 class AdminBeltPickerTests(SimpleTestCase):
     def test_rank_widget_shows_same_artwork_and_retains_native_select(self):
         widget = AdminBeltRankWidget(choices=[
