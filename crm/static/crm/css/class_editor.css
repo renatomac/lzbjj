@@ -20,3 +20,23 @@
 .crm-class-editor .crm-form-actions { border-top:0; padding-top:1.5rem; margin-top:0; }
 @media(max-width:850px) { .crm-class-editor .crm-weekday-grid { grid-template-columns:repeat(4,minmax(0,1fr)); } }
 @media(max-width:520px) { .crm-class-editor .crm-weekday-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .crm-class-editor .crm-class-section-title { align-items:flex-start; } }
+
+/* Refined desktop layout: override legacy CRM form constraints at the source. */
+.crm-class-editor { width: min(100%, 1120px); max-width: 1120px; }
+.crm-class-editor .crm-class-form { width: 100%; max-width: none; }
+.crm-class-editor .crm-form-heading { padding-bottom: 1.6rem; }
+.crm-class-editor .crm-class-section { padding: 1.8rem 0; }
+.crm-class-editor .crm-class-section .row { --bs-gutter-x: 1.5rem; --bs-gutter-y: 1.25rem; }
+.crm-class-editor .crm-class-section-title { margin-bottom: 1.5rem; }
+.crm-class-editor .crm-class-section-title h2 { font-size: 1.16rem; letter-spacing: -.015em; }
+.crm-class-editor .crm-class-section .form-control,
+.crm-class-editor .crm-class-section .form-select { font-size: .95rem; }
+.crm-class-editor .crm-weekday-fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
+.crm-class-editor .crm-weekday-option { min-height: 74px; flex-direction: row; gap: .5rem; padding: .75rem .5rem; }
+.crm-class-editor .crm-weekday-option input { accent-color: #175cd3; }
+.crm-class-editor .crm-class-actions { display: flex; justify-content: flex-end; align-items: center; gap: .8rem; }
+.crm-class-editor .crm-class-actions .btn { min-width: 128px; }
+@media(max-width: 720px) {
+  .crm-class-editor .crm-weekday-option { flex-direction: column; min-height: 76px; }
+  .crm-class-editor .crm-form-card .card-body { padding: 1.35rem; }
+}
