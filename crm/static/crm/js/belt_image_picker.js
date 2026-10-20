@@ -17,7 +17,7 @@
     picker.dataset.initialized = "true";
 
     function selectedOption() {
-      return options.find(item => item.dataset.value === select.value) || options[0];
+      return options.find(item => !item.hidden && item.dataset.value === select.value) || options.find(item => !item.hidden);
     }
     function render() {
       const matched = options.find(item => item.dataset.value === select.value);
@@ -54,6 +54,7 @@
       picker.classList.add("is-open");
       trigger.setAttribute("aria-expanded", "true");
       const current = selectedOption();
+      if (!current) return close(true);
       // Keep the chosen belt visible without scrolling the page.
       menu.scrollTop = Math.max(0, current.offsetTop - menu.offsetTop - 40);
       current.focus();
@@ -82,13 +83,16 @@
         if (event.key === "ArrowDown" || event.key === "ArrowUp") {
           event.preventDefault();
           const step = event.key === "ArrowDown" ? 1 : -1;
-          options[(i + step + options.length) % options.length].focus();
+          const visible = options.filter(item => !item.hidden);
+          if (visible.length) visible[(visible.indexOf(option) + step + visible.length) % visible.length].focus();
         } else if (event.key === "Home") {
           event.preventDefault();
-          options[0].focus();
+          const first = options.find(item => !item.hidden);
+          if (first) first.focus();
         } else if (event.key === "End") {
           event.preventDefault();
-          options[options.length - 1].focus();
+          const last = options.filter(item => !item.hidden).at(-1);
+          if (last) last.focus();
         } else if (event.key === "Escape") {
           event.preventDefault();
           close(true);
