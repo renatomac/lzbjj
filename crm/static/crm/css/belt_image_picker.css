@@ -66,3 +66,6 @@
   .lzbjj-belt-picker .lzbjj-belt-art-fallback,
   .lzbjj-belt-picker .lzbjj-belt-art-placeholder { width:78px; }
 }
+
+/* Member-type filtering must hide invalid ranks even with flex item styling. */
+.lzbjj-belt-picker .lzbjj-belt-option[hidden] { display: none !important; }
