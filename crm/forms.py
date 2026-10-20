@@ -19,6 +19,7 @@ from .models import (
     Class, Attendance, BeltPromotion, Contact,BeltRank,WaiverSignature, 
     SessionAttendance, ClassSession, BeltPromotion, ADULT_BELT_ORDER, KID_BELT_ORDER
 )
+from .belt_picker import belt_picker_options
 from .password_validation import validate_password_strength
 import logging
 
@@ -209,6 +210,7 @@ class MemberForm(forms.ModelForm):
             choices.append(("Previously recorded", [(selected, f"{label} — {stripes} stripes (existing record)")]))
         self.fields["belt_selection"].choices = choices
         self.fields["belt_selection"].initial = selected
+        self.belt_options = belt_picker_options(choices)
         available_users = User.objects.filter(is_active=True)
         if self.instance.pk and self.instance.user_id:
             available_users = available_users.filter(Q(pk=self.instance.user_id) | Q(member__isnull=True))
@@ -539,14 +541,12 @@ class BeltPromotionForm(forms.ModelForm):
                 if not existing and rank == start_rank and stripes <= start_stripes:
                     continue
                 path = belt_image_path(rank, stripes, "child" if is_youth else "adult")
-                if path is None:
-                    continue
                 value = f"{rank}|{stripes}"
                 label = f"{dict(BeltRank.choices).get(rank, rank)} — {stripes} stripes"
                 choices.append((value, label))
                 self.belt_options.append({
                     "value": value, "label": label,
-                    "image_url": staticfiles_storage.url(path),
+                    "image_url": staticfiles_storage.url(path) if path else "",
                     "rank": rank, "stripes": stripes,
                 })
 
@@ -586,6 +586,7 @@ class BaseWaiverForm(forms.ModelForm):
         self.fields["reported_belt_rank"].choices = [("", "Select belt (optional)")] + [
             (rank, BeltRank(rank).label) for rank in ranks
         ]
+        self.belt_options = belt_picker_options(self.fields["reported_belt_rank"].choices)
 
 
     class Meta:
