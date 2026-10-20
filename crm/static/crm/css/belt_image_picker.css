@@ -15,14 +15,20 @@
 .lzbjj-belt-preview img { width: 105px; max-width: 38%; height: 33px; object-fit: contain; flex-shrink: 0; }
 .lzbjj-belt-empty { color: #64748b; }
 .lzbjj-belt-picker .lzbjj-belt-menu {
+  position: absolute; top: 100%; left: 0; right: 0;
+  display: none; background: #fff; color: #25364b;
+  box-sizing: border-box;
   max-height: min(360px, 58vh); overflow-y: auto; overscroll-behavior: contain;
   border: 1px solid #cbd5e1; border-radius: 11px;
   min-width: 100%; z-index: 1080;
 }
+.lzbjj-belt-picker.is-open .lzbjj-belt-menu { display: block !important; }
+.lzbjj-belt-picker .lzbjj-belt-menu[hidden] { display: none !important; }
 .lzbjj-belt-picker .lzbjj-belt-option {
   display:flex; align-items:center; gap: 14px; min-height: 49px;
   border-radius: 7px; padding: 7px 10px;
   white-space: normal; font-size: .88rem; color: #25364b;
+  cursor: pointer; background: transparent; border: 0; width: 100%; text-align: left;
 }
 .lzbjj-belt-picker .lzbjj-belt-option img {
   width:105px; height:34px; flex-shrink:0; object-fit:contain;
