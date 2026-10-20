@@ -39,7 +39,10 @@ class BeltPickerOptionTests(SimpleTestCase):
         self.assertFalse(member_type_allows_belt("adult", "white", 5))
         self.assertFalse(member_type_allows_belt("adult", "yellow", 2))
         self.assertTrue(member_type_allows_belt("transition", "gray", 3))
-        self.assertTrue(member_type_allows_belt("transition", "purple", 2))
+        self.assertTrue(member_type_allows_belt("transition", "green-black", 11))
+        self.assertFalse(member_type_allows_belt("transition", "purple", 2))
+        self.assertFalse(member_type_allows_belt("transition", "blue", 0))
+        self.assertFalse(member_type_allows_belt("transition", "black", 9))
         self.assertFalse(member_type_allows_belt("adult", "red-black", 0))
 
     def test_black_degrees_7_to_9_are_single_entries(self):
