@@ -138,6 +138,24 @@ def member_belt_selection_choices():
         groups.append((f"Youth · {labels[rank]}", options(rank, 11)))
     return groups
 
+def member_type_allows_belt(member_type, rank, stripes):
+    """Match rank choices to the selected membership category."""
+    try:
+        stripes = int(stripes)
+    except (TypeError, ValueError):
+        return False
+    if member_type == "child":
+        return rank in KID_BELT_ORDER and 0 <= stripes <= 11
+    if member_type == "adult":
+        return rank in ADULT_BELT_ORDER and 0 <= stripes <= (9 if rank == BeltRank.BLACK else 4)
+    if member_type == Member.TRANSITIONING:
+        return (
+            (rank in KID_BELT_ORDER and 0 <= stripes <= 11)
+            or (rank in ADULT_BELT_ORDER and 0 <= stripes <= (9 if rank == BeltRank.BLACK else 4))
+        )
+    return False
+
+
 class MemberForm(forms.ModelForm):
     belt_selection = forms.ChoiceField(
         label="Belt / stripes",
@@ -252,6 +270,12 @@ class MemberForm(forms.ModelForm):
             user = cleaned_data.get("user")
             if not user:
                 self.add_error("user", "Adult members must be linked to an existing user.")'''
+
+        selection = cleaned_data.get("belt_selection")
+        if member_type and selection:
+            rank, stripes = selection.split("|", 1)
+            if not member_type_allows_belt(member_type, rank, stripes):
+                self.add_error("belt_selection", "Select a belt valid for the chosen member type.")
 
         # Conditional phone validation (21+)
         if dob:
