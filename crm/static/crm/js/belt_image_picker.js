@@ -29,6 +29,10 @@
       });
       trigger.disabled = select.disabled;
       trigger.setAttribute("aria-label", "Belt: " + label.textContent);
+      if (picker.dataset.previewTarget) {
+        const target = document.querySelector(picker.dataset.previewTarget);
+        if (target) target.textContent = label.textContent;
+      }
     }
 
     options.forEach(option => option.addEventListener("click", () => {
