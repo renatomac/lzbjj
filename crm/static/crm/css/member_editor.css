@@ -59,6 +59,10 @@
   overflow: hidden;
   margin: 0;
 }
+/* Dropdown menus must escape the card and overlap later sections. */
+.member-editor-page #training { position: relative; z-index: 3; overflow: visible; }
+.member-editor-page #training .lzbjj-belt-picker { position: relative; }
+
 .member-editor-card-head {
   display: flex; align-items: center; gap: 13px;
   padding: 23px 26px 20px;
