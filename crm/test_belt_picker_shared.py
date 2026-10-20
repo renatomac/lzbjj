@@ -29,6 +29,14 @@ class BeltPickerOptionTests(SimpleTestCase):
         self.assertIn("white|11", values)
         self.assertEqual(len(values), len(options))
 
+    def test_coral_and_red_belts_do_not_offer_stripes(self):
+        options = belt_picker_options(member_belt_selection_choices())
+        values = {option["value"] for option in options}
+        for rank in ("red-black", "red-white", "red"):
+            self.assertIn(f"{rank}|0", values)
+            for stripes in range(1, 12):
+                self.assertNotIn(f"{rank}|{stripes}", values)
+
     def test_artwork_matches_existing_promotion_selector(self):
         options = belt_picker_options([("gray|3", "Gray — 3 stripes")])
         self.assertEqual(len(options), 1)
@@ -163,6 +171,9 @@ class BeltPickerIntegrationTests(TestCase):
         self.assertIn("Blk9.svg", options["black|9"]["image_url"])
         self.assertIn("red-black|0", options)
         self.assertEqual(options["red-black|0"]["image_url"], "")
+        self.assertNotIn("red-black|1", options)
+        self.assertNotIn("red-white|1", options)
+        self.assertNotIn("red|1", options)
 
 class AdminBeltPickerTests(SimpleTestCase):
     def test_rank_widget_shows_same_artwork_and_retains_native_select(self):
