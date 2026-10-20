@@ -1,0 +1,11 @@
+{% load crispy_forms_tags %}
+{% comment %}Shared responsive field grid; keeps Django field validation and hidden fields intact.{% endcomment %}
+{% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+{% if form.non_field_errors %}<div class="alert alert-danger" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+<div class="row g-3">
+  {% for field in form.visible_fields %}
+  <div class="{% if field.field.widget.input_type == 'checkbox' or field.field.widget.input_type == 'file' or field.field.widget.input_type == 'textarea' %}col-12{% else %}col-12 col-md-6{% endif %}">
+    {{ field|as_crispy_field }}
+  </div>
+  {% endfor %}
+</div>
