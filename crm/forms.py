@@ -291,12 +291,14 @@ class MemberForm(forms.ModelForm):
 class StaffForm(forms.ModelForm):
     """Linked members own personal data; staff owns employment information."""
 
+    belt_selection = forms.ChoiceField(label="Belt / stripes")
+
     class Meta:
         model = Staff
         fields = [
             "member_profile", "is_active", "first_name", "last_name",
             "role", "gender", "address", "city", "state", "zip_code",
-            "date_of_birth", "join_date", "belt_rank", "stripes", "photo",
+            "date_of_birth", "join_date", "belt_selection", "photo",
         ]
         widgets = {
             "date_of_birth": forms.DateInput(attrs={"type": "date"}),
@@ -306,8 +308,7 @@ class StaffForm(forms.ModelForm):
         labels = {"member_profile": "Linked training member (optional)"}
         help_texts = {
             "member_profile": "Choose an existing member if this staff member also trains here. Their member belt and promotion history become authoritative.",
-            "belt_rank": "Used only when no training member is linked.",
-            "stripes": "Used only when no training member is linked.",
+            "belt_selection": "Only editable when no training member is linked.",
         }
 
     def __init__(self, *args, **kwargs):
@@ -320,8 +321,6 @@ class StaffForm(forms.ModelForm):
         self.fields["member_profile"].required = not bool(self.instance.pk)
         if not self.instance.pk:
             self.fields["state"].initial = "IL"
-            self.fields["belt_rank"].initial = "white"
-            self.fields["stripes"].initial = 0
             self.fields["is_active"].initial = True
 
         # When creating a staff profile, a selected member is the source for
@@ -331,15 +330,14 @@ class StaffForm(forms.ModelForm):
         if selected_member:
             for field in ("first_name", "last_name", "gender", "address", "city",
                           "state", "zip_code", "date_of_birth", "photo",
-                          "belt_rank", "stripes"):
+                          ):
                 if field in self.fields:
                     value = getattr(selected_member, field, None)
                     if field == "date_of_birth" and value:
                         value = value.isoformat()
                     if value is not None:
                         self.fields[field].initial = value
-            for field in ("belt_rank", "stripes"):
-                self.fields[field].disabled = True
+            self.fields["belt_selection"].disabled = True
             if not self.instance.pk:
                 # New staff records must never be created with stale member details.
                 for field in ("first_name", "last_name", "gender", "address",
@@ -356,10 +354,22 @@ class StaffForm(forms.ModelForm):
         if linked:
             # Display authoritative member belt on the form without allowing edits
             # to the legacy staff belt fields.
-            self.fields["belt_rank"].disabled = True
-            self.fields["stripes"].disabled = True
-            self.fields["belt_rank"].initial = self.instance.member_profile.belt_rank
-            self.fields["stripes"].initial = self.instance.member_profile.stripes
+            self.fields["belt_selection"].disabled = True
+
+        # The linked member owns rank data; otherwise use staff's own belt.
+        source = selected_member or (self.instance.member_profile if linked else self.instance)
+        rank = str(getattr(source, "belt_rank", BeltRank.WHITE) or BeltRank.WHITE)
+        stripes = int(getattr(source, "stripes", 0) or 0)
+        selected = f"{rank}|{stripes}"
+        choices = member_belt_selection_choices()
+        values = {value for _, group in choices for value, _ in group}
+        if selected not in values and rank in dict(BeltRank.choices):
+            label = dict(BeltRank.choices)[rank]
+            choices.append(("Previously recorded", [(selected, f"{label} — {stripes} stripes (existing record)")]))
+        self.fields["belt_selection"].choices = choices
+        self.fields["belt_selection"].initial = selected
+        self.fields["belt_selection"].disabled = bool(selected_member or linked)
+        self.belt_options = belt_picker_options(choices)
 
     def clean(self):
         cleaned = super().clean()
@@ -385,6 +395,14 @@ class StaffForm(forms.ModelForm):
     @transaction.atomic
     def save(self, commit=True):
         staff = super().save(commit=False)
+        member = self.cleaned_data.get("member_profile")
+        if member:
+            staff.belt_rank = member.belt_rank
+            staff.stripes = member.stripes
+        else:
+            rank, stripes = self.cleaned_data["belt_selection"].split("|", 1)
+            staff.belt_rank = rank
+            staff.stripes = int(stripes)
         if self.cleaned_data.get("user"):
             staff.user = self.cleaned_data["user"]
         if commit:
