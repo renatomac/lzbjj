@@ -51,3 +51,15 @@ class ProfessionalFormTemplateTests(SimpleTestCase):
         self.assertIn('class="crm-class-form"', source)
         self.assertNotIn('class="django-form"', source)
         self.assertIn('class="crm-weekday-fieldset"', source)
+
+    def test_class_type_has_consistent_select_widget(self):
+        from .forms import ClassForm
+        self.assertIn("form-select", ClassForm.base_fields["type"].widget.attrs.get("class", ""))
+
+    def test_class_editor_contains_no_literal_newline_escape(self):
+        source = get_template("classes/add.html").template.source
+        self.assertNotIn(r"\\n", source)
+
+    def test_shared_design_system_is_loaded(self):
+        self.assertIsNotNone(finders.find("crm/css/design_system.css"))
+        self.assertIn("crm/css/design_system.css", get_template("layout.html").template.source)
