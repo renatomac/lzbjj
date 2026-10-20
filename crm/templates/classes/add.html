@@ -72,7 +72,9 @@
             <span class="crm-class-section-icon"><i class="fa-solid fa-repeat" aria-hidden="true"></i></span>
             <div><h2>Repeat on</h2><p>Select all weekdays on which this class takes place.</p></div>
           </div>
-          <fieldset class="crm-weekday-fieldset">\n          <legend class="visually-hidden">Days of week</legend>\n          <div class="crm-weekday-grid" id="crm-class-weekdays">
+          <fieldset class="crm-weekday-fieldset">
+          <legend class="visually-hidden">Days of week</legend>
+          <div class="crm-weekday-grid" id="crm-class-weekdays">
             {% for choice in form.days_of_week %}
               <label class="crm-weekday-option">
                 {{ choice.tag }}
@@ -80,7 +82,8 @@
               </label>
             {% endfor %}
           </div>
-          </fieldset>\n          {% if form.days_of_week.errors %}<div class="invalid-feedback d-block">{{ form.days_of_week.errors }}</div>{% endif %}
+          </fieldset>
+          {% if form.days_of_week.errors %}<div class="invalid-feedback d-block">{{ form.days_of_week.errors }}</div>{% endif %}
           <p class="form-text mb-0 mt-3">You can select more than one day.</p>
         </div>
 
