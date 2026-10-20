@@ -5,6 +5,45 @@
     const root = document.getElementById("memberEditor");
     if (!root) return;
     root.classList.add("js-enabled");
+    // Belt choices depend on the member type, without requiring a page reload.
+    const memberType = root.querySelector('[name="member_type"]');
+    const beltPicker = root.querySelector('[data-belt-image-picker]');
+    if (memberType && beltPicker) {
+      const nativeBelt = beltPicker.querySelector('select[name="belt_selection"]');
+      const beltButtons = Array.from(beltPicker.querySelectorAll(".lzbjj-belt-option"));
+      const youthRanks = new Set([
+        "white", "gray-white", "gray", "gray-black", "yellow-white", "yellow",
+        "yellow-black", "orange-white", "orange", "orange-black",
+        "green-white", "green", "green-black"
+      ]);
+      const adultRanks = new Set(["white", "blue", "purple", "brown", "black"]);
+      function allowed(value, type) {
+        const [rank, count] = value.split("|");
+        const stripes = Number(count);
+        const youth = youthRanks.has(rank) && stripes >= 0 && stripes <= 11;
+        const adult = adultRanks.has(rank) && stripes >= 0 &&
+          stripes <= (rank === "black" ? 9 : 4);
+        return type === "child" ? youth :
+          type === "adult" ? adult : (youth || adult);
+      }
+      function filterBelts() {
+        if (!nativeBelt) return;
+        const type = memberType.value;
+        for (const option of nativeBelt.options) {
+          option.hidden = !allowed(option.value, type);
+          option.disabled = option.hidden;
+        }
+        for (const button of beltButtons) {
+          button.hidden = !allowed(button.dataset.value, type);
+          button.disabled = button.hidden;
+        }
+        // A change in member type must not silently submit an invalid belt.
+        if (!allowed(nativeBelt.value, type)) nativeBelt.value = "white|0";
+        nativeBelt.dispatchEvent(new Event("change", {bubbles: true}));
+      }
+      memberType.addEventListener("change", filterBelts);
+      filterBelts();
+    }
     const contactList = root.querySelector("#memberContacts");
     const addButton = root.querySelector("#addContact");
     const template = root.querySelector("#emptyContactTemplate");
