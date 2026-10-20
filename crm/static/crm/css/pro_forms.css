@@ -1,0 +1,17 @@
+/* Shared form shell, consistent with the Member editor. */
+.crm-pro-form { max-width: 1280px; margin: 0 auto 2rem; }
+.crm-pro-form .crm-form-card {
+  background: #fff; border: 1px solid #e0e6ee; border-radius: 18px;
+  box-shadow: 0 14px 35px rgba(20,37,61,.055);
+}
+.crm-pro-form .crm-form-card .card-body { padding: clamp(1.2rem, 3vw, 2.25rem); }
+.crm-pro-form .crm-form-heading { display:flex; flex-wrap:wrap; align-items:flex-start; justify-content:space-between; gap:1rem; padding-bottom:1.2rem; margin-bottom:1.4rem; border-bottom:1px solid #e6ebf1; }
+.crm-pro-form .crm-form-heading h1 { font-size:clamp(1.4rem,2.5vw,1.9rem); font-weight:750; margin:0; letter-spacing:-.02em; }
+.crm-pro-form .crm-form-subtitle { color:#687789; margin:.5rem 0 0; }
+.crm-pro-form label.form-label { font-weight:600; color:#243246; }
+.crm-pro-form .form-control, .crm-pro-form .form-select { min-height:44px; border-radius:9px; border-color:#cbd5e1; }
+.crm-pro-form textarea.form-control { min-height:100px; }
+.crm-pro-form .form-control:focus, .crm-pro-form .form-select:focus { border-color:#4489e5; box-shadow:0 0 0 .2rem rgba(48,118,210,.12); }
+.crm-pro-form .crm-form-actions { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:.75rem; border-top:1px solid #e6ebf1; padding-top:1.25rem; margin-top:1.6rem; }
+.crm-pro-form .crm-form-actions .btn { min-height:44px; padding:.55rem 1.3rem; border-radius:9px; }
+@media(max-width:575px) { .crm-pro-form .crm-form-actions .btn { flex:1; } }
