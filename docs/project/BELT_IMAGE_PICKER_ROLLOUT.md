@@ -20,7 +20,7 @@ Acceptance criteria:
 2. The authoritative Django ChoiceField remains the only posted value; forged
    rank/stripe selections fail server validation.
 3. Member and Staff belt+stripe choices map back to the existing separate model
-   columns. Waiver stores rank alone. No migrations are required.
+   columns. Waiver stores rank alone. Migration 0036 consolidates existing legacy coral/red rank records.
 4. Promotion keeps its current allowed progression and can display every
    authorized selection, even if specific artwork does not exist.
 5. Linked Staff belt values always come from Member, not from browser input.
@@ -28,8 +28,9 @@ Acceptance criteria:
    belt image. Native selects remain usable without JavaScript.
 7. Optional waiver belt stays optional; adult and youth ranks remain
    age/form appropriate.
-8. Existing signatures, student records, stripe history, and promotions are not
-   bulk-modified or migrated.
+8. Legacy coral/red ranks are consolidated to black 7th/8th/9th degree through
+   migration 0036, including Members, Staff, Promotions, and Waiver reporting.
+   Signed waiver records keep their historical degree in reported_belt_degree.
 
 ## Single reusable implementation
 
@@ -82,11 +83,10 @@ unchanged to avoid altering admin persistence.
 
 **Do not deploy until the tests pass and sponsor approves.**
 
-There are no migrations expected for this shared visual control. After merge
+Migration 0036 is REQUIRED for this version. Back up the database first and run `python manage.py migrate` only after verifying the backup and QA. After merge
 into `main`, use the established PythonAnywhere deployment playbook: preserve
 untracked production files and backup data, pull the approved version without
 destructive resets, run checks and `collectstatic --noinput`, reload the web
 app, and smoke-test the relevant screens.
 
-Rollback: revert the approved merge and run `collectstatic` again; existing
-belt and stripe columns and historical records remain untouched.
+Rollback: restore the pre-migration database backup and the prior approved code release. The forward data consolidation is not automatically reversible to distinct coral/red rank codes.
