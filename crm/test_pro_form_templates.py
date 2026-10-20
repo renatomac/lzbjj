@@ -33,3 +33,15 @@ class ProfessionalFormTemplateTests(SimpleTestCase):
         for path in ("users/add.html", "login/change_password.html"):
             with self.subTest(template=path):
                 self.assertIn("password_rules_checklist.html", get_template(path).template.source)
+
+    def test_class_editor_renders_all_visible_and_hidden_fields(self):
+        source = get_template("classes/add.html").template.source
+        for field in ("name", "type", "instructor", "start_time", "end_time", "days_of_week"):
+            self.assertIn("form." + field, source)
+        self.assertIn("form.hidden_fields", source)
+        self.assertIn("form.non_field_errors", source)
+        self.assertIn("form.days_of_week.errors", source)
+        self.assertIn("crm-weekday-option", source)
+
+    def test_class_editor_css_exists(self):
+        self.assertIsNotNone(finders.find("crm/css/class_editor.css"))
