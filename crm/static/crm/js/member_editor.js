@@ -23,8 +23,8 @@
         const youth = youthRanks.has(rank) && stripes >= 0 && stripes <= 11;
         const adult = adultRanks.has(rank) && stripes >= 0 &&
           stripes <= (rank === "black" ? 9 : 4);
-        return type === "child" ? youth :
-          type === "adult" ? adult : (youth || adult);
+        return (type === "child" || type === "transition") ? youth :
+          type === "adult" ? adult : false;
       }
       function filterBelts() {
         if (!nativeBelt) return;
