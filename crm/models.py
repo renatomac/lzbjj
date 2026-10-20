@@ -45,9 +45,6 @@ class BeltRank(models.TextChoices):
     PURPLE = 'purple', 'Purple'
     BROWN = 'brown', 'Brown'
     BLACK = 'black', 'Black'
-    RED_BLACK = 'red-black', 'Red & Black'
-    RED_WHITE = 'red-white', 'Red & White'
-    RED = 'red', 'Red'
 
 
 ADULT_BELT_ORDER = [
@@ -56,9 +53,6 @@ ADULT_BELT_ORDER = [
     BeltRank.PURPLE,
     BeltRank.BROWN,
     BeltRank.BLACK,
-    BeltRank.RED_BLACK,
-    BeltRank.RED_WHITE,
-    BeltRank.RED,
 ]
 
 KID_BELT_ORDER = [
@@ -1206,6 +1200,7 @@ class WaiverSignature(models.Model):
     participant_last_name = models.CharField(max_length=100)
     participant_dob = models.DateField(null=True, blank=True)
     reported_belt_rank = models.CharField(max_length=50, choices=BeltRank.choices, blank=True, default="")
+    reported_belt_degree = models.PositiveSmallIntegerField(null=True, blank=True, help_text="Degree of reported black belt; preserves legacy coral/red waiver distinctions.")
 
     # Parent / Guardian (required for minors)
     guardian_first_name = models.CharField(max_length=100, blank=True)
