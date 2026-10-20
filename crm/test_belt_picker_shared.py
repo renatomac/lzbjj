@@ -29,20 +29,13 @@ class BeltPickerOptionTests(SimpleTestCase):
         self.assertIn("white|11", values)
         self.assertEqual(len(values), len(options))
 
-    def test_advanced_belt_degrees_keep_existing_rank_codes(self):
-        options = {o['value']: o['label'] for o in belt_picker_options(member_belt_selection_choices())}
-        self.assertEqual(options['red-black|0'], 'Red & Black — Black belt, 7th degree')
-        self.assertEqual(options['red-white|0'], 'Red & White — Black belt, 8th degree')
-        self.assertEqual(options['red|0'], 'Red — Black belt, 9th degree')
-        self.assertEqual(belt_selection_label('blue', 2), 'Blue — 2 stripes')
-
-    def test_coral_and_red_belts_do_not_offer_stripes(self):
-        options = belt_picker_options(member_belt_selection_choices())
-        values = {option["value"] for option in options}
-        for rank in ("red-black", "red-white", "red"):
-            self.assertIn(f"{rank}|0", values)
-            for stripes in range(1, 12):
-                self.assertNotIn(f"{rank}|{stripes}", values)
+    def test_black_degrees_7_to_9_are_single_entries(self):
+        options = {o["value"]: o["label"] for o in belt_picker_options(member_belt_selection_choices())}
+        self.assertEqual(options["black|7"], "Black — 7th degree")
+        self.assertEqual(options["black|8"], "Black — 8th degree")
+        self.assertEqual(options["black|9"], "Black — 9th degree")
+        self.assertEqual(belt_selection_label("blue", 2), "Blue — 2 stripes")
+        self.assertFalse(any(k.startswith(("red-black|", "red-white|", "red|")) for k in options))
 
     def test_artwork_matches_existing_promotion_selector(self):
         options = belt_picker_options([("gray|3", "Gray — 3 stripes")])
@@ -168,19 +161,16 @@ class BeltPickerIntegrationTests(TestCase):
         self.assertNotIn("purple|2", options)
         self.assertNotIn("blue|4", options)
 
-    def test_promotion_picker_includes_corals_without_broken_image_urls(self):
+    def test_promotion_picker_offers_black_degrees_without_duplicate_ranks(self):
         self.member.belt_rank = "black"
-        self.member.stripes = 8
+        self.member.stripes = 6
         self.member.save(update_fields=["belt_rank", "stripes"])
         form = BeltPromotionForm(member=self.member)
         options = {option["value"]: option for option in form.belt_options}
-        self.assertIn("black|9", options)
-        self.assertIn("Blk9.svg", options["black|9"]["image_url"])
-        self.assertIn("red-black|0", options)
-        self.assertEqual(options["red-black|0"]["image_url"], "")
-        self.assertNotIn("red-black|1", options)
-        self.assertNotIn("red-white|1", options)
-        self.assertNotIn("red|1", options)
+        for degree in (7, 8, 9):
+            self.assertIn(f"black|{degree}", options)
+            self.assertIn(f"Blk{degree}.svg", options[f"black|{degree}"]["image_url"])
+        self.assertFalse(any(value.startswith(("red-black|", "red-white|", "red|")) for value in options))
 
 class AdminBeltPickerTests(SimpleTestCase):
     def test_rank_widget_shows_same_artwork_and_retains_native_select(self):
