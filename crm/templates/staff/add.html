@@ -1,4 +1,6 @@
 {% extends "layout.html" %}
+{% load static crispy_forms_tags %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'crm/css/pro_forms.css' %}">{% endblock %}
 
 {% block title %}Staff Editor{% endblock %}
 {% block header_title %}Staff Manager{% endblock %}
@@ -52,40 +54,34 @@ document.addEventListener("DOMContentLoaded", function () {
 </script>
 
 
-<div class="row justify-content-center">
-    <div class="col-lg-8">
-        <div class="card main-card mb-4">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h3 class="fw-bold mb-0">{{title}}</h3>
-                    <a href="{% url 'staff'%}" class="btn btn-custom-ghost"><i class="fa-solid fa-arrow-left"></i> Back to Staff</a>
-                </div>
-                {% load crispy_forms_tags %}
-                <form action="{% if action_url == 'addStaff' %}
-                                {% url 'addStaff' %}
-                            {% else %}
-                                {% url 'editStaff' staff_id=staff_id %}
-                            {% endif %}"  
-                        method="post">
-                    {% csrf_token %}
-                    <p class="text-muted small">Select the training member. Their personal information and linked login will be used automatically. Members without a login account must have one linked before staff creation.</p>
-                    {% for field in form.hidden_fields %}{{ field }}{% endfor %}
-                    <div class="row g-3">
-                      {% for field in form.visible_fields %}
-                        {% if field.name != "belt_selection" %}
-                          <div class="col-12 col-md-6">{{ field|as_crispy_field }}</div>
-                        {% endif %}
-                      {% endfor %}
-                      <div class="col-12">
-                        {% include "components/belt_image_picker.html" with field=form.belt_selection options=form.belt_options picker_label="Belt / stripes" %}
-                      </div>
-                    </div>
-                    {% if form.non_field_errors %}<div class="alert alert-danger mt-3">{{ form.non_field_errors }}</div>{% endif %}
-                    <button type="submit" class="btn btn-primary mt-4">Save staff</button>
-                </form>    
-            </div>
+<section class="crm-pro-form" aria-label="Staff editor">
+  <div class="card crm-form-card">
+    <div class="card-body">
+      <header class="crm-form-heading">
+        <div><h1>{{ title }}</h1><p class="crm-form-subtitle">Manage staff role, linked member information, and training credentials.</p></div>
+        <a href="{% url 'staff' %}" class="btn btn-outline-secondary"><i class="fa-solid fa-arrow-left me-2" aria-hidden="true"></i>Back to Staff</a>
+      </header>
+      <form action="{% if action_url == 'addStaff' %}{% url 'addStaff' %}{% else %}{% url 'editStaff' staff_id=staff_id %}{% endif %}" method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <p class="text-muted small">Select a training member to use their personal details and linked login. Members without a login must have one linked before staff creation.</p>
+        {% for field in form.hidden_fields %}{{ field }}{% endfor %}
+        {% if form.non_field_errors %}<div class="alert alert-danger" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+        <div class="row g-3">
+          {% for field in form.visible_fields %}
+            {% if field.name != "belt_selection" %}
+              <div class="col-12 col-md-6">{{ field|as_crispy_field }}</div>
+            {% endif %}
+          {% endfor %}
+          <div class="col-12">
+            {% include "components/belt_image_picker.html" with field=form.belt_selection options=form.belt_options picker_label="Belt / stripes" %}
+          </div>
         </div>
+        <div class="crm-form-actions">
+          <a href="{% url 'staff' %}" class="btn btn-outline-secondary">Cancel</a>
+          <button type="submit" class="btn btn-primary"><i class="fa-solid fa-check me-2" aria-hidden="true"></i>Save Staff</button>
+        </div>
+      </form>
     </div>
-
-</div>
+  </div>
+</section>
 {% endblock %}
