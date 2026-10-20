@@ -113,19 +113,11 @@ ContactFormSet = inlineformset_factory(
 )
 
 
-ADVANCED_BLACK_DEGREES = {
-    BeltRank.RED_BLACK: 7,
-    BeltRank.RED_WHITE: 8,
-    BeltRank.RED: 9,
-}
-
-
 def belt_selection_label(rank, stripes):
-    """Display coral/red ranks as black-belt degrees without changing stored values."""
-    if rank in ADVANCED_BLACK_DEGREES:
-        degree = ADVANCED_BLACK_DEGREES[rank]
-        return f"{dict(BeltRank.choices)[rank]} — Black belt, {degree}th degree"
+    """Black 7–9 are degrees of black, not additional ranks."""
     label = dict(BeltRank.choices).get(rank, str(rank))
+    if str(rank) == "black" and int(stripes) >= 7:
+        return f"Black — {stripes}th degree"
     return f"{label} — {stripes} {'stripe' if stripes == 1 else 'stripes'}"
 
 
@@ -141,7 +133,7 @@ def member_belt_selection_choices():
 
     groups = [("White belt", options(BeltRank.WHITE, 11))]
     for rank in ADULT_BELT_ORDER[1:]:
-        groups.append((f"Adult · {labels[rank]}", options(rank, 9 if rank == BeltRank.BLACK else (0 if rank in (BeltRank.RED_BLACK, BeltRank.RED_WHITE, BeltRank.RED) else 4))))
+        groups.append((f"Adult · {labels[rank]}", options(rank, 9 if rank == BeltRank.BLACK else 4)))
     for rank in KID_BELT_ORDER[1:]:
         groups.append((f"Youth · {labels[rank]}", options(rank, 11)))
     return groups
@@ -566,7 +558,7 @@ class BeltPromotionForm(forms.ModelForm):
         is_youth = order == KID_BELT_ORDER
         choices = []
         for rank in order[start_index:]:
-            stripe_max = 11 if is_youth else (9 if rank == BeltRank.BLACK else (0 if rank in (BeltRank.RED_BLACK, BeltRank.RED_WHITE, BeltRank.RED) else 4))
+            stripe_max = 11 if is_youth else (9 if rank == BeltRank.BLACK else 4)
             for stripes in range(stripe_max + 1):
                 # No demotions or unchanged selections for a new promotion.
                 # On edit, retain the originally saved rank/stripe combination.
