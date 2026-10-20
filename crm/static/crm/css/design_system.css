@@ -1,0 +1,33 @@
+/* LZBJJ CRM shared visual language. Scoped to common surfaces; no layout overrides for timer/camera views. */
+:root {
+  --crm-ink: #17283d;
+  --crm-muted: #64748b;
+  --crm-border: #dbe3ed;
+  --crm-blue: #1765d1;
+  --crm-radius: 14px;
+  --crm-shadow: 0 12px 30px rgba(23, 40, 61, .055);
+}
+body { -webkit-font-smoothing: antialiased; }
+main .card:not(.crm-form-card), .main-card {
+  border-radius: var(--crm-radius);
+  border-color: var(--crm-border);
+}
+main .card:not(.crm-form-card) .card-header { border-bottom-color: var(--crm-border); }
+main .form-control:not([type="checkbox"]):not([type="radio"]),
+main .form-select {
+  border-radius: 9px;
+  border-color: #cbd5e1;
+  min-height: 42px;
+}
+main .form-control:focus, main .form-select:focus {
+  border-color: #4489e5;
+  box-shadow: 0 0 0 .2rem rgba(48,118,210,.12);
+}
+main .btn:not(.btn-link) { border-radius: 9px; }
+main .form-label { font-weight: 600; }
+main .form-text { color: var(--crm-muted); }
+main .invalid-feedback, main .errorlist { font-size: .86rem; }
+main .table thead th { font-weight: 700; }
+@media (prefers-reduced-motion: reduce) {
+  main .btn, main .form-control, main .form-select { transition: none; }
+}
