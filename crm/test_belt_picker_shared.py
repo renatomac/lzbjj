@@ -13,7 +13,7 @@ from django.test import SimpleTestCase, TestCase
 from crm.belt_picker import belt_picker_options
 from crm.forms import (
     AdultWaiverForm, BeltPromotionForm, MemberForm, MinorWaiverForm, StaffForm,
-    member_belt_selection_choices, belt_selection_label,
+    member_belt_selection_choices, belt_selection_label, member_type_allows_belt,
 )
 from crm.models import BeltRank, Member, Staff, BeltPromotion
 from crm.admin import MemberAdmin, StaffAdmin, BeltPromotionAdmin
@@ -28,6 +28,19 @@ class BeltPickerOptionTests(SimpleTestCase):
         self.assertIn("black|9", values)
         self.assertIn("white|11", values)
         self.assertEqual(len(values), len(options))
+
+    def test_member_type_limits_belt_choices(self):
+        self.assertTrue(member_type_allows_belt("child", "gray", 11))
+        self.assertTrue(member_type_allows_belt("child", "white", 11))
+        self.assertFalse(member_type_allows_belt("child", "blue", 0))
+        self.assertFalse(member_type_allows_belt("child", "black", 9))
+        self.assertTrue(member_type_allows_belt("adult", "black", 9))
+        self.assertTrue(member_type_allows_belt("adult", "white", 4))
+        self.assertFalse(member_type_allows_belt("adult", "white", 5))
+        self.assertFalse(member_type_allows_belt("adult", "yellow", 2))
+        self.assertTrue(member_type_allows_belt("transition", "gray", 3))
+        self.assertTrue(member_type_allows_belt("transition", "purple", 2))
+        self.assertFalse(member_type_allows_belt("adult", "red-black", 0))
 
     def test_black_degrees_7_to_9_are_single_entries(self):
         options = {o["value"]: o["label"] for o in belt_picker_options(member_belt_selection_choices())}
