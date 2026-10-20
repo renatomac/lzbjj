@@ -1,31 +1,27 @@
 {% extends "layout.html" %}
 {% load static %}
-{% load crispy_forms_tags %}
-
-{% block title %}Add User{% endblock %}
-{% block header_title %}<i class="fas fa-users me-2"></i>User Manager{% endblock %}
-
+{% block title %}{{ title }}{% endblock %}
+{% block header_title %}User Manager{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'crm/css/pro_forms.css' %}">{% endblock %}
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-lg-8">
-        <div class="card main-card mb-4">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h3 class="fw-bold mb-0">{{ title }}</h3>
-                    <a href="{% url 'users' %}" class="btn btn-custom-ghost"><i class="fa-solid fa-arrow-left"></i> Back to Users</a>
-                </div>
-                <form action="{% url 'addUser' %}" method="post">
-                    {% csrf_token %}
-                    {{ form|crispy }}
-
-                    {% include "partials/password_rules_checklist.html" with input_id=form.password1.id_for_label list_id="password1-rules" %}
-
-                    <input type="submit" class="btn btn-primary" value="Submit">
-                </form>
-            </div>
+<section class="crm-pro-form" aria-label="User account editor">
+  <div class="card crm-form-card">
+    <div class="card-body">
+      <header class="crm-form-heading">
+        <div><h1>{{ title }}</h1><p class="crm-form-subtitle">Manage login credentials and account access.</p></div>
+        <a href="{% url 'users' %}" class="btn btn-outline-secondary"><i class="fa-solid fa-arrow-left me-2" aria-hidden="true"></i>Back to Users</a>
+      </header>
+      <form action="{% url 'addUser' %}" method="post">
+        {% csrf_token %}
+        {% include "components/pro_form_fields.html" %}
+        {% include "partials/password_rules_checklist.html" with input_id=form.password1.id_for_label list_id="password1-rules" %}
+        <div class="crm-form-actions">
+          <a href="{% url 'users' %}" class="btn btn-outline-secondary">Cancel</a>
+          <button type="submit" class="btn btn-primary"><i class="fa-solid fa-user-check me-2" aria-hidden="true"></i>Save User</button>
         </div>
+      </form>
     </div>
-</div>
-
+  </div>
+</section>
 <script src="{% static 'crm/js/password_rules.js' %}"></script>
 {% endblock %}
