@@ -144,15 +144,10 @@ def member_type_allows_belt(member_type, rank, stripes):
         stripes = int(stripes)
     except (TypeError, ValueError):
         return False
-    if member_type == "child":
+    if member_type in ("child", Member.TRANSITIONING):
         return rank in KID_BELT_ORDER and 0 <= stripes <= 11
     if member_type == "adult":
         return rank in ADULT_BELT_ORDER and 0 <= stripes <= (9 if rank == BeltRank.BLACK else 4)
-    if member_type == Member.TRANSITIONING:
-        return (
-            (rank in KID_BELT_ORDER and 0 <= stripes <= 11)
-            or (rank in ADULT_BELT_ORDER and 0 <= stripes <= (9 if rank == BeltRank.BLACK else 4))
-        )
     return False
 
 
