@@ -5,6 +5,7 @@ Uses the actual forms and template, not a browser-side mock.
 from datetime import date
 
 from django.contrib.auth import get_user_model
+from django.contrib import admin
 from django.contrib.staticfiles import finders
 from django.template.loader import get_template, render_to_string
 from django.test import SimpleTestCase, TestCase
@@ -14,7 +15,9 @@ from crm.forms import (
     AdultWaiverForm, BeltPromotionForm, MemberForm, MinorWaiverForm, StaffForm,
     member_belt_selection_choices,
 )
-from crm.models import BeltRank, Member, Staff
+from crm.models import BeltRank, Member, Staff, BeltPromotion
+from crm.admin import MemberAdmin, StaffAdmin, BeltPromotionAdmin
+from crm.widgets import AdminBeltRankWidget
 
 
 class BeltPickerOptionTests(SimpleTestCase):
@@ -160,3 +163,30 @@ class BeltPickerIntegrationTests(TestCase):
         self.assertIn("Blk9.svg", options["black|9"]["image_url"])
         self.assertIn("red-black|0", options)
         self.assertEqual(options["red-black|0"]["image_url"], "")
+
+class AdminBeltPickerTests(SimpleTestCase):
+    def test_rank_widget_shows_same_artwork_and_retains_native_select(self):
+        widget = AdminBeltRankWidget(choices=[
+            ("", "---------"), ("white", "White"), ("blue", "Blue"),
+        ])
+        html = widget.render("belt_rank", "blue", attrs={"id": "id_belt_rank"})
+        self.assertIn('name="belt_rank"', html)
+        self.assertIn('data-belt-image-picker', html)
+        self.assertIn('data-value="blue"', html)
+        self.assertIn("B0.svg", html)
+        self.assertIn("lzbjj-belt-native", html)
+
+    def test_member_staff_and_promotion_admin_use_image_rank_widgets(self):
+        cases = [
+            (MemberAdmin(Member, admin.site), Member, "belt_rank"),
+            (StaffAdmin(Staff, admin.site), Staff, "belt_rank"),
+            (BeltPromotionAdmin(BeltPromotion, admin.site), BeltPromotion, "new_rank"),
+            (BeltPromotionAdmin(BeltPromotion, admin.site), BeltPromotion, "old_rank"),
+        ]
+        for model_admin, model, field_name in cases:
+            with self.subTest(model=model.__name__, field=field_name):
+                form_field = model_admin.formfield_for_choice_field(
+                    model._meta.get_field(field_name),
+                    request=None,
+                )
+                self.assertIsInstance(form_field.widget, AdminBeltRankWidget)
