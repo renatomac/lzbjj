@@ -19,7 +19,7 @@ Native select stays available without JS or when enhancement fails.
       <button type="button" role="option" aria-selected="false"
               class="dropdown-item lzbjj-belt-option" data-value="{{ option.value }}" data-label="{{ option.label }}" data-image="{{ option.image_url }}" data-rank="{{ option.rank }}">
         {% if option.image_url %}<img src="{{ option.image_url }}" alt="" width="105" height="34" loading="lazy">
-        {% elif option.rank %}<span class="lzbjj-belt-art-fallback" data-rank="{{ option.rank }}" aria-hidden="true"></span>
+        {% elif option.rank %}<span class="lzbjj-belt-art-fallback" data-rank="{{ option.rank }}" aria-hidden="true"><span class="lzbjj-belt-stripes">{% for stripe in "1234" %}{% if forloop.counter <= option.stripes %}<span></span>{% endif %}{% endfor %}</span></span>
         {% else %}<span class="lzbjj-belt-art-placeholder" aria-hidden="true"></span>{% endif %}
         <span class="lzbjj-belt-option-label">{{ option.label }}</span>
       </button>
