@@ -44,6 +44,16 @@
   display:inline-block; border: 1px solid #5a6772;
   background: #fff; box-shadow: inset 5px 0 0 rgba(0,0,0,.75);
 }
+.lzbjj-belt-picker .lzbjj-belt-art-fallback { position: relative; }
+.lzbjj-belt-picker .lzbjj-belt-stripes {
+  position: absolute; left: 12px; top: 0; bottom: 0;
+  display: inline-flex; gap: 4px; align-items: stretch;
+}
+.lzbjj-belt-picker .lzbjj-belt-stripes > span {
+  display: block; width: 4px; height: 100%; background: #f7f7f7;
+  border: 1px solid rgba(0,0,0,.25);
+}
+.lzbjj-belt-picker [data-rank="red-white"] .lzbjj-belt-stripes > span { background: #151515; }
 .lzbjj-belt-picker [data-rank="red-black"] { background: linear-gradient(90deg,#151515 0 45%,#a81822 45% 100%); }
 .lzbjj-belt-picker [data-rank="red-white"] { background: linear-gradient(90deg,#fff 0 45%,#ad1d26 45% 100%); }
 .lzbjj-belt-picker [data-rank="red"] { background: #bc1e2d; }
