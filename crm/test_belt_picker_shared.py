@@ -13,7 +13,7 @@ from django.test import SimpleTestCase, TestCase
 from crm.belt_picker import belt_picker_options
 from crm.forms import (
     AdultWaiverForm, BeltPromotionForm, MemberForm, MinorWaiverForm, StaffForm,
-    member_belt_selection_choices,
+    member_belt_selection_choices, belt_selection_label,
 )
 from crm.models import BeltRank, Member, Staff, BeltPromotion
 from crm.admin import MemberAdmin, StaffAdmin, BeltPromotionAdmin
@@ -28,6 +28,13 @@ class BeltPickerOptionTests(SimpleTestCase):
         self.assertIn("black|9", values)
         self.assertIn("white|11", values)
         self.assertEqual(len(values), len(options))
+
+    def test_advanced_belt_degrees_keep_existing_rank_codes(self):
+        options = {o['value']: o['label'] for o in belt_picker_options(member_belt_selection_choices())}
+        self.assertEqual(options['red-black|0'], 'Red & Black — Black belt, 7th degree')
+        self.assertEqual(options['red-white|0'], 'Red & White — Black belt, 8th degree')
+        self.assertEqual(options['red|0'], 'Red — Black belt, 9th degree')
+        self.assertEqual(belt_selection_label('blue', 2), 'Blue — 2 stripes')
 
     def test_coral_and_red_belts_do_not_offer_stripes(self):
         options = belt_picker_options(member_belt_selection_choices())
