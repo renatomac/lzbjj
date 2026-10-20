@@ -14,7 +14,7 @@
         {% if option.image_url %}
           <img src="{{ option.image_url }}" alt="" width="105" height="34" loading="lazy">
         {% elif option.rank %}
-          <span class="lzbjj-belt-art-fallback" data-rank="{{ option.rank }}" aria-hidden="true"></span>
+          <span class="lzbjj-belt-art-fallback" data-rank="{{ option.rank }}" aria-hidden="true"><span class="lzbjj-belt-stripes">{% for stripe in "1234" %}{% if forloop.counter <= option.stripes %}<span></span>{% endif %}{% endfor %}</span></span>
         {% else %}
           <span class="lzbjj-belt-art-placeholder" aria-hidden="true"></span>
         {% endif %}
