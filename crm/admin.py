@@ -186,10 +186,11 @@ class MembershipAdmin(admin.ModelAdmin):
 
 @admin.register(Payment)
 class PaymentAdmin(admin.ModelAdmin):
-    list_display = ("id", "user", "amount", "payment_date", "payment_method", "status")
+    list_display = ("id", "member", "user", "amount", "payment_date", "payment_method", "status", "received_by", "recorded_by")
     list_filter = ("payment_method", "status", "payment_date")
-    search_fields = ("user__username",)
-    autocomplete_fields = ("user",)
+    search_fields = ("user__username", "member__first_name", "member__last_name")
+    autocomplete_fields = ("user", "member")
+    readonly_fields = ('recorded_by', 'confirmation_key', 'timestamp')
 
 
 

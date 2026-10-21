@@ -15,6 +15,15 @@ class ProfessionalFormTemplateTests(SimpleTestCase):
             "attendance/session_edit.html",
             "login/change_password.html",
             "timers/timer_form.html",
+            "members/index.html",
+            "staff/index.html",
+            "users/index.html",
+            "classes/index.html",
+            "login/layout.html",
+            "login/login.html",
+            "billing/index.html",
+            "waiver/index.html",
+            "notifications/list.html",
         ):
             with self.subTest(template=path):
                 self.assertIsNotNone(get_template(path))

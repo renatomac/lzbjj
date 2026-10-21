@@ -30,7 +30,10 @@ class Command(BaseCommand):
             '--type',
             type=str,
             default='all',
-            help='Type of notification to generate (birthday, promotion_milestone, low_attendance, membership_expiring, streak_milestone, waiver_expiring, trial_expired, all)',
+            choices=['birthday', 'promotion_milestone', 'low_attendance', 'membership_expiring',
+                     'streak_milestone', 'waiver_expiring', 'trial_expired', 'attendance_missing',
+                     'membership_missing', 'payment_overdue', 'action_required', 'all'],
+            help='Notification type; action_required reconciles attendance, membership, and overdue payment alerts.',
         )
         parser.add_argument(
             '--verbose',
@@ -43,6 +46,14 @@ class Command(BaseCommand):
         verbose = options['verbose']
 
         results = {}
+        from notifications.action_required import reconcile_action_required_notifications
+        if notification_type in ['attendance_missing', 'membership_missing', 'payment_overdue', 'action_required', 'all']:
+            results['action_required'] = reconcile_action_required_notifications(
+                attendance=notification_type in ['attendance_missing', 'action_required', 'all'],
+                membership=notification_type in ['membership_missing', 'action_required', 'all'],
+                overdue=notification_type in ['payment_overdue', 'action_required', 'all'])
+            self.stdout.write(self.style.SUCCESS(
+                f"Action-required notifications: {len(results['action_required'])} created or reopened"))
 
         if notification_type in ['birthday', 'all']:
             self.stdout.write("Generating birthday notifications...")

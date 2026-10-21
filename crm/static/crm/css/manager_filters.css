@@ -1,13 +1,47 @@
-/* Compact, aligned search fields for User, Staff and Class managers. */
-.manager-filter-form { --bs-gutter-x: 1rem; --bs-gutter-y: .875rem; }
-.manager-filter-form .form-label { display:block; margin-bottom: .25rem; }
-.manager-filter-form .form-control,
-.manager-filter-form .form-select { height: 42px; min-height:42px; }
-.manager-search { position:relative; }
-.manager-search > i {
-  position:absolute; top:50%; left:13px; transform:translateY(-50%);
-  font-size:13px; line-height:1; pointer-events:none; z-index:2;
+/* Shared search layout for Members, Staff, Users and Classes. */
+.manager-filter-card { container: manager-filters / inline-size; }
+.manager-filter-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: .5rem 1rem;
 }
-.manager-search .form-control { padding-left:36px; }
-.manager-filter-card .btn-custom-ghost { white-space:nowrap; }
-.manager-table-card .table-responsive { overflow-x:auto; }
+.manager-filter-field { display: grid; min-width: 0; gap: .5rem; }
+.manager-filter-field .form-label {
+  display: block;
+  margin: 0;
+  align-self: end;
+  overflow-wrap: anywhere;
+}
+.manager-search { position: relative; min-width: 0; }
+.manager-search > i {
+  position: absolute; top: 50%; left: 13px; transform: translateY(-50%);
+  font-size: 13px; line-height: 1; pointer-events: none; z-index: 2;
+}
+.manager-search .form-control { padding-left: 36px; }
+.manager-filter-form .form-control,
+.manager-filter-form .form-select {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  height: 2.75rem;
+  min-height: 2.75rem;
+  margin: 0;
+  align-self: stretch;
+  line-height: 1.5;
+}
+.manager-filter-actions { grid-column: 1 / -1; margin-top: .5rem; flex-wrap: wrap; }
+.manager-filter-card .btn-custom-ghost { white-space: normal; }
+.manager-table-card .table-responsive { overflow-x: auto; }
+@supports (grid-template-rows: subgrid) {
+  .manager-filter-field { grid-row: span 2; grid-template-rows: subgrid; }
+  @container manager-filters (min-width: 36rem) {
+    .manager-filter-form--two { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+  }
+  @container manager-filters (min-width: 48rem) {
+    .manager-filter-form:not(.manager-filter-form--two) {
+      grid-template-columns: minmax(0, 2fr) repeat(2, minmax(0, 1fr));
+    }
+  }
+}

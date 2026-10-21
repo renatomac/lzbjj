@@ -15,9 +15,11 @@ main .card:not(.crm-form-card), .main-card {
 main .card:not(.crm-form-card) .card-header { border-bottom-color: var(--crm-border); }
 main .form-control:not([type="checkbox"]):not([type="radio"]),
 main .form-select {
+  box-sizing: border-box;
+  min-width: 0;
   border-radius: 9px;
   border-color: #cbd5e1;
-  min-height: 42px;
+  min-height: 2.75rem;
 }
 main .form-control:focus, main .form-select:focus {
   border-color: #4489e5;
@@ -28,6 +30,14 @@ main .form-label { font-weight: 600; }
 main .form-text { color: var(--crm-muted); }
 main .invalid-feedback, main .errorlist { font-size: .86rem; }
 main .table thead th { font-weight: 700; }
+.crm-filter-actions .btn,
+.crm-filter-toolbar .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.75rem;
+}
+.crm-filter-toolbar { align-items: center; }
 @media (prefers-reduced-motion: reduce) {
   main .btn, main .form-control, main .form-select { transition: none; }
 }

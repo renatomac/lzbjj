@@ -1,15 +1,21 @@
 {% extends "layout.html" %}
-{% load belt_images %}
+{% load belt_images static %}
 
 {% block title %}Member Profile{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'crm/css/manual_payments.css' %}">{% endblock %}
 
 {% block content %}
 <div class="container-fluid py-4">
+    {% if can_record_payment %}
+    <div class="d-flex justify-content-end mb-3">
+        <a class="btn btn-primary" href="{% url 'viewMember' member.pk %}?tab=payments">Record manual payment</a>
+    </div>
+    {% endif %}
     <div class="card bg-white shadow-sm mb-4 mx-auto">
         <div class="card-header border-bottom">
             <ul class="nav nav-tabs card-header-tabs" id="myTab" role="tablist">
                 <li class="nav-item">
-                    <a class="nav-link active" id="personal-tab" data-bs-toggle="tab" href="#personal" role="tab" aria-controls="personal" aria-selected="true">
+                    <a class="nav-link{% if not show_payments_tab %} active{% endif %}" id="personal-tab" data-bs-toggle="tab" href="#personal" role="tab" aria-controls="personal" aria-selected="{% if show_payments_tab %}false{% else %}true{% endif %}">
                         <i class="far fa-address-card me-2"></i>Personal Information
                     </a>
                 </li>
@@ -34,7 +40,7 @@
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" id="payments-tab" data-bs-toggle="tab" href="#payments" role="tab" aria-controls="payments" aria-selected="false">
+                    <a class="nav-link{% if show_payments_tab %} active{% endif %}" id="payments-tab" data-bs-toggle="tab" href="#payments" role="tab" aria-controls="payments" aria-selected="{% if show_payments_tab %}true{% else %}false{% endif %}">
                         <i class="fas fa-dollar-sign me-2"></i>Payments
                     </a>
                 </li>
@@ -57,7 +63,7 @@
         </div>
         <div class="card-body">
             <div class="tab-content" id="myTabContent">
-                <div class="tab-pane fade show active" id="personal" role="tabpanel" aria-labelledby="personal-tab">
+                <div class="tab-pane fade{% if not show_payments_tab %} show active{% endif %}" id="personal" role="tabpanel" aria-labelledby="personal-tab">
                     <div class="card shadow-sm rounded-3">
                         <div class="card-body">
                             <div class="row g-4 align-items-center">
@@ -202,7 +208,30 @@
                     </div>
                 </div>
 
-                <div class="tab-pane fade" id="payments" role="tabpanel" aria-labelledby="payments-tab">
+                <div class="tab-pane fade{% if show_payments_tab %} show active{% endif %}" id="payments" role="tabpanel" aria-labelledby="payments-tab">
+                    {% if can_record_payment and member.membership_payment_method != 'credit_card' %}
+                    <form method="post" action="{% url 'viewMember' member.pk %}?tab=payments" class="card card-body mb-3 manual-payment-form">
+                        {% csrf_token %}
+                        <h5>Confirm manual membership payment</h5>
+                        <p class="text-muted small">Record money already received. Membership method: {{ member.get_membership_payment_method_display }}.</p>
+                        {{ manual_payment_form.non_field_errors }}
+                        {{ manual_payment_form.confirmation_key }}{{ manual_payment_form.confirmation_key.errors }}
+                        <div class="manual-payment-fields">
+                            {% for field in manual_payment_form.visible_fields %}
+                            <div class="manual-payment-field"><label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}<div class="manual-payment-errors text-danger small">{{ field.errors }}</div></div>
+                            {% endfor %}
+                        </div>
+                        <button type="submit" class="btn btn-primary mt-3 align-self-start">Confirm payment received</button>
+                    </form>
+                    {% elif can_record_payment %}
+                    <div class="alert alert-info">
+                        <h5>Set up manual payments</h5>
+                        <p>This member’s membership payment method is currently <strong>Credit card</strong>. To enter a manual receipt, edit the member and select Cash, Check, Zelle, Bank transfer, or Other manual payment in the Membership section.</p>
+                        <a class="btn btn-outline-primary" href="{% url 'editMember' member.pk %}#membership">Change membership payment method</a>
+                    </div>
+                    {% else %}
+                    <p class="alert alert-info">A staff member or administrator can confirm manual payments here.</p>
+                    {% endif %}
                     <div class="card shadow-sm rounded-3">
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-center mb-4">
@@ -218,6 +247,8 @@
                                             <th>Method</th>
                                             <th>Status</th>
                                             <th>Source</th>
+                                            <th>Received by</th>
+                                            <th>Recorded by</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -231,10 +262,12 @@
                                             <td>{{ payment.method }}</td>
                                             <td>{{ payment.status }}</td>
                                             <td>{{ payment.source }}</td>
+                                            <td>{{ payment.received_by|default:'—' }}</td>
+                                            <td>{{ payment.recorded_by|default:'—' }}</td>
                                         </tr>
                                         {% empty %}
                                         <tr>
-                                            <td colspan="5" class="text-center text-muted">No payments recorded this year.</td>
+                                            <td colspan="7" class="text-center text-muted">No payments recorded this year.</td>
                                         </tr>
                                         {% endfor %}
                                     </tbody>

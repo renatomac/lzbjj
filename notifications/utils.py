@@ -41,7 +41,7 @@ def mark_notification_read(notification_id, user):
     """Helper to mark a single notification as read"""
     try:
         notification = Notification.objects.get(id=notification_id, user=user)
-        if not notification.is_read:
+        if not notification.is_read and not notification.requires_action:
             notification.is_read = True
             notification.save(update_fields=['is_read'])
         return notification
@@ -51,7 +51,7 @@ def mark_notification_read(notification_id, user):
 
 def mark_all_notifications_read(user):
     """Helper to mark all user's notifications as read"""
-    updated = Notification.objects.filter(user=user, is_read=False).update(is_read=True)
+    updated = Notification.objects.filter(user=user, is_read=False, requires_action=False).update(is_read=True)
     return updated
 
 

@@ -17,6 +17,16 @@
           </p>
         </div>
         <div class="d-flex gap-2 align-items-center flex-wrap">
+          {% if not session.is_canceled and session.date <= today %}
+            {% if session.attendance_reported_at %}
+              <span class="badge bg-success">Attendance reported</span>
+            {% else %}
+              <form method="post" action="{% url 'attendance_mark_reported' session.pk %}">
+                {% csrf_token %}
+                <button class="btn btn-outline-primary" type="submit">Mark attendance reported (including zero attendees)</button>
+              </form>
+            {% endif %}
+          {% endif %}
           {% if request.user.is_staff %}
             <a href="{% url 'attendance_bulk' %}?session_id={{ sessionSelected }}" class="btn btn-sm btn-primary"><i class="fa-solid fa-camera me-2"></i>Phone / tablet camera</a>
           {% endif %}

@@ -10,6 +10,7 @@ from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 from datetime import timedelta, date
+from decimal import Decimal
 import re
 from dateutil.relativedelta import relativedelta
 from localflavor.us.forms import USStateSelect
@@ -152,6 +153,13 @@ def member_type_allows_belt(member_type, rank, stripes):
 
 
 class MemberForm(forms.ModelForm):
+    membership_payment_method = forms.ChoiceField(
+        choices=Member.PaymentMethod.choices, required=False,
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        help_text='Non-card payments are confirmed by staff in the member’s Payments tab.')
+
+    def clean_membership_payment_method(self):
+        return self.cleaned_data.get('membership_payment_method') or self.instance.membership_payment_method
     belt_selection = forms.ChoiceField(
         label="Belt / stripes",
         widget=forms.Select(attrs={"class": "form-select"}),
@@ -193,6 +201,7 @@ class MemberForm(forms.ModelForm):
             "membership_start_date",
             "membership_end_date",
             "plan",
+            "membership_payment_method",
             "notes",
         ]
         widgets = {
@@ -313,6 +322,32 @@ class MemberForm(forms.ModelForm):
             self.save_m2m()
 
         return member
+
+
+class ManualPaymentForm(forms.Form):
+    payment_date = forms.DateField(label='Payment received on', initial=timezone.localdate,
+                                  widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}))
+    amount = forms.DecimalField(label='Amount received ($)', max_digits=10, decimal_places=2,
+        min_value=Decimal('0.01'), widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}))
+    payment_method = forms.ChoiceField(choices=[choice for choice in Member.PaymentMethod.choices
+        if choice[0] != Member.PaymentMethod.CREDIT_CARD], widget=forms.Select(attrs={'class': 'form-select'}))
+    received_by = forms.ModelChoiceField(label='Received by', queryset=User.objects.none(),
+                                        widget=forms.Select(attrs={'class': 'form-select'}))
+    confirmation_key = forms.UUIDField(widget=forms.HiddenInput())
+
+    def __init__(self, *args, **kwargs):
+        import uuid
+        super().__init__(*args, **kwargs)
+        self.fields['received_by'].queryset = User.objects.filter(is_active=True).filter(
+            Q(is_staff=True) | Q(is_superuser=True) | Q(is_coach=True)).order_by('first_name', 'username')
+        self.fields['received_by'].label_from_instance = lambda user: user.get_full_name() or user.username
+        self.fields['confirmation_key'].initial = uuid.uuid4
+
+    def clean_payment_date(self):
+        value = self.cleaned_data['payment_date']
+        if value > timezone.localdate():
+            raise forms.ValidationError('A received payment cannot have a future date.')
+        return value
 
 
 class StaffForm(forms.ModelForm):

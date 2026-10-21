@@ -166,6 +166,7 @@
             <div class="member-editor-fields">
               {% include "members/_editor_field.html" with field=form.lifecycle_status %}
               {% include "members/_editor_field.html" with field=form.plan %}
+              {% include "members/_editor_field.html" with field=form.membership_payment_method %}
               {% include "members/_editor_field.html" with field=form.membership_start_date %}
               {% include "members/_editor_field.html" with field=form.membership_end_date %}
               {% if form.user %}{% include "members/_editor_field.html" with field=form.user %}{% endif %}

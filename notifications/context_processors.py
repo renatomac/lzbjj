@@ -10,7 +10,7 @@ def notifications(request):
 
     try:
         # Get all notifications (persistent - they don't disappear)
-        qs = Notification.objects.filter(user=user).order_by('-created_at')
+        qs = Notification.objects.filter(user=user).order_by('-requires_action', '-created_at')
         unread_count = qs.filter(is_read=False).count()
         
         # All notifications (for displaying in full list)

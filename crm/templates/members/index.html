@@ -1,5 +1,5 @@
 {% extends "layout.html" %}
-{% load belt_images %}
+{% load belt_images static %}
 
 {% block header_title %}
 <i class="fas fa-users me-2"></i>
@@ -7,6 +7,7 @@ Members <span class="badge bg-primary ms-2" data-member-count>{{ all_members|len
 {% endblock %}
 
 {% block content %}
+<link rel="stylesheet" href="{% static 'crm/css/manager_filters.css' %}">
 <div class="container-fluid px-0">
     <div class="d-flex justify-content-end align-items-center pt-2 pb-2 mb-3">
         <a href="{% url 'addMember' %}" class="btn btn-primary shadow-sm">
@@ -17,33 +18,33 @@ Members <span class="badge bg-primary ms-2" data-member-count>{{ all_members|len
     <!-- Compact search and overview: side-by-side on large screens -->
     <div class="row g-3 g-lg-4 align-items-stretch mb-3 mb-lg-4">
         <div class="col-12 col-lg-7">
-            <div class="card border-0 shadow-sm rounded-3 rounded-lg-4 h-100">
+            <div class="card border-0 shadow-sm rounded-3 rounded-lg-4 h-100 manager-filter-card">
                 <div class="card-body p-3 p-lg-4">
-                    <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
                         <h5 class="fw-bold mb-0 fs-6"><i class="fas fa-search text-primary me-2"></i>Find Members</h5>
                         <a href="{% url 'dashboard' %}" class="btn btn-custom-ghost btn-sm text-nowrap">
                             <i class="fa-solid fa-arrow-left me-1"></i>Back to Dashboard
                         </a>
                     </div>
-                    <form method="GET" id="member-filter-form" class="row g-3 align-items-end" role="search">
-                        <div class="col-12 col-md-6 member-filter-col">
-                            <label for="member-query" class="form-label small fw-semibold mb-1">Search</label>
-                            <div class="member-search-field">
-                                <i class="fas fa-search text-muted member-search-icon" aria-hidden="true"></i>
+                    <form method="GET" id="member-filter-form" class="manager-filter-form" role="search">
+                        <div class="manager-filter-field">
+                            <label for="member-query" class="form-label small fw-semibold">Search</label>
+                            <div class="manager-search">
+                                <i class="fas fa-search text-muted" aria-hidden="true"></i>
                                 <input id="member-query" type="search" class="form-control"
                                        name="query" placeholder="Name or email..." value="{{ query }}">
                             </div>
                         </div>
-                        <div class="col-6 col-md-3 member-filter-col">
-                            <label for="member-status" class="form-label small fw-semibold mb-1">Status</label>
+                        <div class="manager-filter-field">
+                            <label for="member-status" class="form-label small fw-semibold">Status</label>
                             <select id="member-status" name="status" class="form-select">
                                 <option value="">All Members</option>
                                 <option value="active" {% if status == "active" %}selected{% endif %}>Active</option>
                                 <option value="inactive" {% if status == "inactive" %}selected{% endif %}>Inactive</option>
                             </select>
                         </div>
-                        <div class="col-6 col-md-3 member-filter-col">
-                            <label for="member-type" class="form-label small fw-semibold mb-1">Type</label>
+                        <div class="manager-filter-field">
+                            <label for="member-type" class="form-label small fw-semibold">Type</label>
                             <select id="member-type" name="member_type" class="form-select">
                                 <option value="" {% if not member_type %}selected{% endif %}>All Types</option>
                                 <option value="adult" {% if member_type == "adult" %}selected{% endif %}>Adults</option>
@@ -51,7 +52,7 @@ Members <span class="badge bg-primary ms-2" data-member-count>{{ all_members|len
                                 <option value="transition" {% if member_type == "transition" %}selected{% endif %}>Transitioning</option>
                             </select>
                         </div>
-                        <div class="col-12 d-flex justify-content-end align-items-center gap-2 mt-1">
+                        <div class="manager-filter-actions d-flex justify-content-end align-items-center gap-2">
                             <span id="member-filter-status" class="small text-muted" role="status" aria-live="polite"></span>
                             <a href="{% url 'members' %}" id="member-clear-filters" class="btn btn-outline-secondary btn-sm">Clear</a>
                         </div>
@@ -255,36 +256,6 @@ Members <span class="badge bg-primary ms-2" data-member-count>{{ all_members|len
 
 <!-- Mobile Optimized CSS -->
 <style>
-    /* Match filter heights and provide consistent horizontal spacing. */
-    #member-filter-form { --bs-gutter-x: 1rem; --bs-gutter-y: .875rem; }
-    #member-filter-form .member-filter-col { min-width: 0; }
-    #member-filter-form .member-filter-col .form-control,
-    #member-filter-form .member-filter-col .form-select {
-        height: 42px;
-        min-height: 42px;
-        box-sizing: border-box;
-    }
-    #member-filter-form .member-filter-col .form-label { display: block; }
-    /* Single input border; small icon positioned inside it. */
-    .member-search-field {
-        position: relative;
-    }
-    .member-search-field .member-search-icon {
-        position: absolute;
-        left: 13px;
-        top: 50%;
-        transform: translateY(-50%);
-        font-size: 13px !important;
-        line-height: 1;
-        pointer-events: none;
-        z-index: 2;
-    }
-    .member-search-field .form-control {
-        width: 100%;
-        padding-left: 36px;
-        min-width: 0;
-        border-radius: 0.375rem;
-    }
     .member-status-icon {
         display: inline-flex;
         align-items: center;

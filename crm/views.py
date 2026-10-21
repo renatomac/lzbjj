@@ -583,7 +583,7 @@ def deleteMember(request, member_id):
 
 @crm_staff_required
 def recordPayment(request, member_id):
-    return render(request, "members/add.html")
+    return redirect(reverse('viewMember', args=[member_id]) + '?tab=payments')
 
 
 @crm_staff_required
@@ -593,6 +593,24 @@ def exportMembers(request):
 @crm_staff_required
 def viewMember(request, member_id):
     instance = get_object_or_404(Member, pk=member_id)
+    from .forms import ManualPaymentForm
+    from .services.membership_billing import confirm_manual_payment
+    from django.core.exceptions import PermissionDenied, ValidationError
+    can_record_payment = bool(request.user.is_staff or request.user.is_superuser)
+    manual_payment_form = ManualPaymentForm(
+        request.POST if request.method == 'POST' else None,
+        initial={'payment_method': instance.membership_payment_method, 'received_by': request.user.pk})
+    if request.method == 'POST':
+        if not can_record_payment:
+            raise PermissionDenied
+        if manual_payment_form.is_valid():
+            try:
+                payment, created = confirm_manual_payment(instance, manual_payment_form.cleaned_data, request.user)
+            except ValidationError as exc:
+                manual_payment_form.add_error(None, exc)
+            else:
+                messages.success(request, 'Manual payment confirmed.' if created else 'This payment was already confirmed.')
+                return redirect(reverse('viewMember', args=[instance.pk]) + '?tab=payments')
     responsible = instance.contacts.filter(contact_type="responsible").values()
     emergency = instance.contacts.filter(contact_type="emergency").values()
 
@@ -659,7 +677,8 @@ def viewMember(request, member_id):
     year_start_dt = timezone.make_aware(datetime.combine(start_of_year, datetime.min.time()))
     gateway_payments = (
         Transaction.objects.filter(Q(member=instance) | Q(allocations__member=instance))
-        .filter(processed_at__gte=year_start_dt)
+        .filter(processed_at__gte=year_start_dt,
+                processed_at__lt=timezone.make_aware(datetime.combine(today + timedelta(days=1), datetime.min.time())))
         .distinct()
         .prefetch_related('allocations__member')
         .order_by('-processed_at')
@@ -667,6 +686,8 @@ def viewMember(request, member_id):
     payments_ytd = []
     for tx in gateway_payments:
         allocation = next((a for a in tx.allocations.all() if a.member_id == instance.id), None)
+        if tx.allocations.all() and allocation is None:
+            continue
         payments_ytd.append({
             'date': timezone.localtime(tx.processed_at).date() if tx.processed_at else None,
             'amount': allocation.amount if allocation else tx.amount,
@@ -676,28 +697,29 @@ def viewMember(request, member_id):
             'source': 'Authorize.Net',
         })
 
-    if instance.user:
-        local_payments = Payment.objects.filter(
-            user=instance.user,
-            payment_date__gte=start_of_year,
-            payment_date__lte=today,
-        ).order_by('-payment_date')
-        for payment in local_payments:
-            payments_ytd.append({
-                'date': payment.payment_date,
-                'amount': payment.amount,
-                'is_split': False,
-                'method': payment.payment_method,
-                'status': payment.status,
-                'source': 'Local',
-            })
+    local_filter = Q(member=instance)
+    if instance.user_id:
+        local_filter |= Q(member__isnull=True, user_id=instance.user_id)
+    local_payments = Payment.objects.filter(
+        local_filter,
+        payment_date__gte=start_of_year,
+        payment_date__lte=today,
+    ).exclude(payment_method__iregex=r'authorize[._ ]?net').select_related('received_by', 'recorded_by').order_by('-payment_date')
+    for payment in local_payments:
+        payments_ytd.append({
+            'date': payment.payment_date,
+            'amount': payment.amount,
+            'is_split': False,
+            'method': payment.payment_method,
+            'status': payment.status,
+            'source': 'Manual' if payment.confirmation_key else 'Local',
+            'received_by': payment.received_by,
+            'recorded_by': payment.recorded_by,
+        })
 
     payments_ytd.sort(key=lambda p: p['date'] or today, reverse=True)
-    payments_ytd_total = sum(float(p['amount']) for p in payments_ytd)
-    print(f"DEBUG: YTD Count: {ytd_count}")
-    print(f"DEBUG: Graph Labels: {graph_labels}") 
-    print(f"DEBUG: Promotions: {list(promotions.values()) }") 
-    print(f"DEBUG: Graph Data: {graph_data}")
+    payments_ytd_total = sum((p['amount'] for p in payments_ytd
+        if p['status'].lower() in ('paid', 'completed', 'success', 'settled')), Decimal('0.00'))
 
     return render(request, "members/view.html", {
         "member": instance,
@@ -712,6 +734,9 @@ def viewMember(request, member_id):
         "graph_data": json.dumps(graph_data),
         "payments_ytd": payments_ytd,
         "payments_ytd_total": payments_ytd_total,
+        "manual_payment_form": manual_payment_form,
+        "can_record_payment": can_record_payment,
+        "show_payments_tab": request.method == 'POST' or request.GET.get('tab') == 'payments',
     })
 
 @crm_staff_required
@@ -1215,6 +1240,21 @@ def attendanceRecord(request, session_id):
         "count_checked": checked,
         "count_total": total,
     })
+
+
+@require_POST
+@crm_staff_required
+def attendance_mark_reported(request, session_id):
+    from crm.services.attendance import mark_attendance_reported
+    from django.core.exceptions import ValidationError
+    session = get_object_or_404(ClassSession, pk=session_id)
+    try:
+        mark_attendance_reported(session)
+    except ValidationError as exc:
+        messages.error(request, exc.messages[0])
+    else:
+        messages.success(request, 'Attendance reported, including any absent students.')
+    return redirect('attendanceRecord', session_id=session.pk)
 
 
 @crm_staff_required
@@ -2254,6 +2294,9 @@ def session_edit(request, session_id):
         if session_form.is_valid() and attendance_formset.is_valid():
             session_form.save()
             attendance_formset.save()
+            if not session.is_canceled and session.date <= timezone.localdate():
+                from crm.services.attendance import mark_attendance_reported
+                mark_attendance_reported(session)
             _dedupe_session_attendance(session)
             messages.success(request, "Session and attendance saved successfully.")
             return redirect("sessions")
@@ -2583,10 +2626,8 @@ def member_autocomplete(request):
 # notifications/
 
 def mark_notification_read(request, pk):
-    n = Notification.objects.get(pk=pk, user=request.user)
-    n.is_read = True
-    n.save()
-    return redirect(n.url or "/")
+    from notifications.views import mark_notification_read as notification_read
+    return notification_read(request, pk)
 
 
 def attendance_report(request):

@@ -8,7 +8,7 @@
         <div>{{ message }}</div>
     {% endif %}
 
-    <div class="mx-auto text-center col-10 col-lg-3">
+    <div class="mx-auto text-center w-100 px-3 mb-4" style="max-width:28rem">
         <form action="{% url 'login' %}" method="post">
             {% csrf_token %}
             <div class="form-group my-3">
@@ -19,6 +19,6 @@
             </div>
             <input class="btn btn-secondary" type="submit" value="Login">
         </form>
-    </p>
+    </div>
 
 {% endblock %}

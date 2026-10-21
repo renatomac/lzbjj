@@ -86,10 +86,18 @@
 
 <div class="card mb-4">
     <div class="card-header">
-        <h5 class="mb-0">Monthly Revenue History</h5>
+        <h5 class="mb-0">Monthly Revenue: Actual vs Expected</h5>
     </div>
     <div class="card-body">
-        <canvas id="monthlyRevenueChart" height="90"></canvas>
+        <p class="text-muted small">Expected income estimates monthly plan charges on membership anniversaries for active members. Uses current plans and prices; excludes enrollment fees, leads, trials, inactive members, and incomplete memberships. Current month expected income covers the full month; actual revenue includes settled gateway receipts and confirmed manual payments to date.</p>
+        <canvas id="monthlyRevenueChart" height="90" role="img" aria-label="Monthly actual settled revenue compared with expected membership income"></canvas>
+        <div class="table-responsive mt-3">
+            <table class="table table-sm mb-0">
+                <caption>Monthly actual and expected income in US dollars</caption>
+                <thead><tr><th scope="col">Month</th><th scope="col">Actual revenue</th><th scope="col">Expected membership income</th></tr></thead>
+                <tbody>{% for row in transaction_metrics.monthly_revenue %}<tr><th scope="row">{{ row.label }}</th><td>${{ row.total|floatformat:2 }}</td><td>${{ row.expected|floatformat:2 }}</td></tr>{% endfor %}</tbody>
+            </table>
+        </div>
     </div>
 </div>
 
@@ -163,7 +171,7 @@
                 <label for="end_date" class="form-label">End Date</label>
                 <input type="date" class="form-control" id="end_date" name="end_date" value="{{ end_date }}">
             </div>
-            <div class="col-md-2">
+            <div class="col-md-2 crm-filter-actions">
                 <button type="submit" class="btn btn-primary w-100"><i class="fas fa-filter me-2"></i>Filter</button>
             </div>
         </form>
@@ -228,6 +236,7 @@
         const monthlyRevenue = {{ monthly_revenue_json|default:"[]"|safe }};
         const labels = monthlyRevenue.map(row => row.label);
         const totals = monthlyRevenue.map(row => row.total);
+        const expected = monthlyRevenue.map(row => row.expected);
         const ctx = document.getElementById('monthlyRevenueChart');
         if (ctx) {
             new Chart(ctx, {
@@ -235,17 +244,23 @@
                 data: {
                     labels: labels,
                     datasets: [{
-                        label: 'Settled revenue',
+                        label: 'Actual revenue',
                         data: totals,
                         backgroundColor: 'rgba(25, 135, 84, 0.6)',
                         borderColor: 'rgba(25, 135, 84, 1)',
+                        borderWidth: 1,
+                    }, {
+                        label: 'Expected membership income',
+                        data: expected,
+                        backgroundColor: 'rgba(13, 110, 253, 0.6)',
+                        borderColor: 'rgba(13, 110, 253, 1)',
                         borderWidth: 1,
                     }],
                 },
                 options: {
                     responsive: true,
                     scales: { y: { beginAtZero: true } },
-                    plugins: { legend: { display: false } },
+                    plugins: { legend: { display: true } },
                 },
             });
         }
