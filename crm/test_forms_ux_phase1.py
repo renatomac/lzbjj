@@ -56,7 +56,9 @@ class MemberBeltOptionTests(SimpleTestCase):
         values = {value for _, group in member_belt_selection_choices() for value, _ in group}
         self.assertIn("gray-white|11", values)
         self.assertIn("black|9", values)
-        self.assertIn("red|0", values)
+        self.assertIn("black|7", values)
+        self.assertIn("black|8", values)
+        self.assertNotIn("red|0", values)
         self.assertNotIn("black|10", values)
 
     def test_form_uses_one_selection_and_does_not_offer_ibjjf_date(self):
