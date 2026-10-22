@@ -1,0 +1,11 @@
+{% comment %}Reusable field renderer; error markup and labels remain tied to Django form fields.{% endcomment %}
+{% if field.is_hidden %}
+  {{ field }}
+{% else %}
+  <div class="member-editor-field {{ field_class|default:'' }}{% if field.errors %} has-error{% endif %}">
+    <label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span class="required-star" aria-hidden="true">*</span>{% endif %}</label>
+    {{ field }}
+    {% if field.help_text %}<small class="help-text" id="{{ field.auto_id }}_help">{{ field.help_text }}</small>{% endif %}
+    {% if field.errors %}<div class="field-errors" role="alert">{{ field.errors }}</div>{% endif %}
+  </div>
+{% endif %}

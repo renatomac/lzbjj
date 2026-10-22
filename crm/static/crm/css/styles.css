@@ -15,12 +15,11 @@ body {
 
 
 
-.form-control{
-    width: 25;
-    margin: 10px;
-    align-items: center;
-    align-self: center;
-    text-align: left;
+/* Form spacing belongs to field wrappers and grid gaps, not controls. */
+.form-control,
+.form-select {
+    margin: 0;
+    min-width: 0;
 }
 
 

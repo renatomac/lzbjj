@@ -19,6 +19,20 @@ from .models import (
 )
 
 
+from .widgets import AdminBeltRankWidget
+
+
+class AdminBeltRankMixin:
+    """Render choices with shared belt artwork in Django admin forms."""
+    belt_fields = {"belt_rank", "old_rank", "new_rank"}
+
+    def formfield_for_choice_field(self, db_field, request, **kwargs):
+        if db_field.name in self.belt_fields:
+            kwargs.setdefault("widget", AdminBeltRankWidget)
+        return super().formfield_for_choice_field(db_field, request, **kwargs)
+
+
+
 # Custom User Admin
 
 
@@ -39,7 +53,7 @@ class UserAdmin(BaseUserAdmin):
 
 
 @admin.register(Member)
-class MemberAdmin(admin.ModelAdmin):
+class MemberAdmin(AdminBeltRankMixin, admin.ModelAdmin):
     list_display = (
         "id",
         "user",
@@ -136,7 +150,7 @@ class MemberAdmin(admin.ModelAdmin):
 
 
 @admin.register(Staff)
-class StaffAdmin(admin.ModelAdmin):
+class StaffAdmin(AdminBeltRankMixin, admin.ModelAdmin):
     list_display = ("id", "user", "role", "belt_rank")
     list_filter = ("role", "belt_rank")
     search_fields = ("user__username", "user__first_name", "user__last_name")
@@ -172,10 +186,11 @@ class MembershipAdmin(admin.ModelAdmin):
 
 @admin.register(Payment)
 class PaymentAdmin(admin.ModelAdmin):
-    list_display = ("id", "user", "amount", "payment_date", "payment_method", "status")
+    list_display = ("id", "member", "user", "amount", "payment_date", "payment_method", "status", "received_by", "recorded_by")
     list_filter = ("payment_method", "status", "payment_date")
-    search_fields = ("user__username",)
-    autocomplete_fields = ("user",)
+    search_fields = ("user__username", "member__first_name", "member__last_name")
+    autocomplete_fields = ("user", "member")
+    readonly_fields = ('recorded_by', 'confirmation_key', 'timestamp')
 
 
 
@@ -244,7 +259,7 @@ class AttendanceAdmin(admin.ModelAdmin):
 
 
 @admin.register(BeltPromotion)
-class BeltPromotionAdmin(admin.ModelAdmin):
+class BeltPromotionAdmin(AdminBeltRankMixin, admin.ModelAdmin):
     list_display = (
         "member",
         "old_rank",

@@ -1,0 +1,59 @@
+/* Keep receipt layout independent of legacy .form-control margins. */
+.manual-payment-form {
+  container: manual-payment / inline-size;
+}
+
+.manual-payment-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: .5rem 1rem;
+}
+
+.manual-payment-field {
+  display: grid;
+  gap: .5rem;
+  min-width: 0;
+}
+
+.manual-payment-field .form-label {
+  display: block;
+  align-self: end;
+  margin: 0;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.manual-payment-form .form-control,
+.manual-payment-form .form-select {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  height: 2.75rem;
+  min-height: 2.75rem;
+  margin: 0;
+  align-self: stretch;
+  line-height: 1.5;
+}
+
+.manual-payment-errors .errorlist {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+/* Shared label/control/error tracks stay aligned even when a label wraps. */
+@supports (grid-template-rows: subgrid) {
+  .manual-payment-field {
+    grid-row: span 3;
+    grid-template-rows: subgrid;
+  }
+
+  @container manual-payment (min-width: 36rem) {
+    .manual-payment-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+
+  @container manual-payment (min-width: 56rem) {
+    .manual-payment-fields { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  }
+}

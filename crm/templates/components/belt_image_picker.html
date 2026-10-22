@@ -1,0 +1,31 @@
+{% comment %}
+Shared image-backed choice control. Requires: field, options.
+Optional: picker_label, picker_help, picker_id.
+Native select stays available without JS or when enhancement fails.
+{% endcomment %}
+<div class="lzbjj-belt-picker mb-2" data-belt-image-picker {% if preview_target %}data-preview-target="{{ preview_target }}"{% endif %}>
+  <label class="form-label fw-semibold" for="{{ field.id_for_label }}">{{ picker_label|default:field.label }}{% if field.field.required %} <span class="text-danger" aria-hidden="true">*</span>{% endif %}</label>
+  <div class="lzbjj-belt-native">{{ field }}</div>
+  <div class="dropdown lzbjj-belt-ui" hidden>
+    <button type="button" class="btn btn-outline-secondary w-100 lzbjj-belt-trigger" aria-haspopup="listbox" aria-controls="belt-menu-{{ field.auto_id }}" aria-expanded="false"
+            aria-label="{{ picker_label|default:field.label }}" {% if field.field.disabled %}disabled{% endif %}>
+      <span class="lzbjj-belt-preview">
+        <span class="lzbjj-belt-empty">Choose a belt</span>
+      </span>
+      <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+    </button>
+    <div id="belt-menu-{{ field.auto_id }}" class="dropdown-menu lzbjj-belt-menu shadow-lg p-2 w-100" role="listbox" hidden aria-label="{{ picker_label|default:field.label }}">
+      {% for option in options %}
+      <button type="button" role="option" aria-selected="false"
+              class="dropdown-item lzbjj-belt-option" data-value="{{ option.value }}" data-label="{{ option.label }}" data-image="{{ option.image_url }}" data-rank="{{ option.rank }}">
+        {% if option.image_url %}<img src="{{ option.image_url }}" alt="" width="105" height="34" loading="lazy">
+        {% elif option.rank %}<span class="lzbjj-belt-art-fallback" data-rank="{{ option.rank }}" aria-hidden="true"><span class="lzbjj-belt-stripes">{% for stripe in "1234" %}{% if forloop.counter <= option.stripes %}<span></span>{% endif %}{% endfor %}</span></span>
+        {% else %}<span class="lzbjj-belt-art-placeholder" aria-hidden="true"></span>{% endif %}
+        <span class="lzbjj-belt-option-label">{{ option.label }}</span>
+      </button>
+      {% endfor %}
+    </div>
+  </div>
+  {% if picker_help %}<div class="form-text">{{ picker_help }}</div>{% elif field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+  {% if field.errors %}<div class="text-danger small mt-2" role="alert">{{ field.errors }}</div>{% endif %}
+</div>

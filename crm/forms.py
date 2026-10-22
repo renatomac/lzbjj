@@ -10,6 +10,8 @@ from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 from datetime import timedelta, date
+from decimal import Decimal
+import re
 from dateutil.relativedelta import relativedelta
 from localflavor.us.forms import USStateSelect
 from phonenumber_field.formfields import PhoneNumberField
@@ -18,6 +20,7 @@ from .models import (
     Class, Attendance, BeltPromotion, Contact,BeltRank,WaiverSignature, 
     SessionAttendance, ClassSession, BeltPromotion, ADULT_BELT_ORDER, KID_BELT_ORDER
 )
+from .belt_picker import belt_picker_options
 from .password_validation import validate_password_strength
 import logging
 
@@ -74,7 +77,22 @@ class LoginForm(AuthenticationForm):
         widget=forms.PasswordInput(attrs={"class": "form-control"})
     )
 
+def validate_us_contact_phone(value):
+    """Allow blank contacts; reject malformed nonblank US numbers."""
+    if not value:
+        return value
+    digits = re.sub(r"\D", "", value)
+    if len(digits) == 11 and digits.startswith("1"):
+        digits = digits[1:]
+    if len(digits) != 10 or digits[0] in "01" or digits[3] in "01":
+        raise ValidationError("Enter a valid 10-digit US phone number.")
+    return f"({digits[:3]}) {digits[3:6]}-{digits[6:]}"
+
+
 class ContactForm(forms.ModelForm):
+    def clean_phone(self):
+        return validate_us_contact_phone(self.cleaned_data.get('phone'))
+
     class Meta:
         model = Contact
         fields = ['name', 'phone', 'email', 'relationship', 'contact_type']
@@ -96,7 +114,58 @@ ContactFormSet = inlineformset_factory(
 )
 
 
+def belt_selection_label(rank, stripes):
+    """Black 7–9 are degrees of black, not additional ranks."""
+    label = dict(BeltRank.choices).get(rank, str(rank))
+    if str(rank) == "black" and int(stripes) >= 7:
+        return f"Black — {stripes}th degree"
+    return f"{label} — {stripes} {'stripe' if stripes == 1 else 'stripes'}"
+
+
+def member_belt_selection_choices():
+    """Present every stored belt rank with its existing promotion stripe ranges."""
+    labels = dict(BeltRank.choices)
+
+    def options(rank, maximum):
+        return [
+            (f"{rank.value}|{n}", belt_selection_label(rank, n))
+            for n in range(maximum + 1)
+        ]
+
+    groups = [("White belt", options(BeltRank.WHITE, 11))]
+    for rank in ADULT_BELT_ORDER[1:]:
+        groups.append((f"Adult · {labels[rank]}", options(rank, 9 if rank == BeltRank.BLACK else 4)))
+    for rank in KID_BELT_ORDER[1:]:
+        groups.append((f"Youth · {labels[rank]}", options(rank, 11)))
+    return groups
+
+def member_type_allows_belt(member_type, rank, stripes):
+    """Match rank choices to the selected membership category."""
+    try:
+        stripes = int(stripes)
+    except (TypeError, ValueError):
+        return False
+    if member_type in ("child", Member.TRANSITIONING):
+        return rank in KID_BELT_ORDER and 0 <= stripes <= 11
+    if member_type == "adult":
+        return rank in ADULT_BELT_ORDER and 0 <= stripes <= (9 if rank == BeltRank.BLACK else 4)
+    return False
+
+
 class MemberForm(forms.ModelForm):
+    membership_payment_method = forms.ChoiceField(
+        choices=Member.PaymentMethod.choices, required=False,
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        help_text='Non-card payments are confirmed by staff in the member’s Payments tab.')
+
+    def clean_membership_payment_method(self):
+        return self.cleaned_data.get('membership_payment_method') or self.instance.membership_payment_method
+    belt_selection = forms.ChoiceField(
+        label="Belt / stripes",
+        widget=forms.Select(attrs={"class": "form-select"}),
+        help_text="Select the current belt and number of stripes.",
+    )
+
 
     user = forms.ModelChoiceField(
         queryset=User.objects.filter(is_active=True),
@@ -126,24 +195,21 @@ class MemberForm(forms.ModelForm):
             "zip_code",
             "gender",
             "date_of_birth",
-            "belt_rank",
-            "stripes",
+            "belt_selection",
             "photo",
             "current_belt_started_on",
-            "ibjjf_rank_registered_on",
             "membership_start_date",
             "membership_end_date",
             "plan",
+            "membership_payment_method",
             "notes",
         ]
         widgets = {
             'phone': forms.TextInput(attrs={'class': 'form-control'}),
-            "belt_rank":  forms.Select(attrs={"class": "form-control"}),
             "lifecycle_status": forms.Select(attrs={"class": "form-control"}),
             "state": USStateSelect(attrs={"class": "form-control"}),
             "date_of_birth": forms.DateInput(attrs={"type": "date"}),
             "current_belt_started_on": forms.DateInput(attrs={"type": "date"}),
-            "ibjjf_rank_registered_on": forms.DateInput(attrs={"type": "date"}),
             "membership_start_date": forms.DateInput(attrs={"type": "date"}),
             "membership_end_date": forms.DateInput(attrs={"type": "date"}),
             "is_active": forms.HiddenInput(),
@@ -155,13 +221,26 @@ class MemberForm(forms.ModelForm):
 
         if not self.instance.pk:
             self.fields["state"].initial = "IL"
-            self.fields["belt_rank"].initial = "white"
-            self.fields["stripes"].initial = 0
             self.fields["is_active"].initial = True
             self.fields["lifecycle_status"].initial = Member.LifecycleStatus.ACTIVE
             self.fields["membership_start_date"].initial = timezone.localdate()
             self.fields["membership_end_date"].initial = timezone.localdate() + relativedelta(months=12)
 
+        # Preserve any existing historical rank/stripe combination on edit.
+        choices = member_belt_selection_choices()
+        if self.instance.pk:
+            rank = str(self.instance.belt_rank or BeltRank.WHITE)
+            stripes = int(self.instance.stripes or 0)
+        else:
+            rank, stripes = BeltRank.WHITE.value, 0
+        selected = f"{rank}|{stripes}"
+        offered = {value for _, group in choices for value, _ in group}
+        if selected not in offered and rank in dict(BeltRank.choices):
+            label = dict(BeltRank.choices)[rank]
+            choices.append(("Previously recorded", [(selected, f"{label} — {stripes} stripes (existing record)")]))
+        self.fields["belt_selection"].choices = choices
+        self.fields["belt_selection"].initial = selected
+        self.belt_options = belt_picker_options(choices)
         available_users = User.objects.filter(is_active=True)
         if self.instance.pk and self.instance.user_id:
             available_users = available_users.filter(Q(pk=self.instance.user_id) | Q(member__isnull=True))
@@ -174,21 +253,13 @@ class MemberForm(forms.ModelForm):
         if self.instance.pk and self.instance.member_type == "child":
             self.fields.pop("user")
 
-        # Disable or hide phone if under 21
-        dob = self.initial.get("date_of_birth") or getattr(self.instance, "date_of_birth", None)
-        if isinstance(dob, str):
-            try:
-                dob = date.fromisoformat(dob)
-            except ValueError:
-                dob = None
-
-        if dob:
-            today = timezone.localdate()
-            age = today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
-            if age < 21:
-                # Option 1: disable the field
-                self.fields["phone"].widget.attrs["readonly"] = True
-                self.fields["phone"].widget.attrs["placeholder"] = "Optional for members under 21"
+        # Phone remains editable for all ages; requirement is checked on submit.
+        self.fields["phone"].widget.attrs.update({
+            "class": "form-control",
+            "inputmode": "tel",
+            "autocomplete": "tel-national",
+            "placeholder": "(847) 555-1234",
+        })
 
     def clean(self):
         cleaned_data = super().clean()
@@ -204,18 +275,38 @@ class MemberForm(forms.ModelForm):
             if not user:
                 self.add_error("user", "Adult members must be linked to an existing user.")'''
 
+        selection = cleaned_data.get("belt_selection")
+        if member_type and selection:
+            rank, stripes = selection.split("|", 1)
+            if not member_type_allows_belt(member_type, rank, stripes):
+                self.add_error("belt_selection", "Select a belt valid for the chosen member type.")
+
         # Conditional phone validation (21+)
         if dob:
-            today = date.today()
+            today = timezone.localdate()
             age = today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
             if age >= 21 and not phone:
                 self.add_error("phone", "Phone number is required for members 21 or older.")
 
+        today = timezone.localdate()
+        if dob and dob > today:
+            self.add_error("date_of_birth", "Date of birth cannot be in the future.")
+        start = cleaned_data.get("membership_start_date")
+        end = cleaned_data.get("membership_end_date")
+        if start and end and end < start:
+            self.add_error("membership_end_date", "Membership end date cannot precede its start date.")
+        for name in ("current_belt_started_on",):
+            value = cleaned_data.get(name)
+            if value and value > today:
+                self.add_error(name, "This date cannot be in the future.")
         return cleaned_data
 
     @transaction.atomic
     def save(self, commit=True):
         member = super().save(commit=False)
+        rank, stripes = self.cleaned_data["belt_selection"].split("|", 1)
+        member.belt_rank = rank
+        member.stripes = int(stripes)
 
         selected_user = self.cleaned_data.get("user")
 
@@ -233,15 +324,43 @@ class MemberForm(forms.ModelForm):
         return member
 
 
+class ManualPaymentForm(forms.Form):
+    payment_date = forms.DateField(label='Payment received on', initial=timezone.localdate,
+                                  widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}))
+    amount = forms.DecimalField(label='Amount received ($)', max_digits=10, decimal_places=2,
+        min_value=Decimal('0.01'), widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}))
+    payment_method = forms.ChoiceField(choices=[choice for choice in Member.PaymentMethod.choices
+        if choice[0] != Member.PaymentMethod.CREDIT_CARD], widget=forms.Select(attrs={'class': 'form-select'}))
+    received_by = forms.ModelChoiceField(label='Received by', queryset=User.objects.none(),
+                                        widget=forms.Select(attrs={'class': 'form-select'}))
+    confirmation_key = forms.UUIDField(widget=forms.HiddenInput())
+
+    def __init__(self, *args, **kwargs):
+        import uuid
+        super().__init__(*args, **kwargs)
+        self.fields['received_by'].queryset = User.objects.filter(is_active=True).filter(
+            Q(is_staff=True) | Q(is_superuser=True) | Q(is_coach=True)).order_by('first_name', 'username')
+        self.fields['received_by'].label_from_instance = lambda user: user.get_full_name() or user.username
+        self.fields['confirmation_key'].initial = uuid.uuid4
+
+    def clean_payment_date(self):
+        value = self.cleaned_data['payment_date']
+        if value > timezone.localdate():
+            raise forms.ValidationError('A received payment cannot have a future date.')
+        return value
+
+
 class StaffForm(forms.ModelForm):
     """Linked members own personal data; staff owns employment information."""
+
+    belt_selection = forms.ChoiceField(label="Belt / stripes")
 
     class Meta:
         model = Staff
         fields = [
             "member_profile", "is_active", "first_name", "last_name",
             "role", "gender", "address", "city", "state", "zip_code",
-            "date_of_birth", "join_date", "belt_rank", "stripes", "photo",
+            "date_of_birth", "join_date", "belt_selection", "photo",
         ]
         widgets = {
             "date_of_birth": forms.DateInput(attrs={"type": "date"}),
@@ -251,8 +370,7 @@ class StaffForm(forms.ModelForm):
         labels = {"member_profile": "Linked training member (optional)"}
         help_texts = {
             "member_profile": "Choose an existing member if this staff member also trains here. Their member belt and promotion history become authoritative.",
-            "belt_rank": "Used only when no training member is linked.",
-            "stripes": "Used only when no training member is linked.",
+            "belt_selection": "Only editable when no training member is linked.",
         }
 
     def __init__(self, *args, **kwargs):
@@ -265,8 +383,6 @@ class StaffForm(forms.ModelForm):
         self.fields["member_profile"].required = not bool(self.instance.pk)
         if not self.instance.pk:
             self.fields["state"].initial = "IL"
-            self.fields["belt_rank"].initial = "white"
-            self.fields["stripes"].initial = 0
             self.fields["is_active"].initial = True
 
         # When creating a staff profile, a selected member is the source for
@@ -276,15 +392,14 @@ class StaffForm(forms.ModelForm):
         if selected_member:
             for field in ("first_name", "last_name", "gender", "address", "city",
                           "state", "zip_code", "date_of_birth", "photo",
-                          "belt_rank", "stripes"):
+                          ):
                 if field in self.fields:
                     value = getattr(selected_member, field, None)
                     if field == "date_of_birth" and value:
                         value = value.isoformat()
                     if value is not None:
                         self.fields[field].initial = value
-            for field in ("belt_rank", "stripes"):
-                self.fields[field].disabled = True
+            self.fields["belt_selection"].disabled = True
             if not self.instance.pk:
                 # New staff records must never be created with stale member details.
                 for field in ("first_name", "last_name", "gender", "address",
@@ -301,10 +416,22 @@ class StaffForm(forms.ModelForm):
         if linked:
             # Display authoritative member belt on the form without allowing edits
             # to the legacy staff belt fields.
-            self.fields["belt_rank"].disabled = True
-            self.fields["stripes"].disabled = True
-            self.fields["belt_rank"].initial = self.instance.member_profile.belt_rank
-            self.fields["stripes"].initial = self.instance.member_profile.stripes
+            self.fields["belt_selection"].disabled = True
+
+        # The linked member owns rank data; otherwise use staff's own belt.
+        source = selected_member or (self.instance.member_profile if linked else self.instance)
+        rank = str(getattr(source, "belt_rank", BeltRank.WHITE) or BeltRank.WHITE)
+        stripes = int(getattr(source, "stripes", 0) or 0)
+        selected = f"{rank}|{stripes}"
+        choices = member_belt_selection_choices()
+        values = {value for _, group in choices for value, _ in group}
+        if selected not in values and rank in dict(BeltRank.choices):
+            label = dict(BeltRank.choices)[rank]
+            choices.append(("Previously recorded", [(selected, f"{label} — {stripes} stripes (existing record)")]))
+        self.fields["belt_selection"].choices = choices
+        self.fields["belt_selection"].initial = selected
+        self.fields["belt_selection"].disabled = bool(selected_member or linked)
+        self.belt_options = belt_picker_options(choices)
 
     def clean(self):
         cleaned = super().clean()
@@ -330,6 +457,14 @@ class StaffForm(forms.ModelForm):
     @transaction.atomic
     def save(self, commit=True):
         staff = super().save(commit=False)
+        member = self.cleaned_data.get("member_profile")
+        if member:
+            staff.belt_rank = member.belt_rank
+            staff.stripes = member.stripes
+        else:
+            rank, stripes = self.cleaned_data["belt_selection"].split("|", 1)
+            staff.belt_rank = rank
+            staff.stripes = int(stripes)
         if self.cleaned_data.get("user"):
             staff.user = self.cleaned_data["user"]
         if commit:
@@ -383,6 +518,7 @@ class ClassForm(forms.ModelForm):
 
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'type': forms.Select(attrs={'class': 'form-select'}),
             'instructor': forms.Select(attrs={'class': 'form-select'}),
             'start_time': forms.TimeInput(attrs={'type': 'time', 'class': 'form-control'}),
             'end_time': forms.TimeInput(attrs={'type': 'time', 'class': 'form-control'}),
@@ -486,14 +622,12 @@ class BeltPromotionForm(forms.ModelForm):
                 if not existing and rank == start_rank and stripes <= start_stripes:
                     continue
                 path = belt_image_path(rank, stripes, "child" if is_youth else "adult")
-                if path is None:
-                    continue
                 value = f"{rank}|{stripes}"
-                label = f"{dict(BeltRank.choices).get(rank, rank)} — {stripes} stripes"
+                label = belt_selection_label(rank, stripes)
                 choices.append((value, label))
                 self.belt_options.append({
                     "value": value, "label": label,
-                    "image_url": staticfiles_storage.url(path),
+                    "image_url": staticfiles_storage.url(path) if path else "",
                     "rank": rank, "stripes": stripes,
                 })
 
@@ -533,6 +667,7 @@ class BaseWaiverForm(forms.ModelForm):
         self.fields["reported_belt_rank"].choices = [("", "Select belt (optional)")] + [
             (rank, BeltRank(rank).label) for rank in ranks
         ]
+        self.belt_options = belt_picker_options(self.fields["reported_belt_rank"].choices)
 
 
     class Meta:

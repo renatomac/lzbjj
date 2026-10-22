@@ -23,7 +23,11 @@
         const message = document.createElement('div'); message.textContent = item.message; row.append(message);
         const time = document.createElement('div'); time.className = 'small text-muted mt-1';
         time.textContent = new Date(item.created_at).toLocaleString(); row.append(time);
-        if (!item.is_read) {
+        if (item.requires_action) {
+          const link = document.createElement('a'); link.className = 'btn btn-sm btn-link px-0';
+          link.textContent = 'Action required'; link.href = item.action_url; row.append(link);
+        }
+        if (!item.is_read && !item.requires_action) {
           const button = document.createElement('button'); button.className = 'btn btn-sm btn-link px-0';
           button.textContent = 'Mark as read'; button.dataset.notificationAction = 'read'; button.dataset.id = item.id; row.append(button);
         }

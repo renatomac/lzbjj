@@ -1,0 +1,71 @@
+/* Shared image-based BJJ rank selector — scoped across CRM / waivers. */
+.lzbjj-belt-picker { position: relative; min-width: 0; width: 100%; }
+.lzbjj-belt-picker .lzbjj-belt-ui[hidden] { display: none !important; }
+.lzbjj-belt-picker.is-enhanced .lzbjj-belt-native { display: none; }
+.lzbjj-belt-picker .lzbjj-belt-trigger {
+  min-height: 58px; width: 100%; padding: 10px 14px; border-radius: 10px;
+  border: 1px solid #b9c5d3; cursor: pointer; font: inherit;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 14px; text-align: left; white-space: normal;
+  background: #fff; color: #273444; border-color: #b9c5d3;
+}
+.lzbjj-belt-picker .lzbjj-belt-trigger::after { display:none; }
+.lzbjj-belt-picker .lzbjj-belt-trigger:focus-visible { outline: 3px solid #9bc2f1; outline-offset: 2px; }
+.lzbjj-belt-picker .lzbjj-belt-trigger:disabled { opacity: .7; cursor: not-allowed; background: #f1f5f9; }
+.lzbjj-belt-preview { display: flex; gap: 12px; align-items: center; min-width:0; font-size: .9rem; }
+.lzbjj-belt-preview img { width: 105px; max-width: 38%; height: 33px; object-fit: contain; flex-shrink: 0; }
+.lzbjj-belt-empty { color: #64748b; }
+.lzbjj-belt-picker .lzbjj-belt-menu {
+  position: absolute; top: 100%; left: 0; right: 0;
+  display: none; background: #fff; color: #25364b;
+  box-sizing: border-box;
+  max-height: min(360px, 58vh); overflow-y: auto; overscroll-behavior: contain;
+  border: 1px solid #cbd5e1; border-radius: 11px;
+  min-width: 100%; z-index: 1080;
+}
+.lzbjj-belt-picker.is-open .lzbjj-belt-menu { display: block !important; }
+.lzbjj-belt-picker .lzbjj-belt-menu[hidden] { display: none !important; }
+.lzbjj-belt-picker .lzbjj-belt-option {
+  display:flex; align-items:center; gap: 14px; min-height: 49px;
+  border-radius: 7px; padding: 7px 10px;
+  white-space: normal; font-size: .88rem; color: #25364b;
+  cursor: pointer; background: transparent; border: 0; width: 100%; text-align: left;
+}
+.lzbjj-belt-picker .lzbjj-belt-option img {
+  width:105px; height:34px; flex-shrink:0; object-fit:contain;
+}
+.lzbjj-belt-picker .lzbjj-belt-option.active,
+.lzbjj-belt-picker .lzbjj-belt-option:focus-visible,
+.lzbjj-belt-picker .lzbjj-belt-option:hover {
+  background: #1768f0; color: white; outline: none;
+}
+.lzbjj-belt-picker .lzbjj-belt-option[aria-selected="true"]:not(.active) { font-weight:700; }
+.lzbjj-belt-picker .lzbjj-belt-art-fallback {
+  width:105px; height:23px; flex-shrink:0;
+  display:inline-block; border: 1px solid #5a6772;
+  background: #fff; box-shadow: inset 5px 0 0 rgba(0,0,0,.75);
+}
+.lzbjj-belt-picker .lzbjj-belt-art-fallback { position: relative; }
+.lzbjj-belt-picker .lzbjj-belt-stripes {
+  position: absolute; left: 12px; top: 0; bottom: 0;
+  display: inline-flex; gap: 4px; align-items: stretch;
+}
+.lzbjj-belt-picker .lzbjj-belt-stripes > span {
+  display: block; width: 4px; height: 100%; background: #f7f7f7;
+  border: 1px solid rgba(0,0,0,.25);
+}
+.lzbjj-belt-picker [data-rank="red-white"] .lzbjj-belt-stripes > span { background: #151515; }
+.lzbjj-belt-picker [data-rank="red-black"] { background: linear-gradient(90deg,#151515 0 45%,#a81822 45% 100%); }
+.lzbjj-belt-picker [data-rank="red-white"] { background: linear-gradient(90deg,#fff 0 45%,#ad1d26 45% 100%); }
+.lzbjj-belt-picker [data-rank="red"] { background: #bc1e2d; }
+.lzbjj-belt-picker .lzbjj-belt-art-placeholder { width:105px; flex-shrink:0; }
+@media (max-width: 560px) {
+  .lzbjj-belt-picker .lzbjj-belt-trigger { min-height:54px; padding:8px 10px; }
+  .lzbjj-belt-picker .lzbjj-belt-option { gap:9px; }
+  .lzbjj-belt-picker .lzbjj-belt-option img,
+  .lzbjj-belt-picker .lzbjj-belt-art-fallback,
+  .lzbjj-belt-picker .lzbjj-belt-art-placeholder { width:78px; }
+}
+
+/* Member-type filtering must hide invalid ranks even with flex item styling. */
+.lzbjj-belt-picker .lzbjj-belt-option[hidden] { display: none !important; }

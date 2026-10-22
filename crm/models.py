@@ -45,9 +45,6 @@ class BeltRank(models.TextChoices):
     PURPLE = 'purple', 'Purple'
     BROWN = 'brown', 'Brown'
     BLACK = 'black', 'Black'
-    RED_BLACK = 'red-black', 'Red & Black'
-    RED_WHITE = 'red-white', 'Red & White'
-    RED = 'red', 'Red'
 
 
 ADULT_BELT_ORDER = [
@@ -56,9 +53,6 @@ ADULT_BELT_ORDER = [
     BeltRank.PURPLE,
     BeltRank.BROWN,
     BeltRank.BLACK,
-    BeltRank.RED_BLACK,
-    BeltRank.RED_WHITE,
-    BeltRank.RED,
 ]
 
 KID_BELT_ORDER = [
@@ -146,6 +140,16 @@ class Contact(models.Model):
 
 
 class Member(models.Model):
+    class PaymentMethod(models.TextChoices):
+        CREDIT_CARD = 'credit_card', 'Credit card (Authorize.Net)'
+        CASH = 'cash', 'Cash'
+        CHECK = 'check', 'Check'
+        ZELLE = 'zelle', 'Zelle'
+        BANK_TRANSFER = 'bank_transfer', 'Bank transfer'
+        OTHER = 'other', 'Other manual payment'
+
+    membership_payment_method = models.CharField(
+        max_length=30, choices=PaymentMethod.choices, default=PaymentMethod.CREDIT_CARD)
     TRANSITIONING = "transition"  # Fits the existing 10-character database column.
     class LifecycleStatus(models.TextChoices):
         LEAD = "lead", "Lead"
@@ -698,6 +702,13 @@ class Membership(models.Model):
 
 
 class Payment(models.Model):
+    member = models.ForeignKey('Member', on_delete=models.PROTECT, null=True, blank=True,
+                              related_name='manual_payments')
+    received_by = models.ForeignKey('User', on_delete=models.PROTECT, null=True, blank=True,
+                                   related_name='received_payments')
+    recorded_by = models.ForeignKey('User', on_delete=models.PROTECT, null=True, blank=True,
+                                   related_name='recorded_payments')
+    confirmation_key = models.UUIDField(null=True, blank=True, unique=True, editable=False)
     user = models.ForeignKey(
         "User",
         on_delete=models.CASCADE,
@@ -718,7 +729,10 @@ class Payment(models.Model):
     def to_dict(self):
         return {
             "id": self.id,
-            "user_id": self.user.id if self.user else None,
+            "user_id": self.user_id,
+            "member_id": self.member_id,
+            "received_by_id": self.received_by_id,
+            "recorded_by_id": self.recorded_by_id,
             "amount": float(self.amount),
             "payment_date": self.payment_date.isoformat(),
             "payment_method": self.payment_method,
@@ -895,6 +909,7 @@ class ClassSession(models.Model):
     )
 
     is_canceled = models.BooleanField(default=False)
+    attendance_reported_at = models.DateTimeField(null=True, blank=True)
 
     notes = models.TextField(blank=True)
 
@@ -1206,6 +1221,7 @@ class WaiverSignature(models.Model):
     participant_last_name = models.CharField(max_length=100)
     participant_dob = models.DateField(null=True, blank=True)
     reported_belt_rank = models.CharField(max_length=50, choices=BeltRank.choices, blank=True, default="")
+    reported_belt_degree = models.PositiveSmallIntegerField(null=True, blank=True, help_text="Degree of reported black belt; preserves legacy coral/red waiver distinctions.")
 
     # Parent / Guardian (required for minors)
     guardian_first_name = models.CharField(max_length=100, blank=True)

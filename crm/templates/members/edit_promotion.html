@@ -80,35 +80,9 @@
         {% csrf_token %}
         {{ form.old_rank }}{{ form.old_stripes }}{{ form.new_rank }}{{ form.new_stripes }}
         <div class="mb-4">
-          <label class="form-label fw-semibold" for="belt-choice-button">New belt and stripes</label>
-          <div class="dropdown w-100" id="belt-image-picker">
-            <button class="btn btn-outline-secondary w-100 d-flex align-items-center justify-content-between gap-3 text-start p-3"
-                    type="button" id="belt-choice-button" data-bs-toggle="dropdown"
-                    data-bs-auto-close="true" aria-expanded="false">
-              <span class="d-flex align-items-center gap-3" id="belt-choice-preview">
-                <span>Select a belt and stripe combination</span>
-              </span>
-              <i class="fas fa-chevron-down"></i>
-            </button>
-            <div class="dropdown-menu w-100 shadow-lg p-2" aria-labelledby="belt-choice-button"
-                 style="max-height:340px;overflow-y:auto;">
-              {% for option in form.belt_options %}
-              <button type="button" class="dropdown-item d-flex align-items-center gap-3 rounded py-2 belt-option"
-                      data-value="{{ option.value }}" data-label="{{ option.label }}"
-                      data-image="{{ option.image_url }}">
-                <img src="{{ option.image_url }}" alt="" width="105" height="34" style="object-fit:contain;">
-                <span>{{ option.label }}</span>
-              </button>
-              {% endfor %}
-            </div>
-          </div>
-          <div class="d-none">{{ form.belt_selection }}</div>
-          {% for error in form.belt_selection.errors %}
-          <div class="text-danger small mt-2">{{ error }}</div>
-          {% endfor %}
+          {% include "components/belt_image_picker.html" with field=form.belt_selection options=form.belt_options picker_label="New belt and stripes" picker_help="Select the exact belt image and stripe progression." preview_target="#id_new_rank_div .fw-semibold" %}
           {% for error in form.new_rank.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
           {% for error in form.new_stripes.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
-          <div class="form-text">Select the exact belt image, including its stripe progression.</div>
         </div>
         <div class="mb-3">
           <label for="{{ form.promotion_date.id_for_label }}" class="form-label fw-semibold">Promotion date</label>
@@ -193,33 +167,5 @@
     </div>
   </div>
 </div>
-<script>
-document.addEventListener("DOMContentLoaded", function () {
-  const picker = document.getElementById("belt-image-picker");
-  if (!picker) return;
-  const select = document.getElementById("id_belt_selection");
-  const preview = document.getElementById("belt-choice-preview");
-  const button = document.getElementById("belt-choice-button");
-  const options = Array.from(picker.querySelectorAll(".belt-option"));
-  function choose(option) {
-    if (!option) return;
-    select.value = option.dataset.value;
-    const img = document.createElement("img");
-    img.src = option.dataset.image;
-    img.alt = "";
-    img.width = 120;
-    img.height = 40;
-    img.style.objectFit = "contain";
-    const label = document.createElement("span");
-    label.textContent = option.dataset.label;
-    preview.replaceChildren(img, label);
-    options.forEach(item => item.classList.toggle("active", item === option));
-    button.setAttribute("aria-label", "Selected: " + option.dataset.label);
-    const newPreview = document.querySelector("#id_new_rank_div .fw-semibold");
-    if (newPreview) newPreview.textContent = option.dataset.label;
-  }
-  options.forEach(option => option.addEventListener("click", () => choose(option)));
-  choose(options.find(option => option.dataset.value === select.value) || options[0]);
-});
-</script>
+
 {% endblock %}

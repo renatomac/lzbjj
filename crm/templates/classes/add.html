@@ -1,38 +1,98 @@
 {% extends "layout.html" %}
-
+{% load static %}
 {% block title %}{{ title }}{% endblock %}
-{% block header_title %}Class manager{% endblock %}
-
+{% block header_title %}Class Manager{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'crm/css/pro_forms.css' %}">
+<link rel="stylesheet" href="{% static 'crm/css/class_editor.css' %}">
+{% endblock %}
 {% block content %}
-
-<div class="row justify-content-center">
-    <div class="col-lg-8">
-        <div class="card main-card">
-            <div class="card-body">
-                <h2 class="fw-bold mb-3">{{ title }}</h2>
-                <a href="{% url 'classes'%}" class="btn btn-custom-ghost"><i class="fa-solid fa-arrow-left"></i> Back to Staff</a>
-                <p class="text-muted mb-4">
-                    {% if action_url == 'addClass' %} 
-                    Create a new recurring class schedule with a specific time and one or more weekdays.
-                    {% elif action_url == 'editClass' %}
-                    Update the details for this recurring class schedule. 
-                    {% else %}
-                    No action selected.
-                    {% endif %}
-                </p> 
-                {% load crispy_forms_tags %}
-                <form action="{% if action_url == 'addClass' %}
-                                {% url 'addClasses' %}
-                            {% else %}
-                                {% url 'editClass' class_id=class.id %}
-                            {% endif %}"  
-                        method="post" class="django-form">
-                    {% csrf_token %}
-                    {{ form|crispy }}
-                    <input type="submit" value="Submit">
-                </form>    
-            </div>
+<section class="crm-pro-form crm-class-editor" aria-label="Class schedule editor">
+  <div class="card crm-form-card">
+    <div class="card-body">
+      <header class="crm-form-heading">
+        <div>
+          <div class="crm-class-eyebrow"><i class="fa-solid fa-calendar-days me-2" aria-hidden="true"></i>CLASS SCHEDULING</div>
+          <h1>{{ title }}</h1>
+          <p class="crm-form-subtitle">Configure the class details, instructor, and weekly recurring schedule.</p>
         </div>
+        <a href="{% url 'classes' %}" class="btn btn-outline-secondary"><i class="fa-solid fa-arrow-left me-2" aria-hidden="true"></i>Back to Classes</a>
+      </header>
+      <form method="post" class="crm-class-form" action="{% if action_url == 'addClass' %}{% url 'addClasses' %}{% else %}{% url 'editClass' class_id=class.id %}{% endif %}">
+        {% csrf_token %}
+        {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+        {% if form.non_field_errors %}<div class="alert alert-danger" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+
+        <div class="crm-class-section">
+          <div class="crm-class-section-title">
+            <span class="crm-class-section-icon"><i class="fa-solid fa-chalkboard-user" aria-hidden="true"></i></span>
+            <div><h2>Class information</h2><p>Identify the class and assign its instructor.</p></div>
+          </div>
+          <div class="row g-4">
+            <div class="col-12 col-lg-6">
+              <label class="form-label" for="{{ form.name.id_for_label }}">Class name{% if form.name.field.required %} <span class="text-danger">*</span>{% endif %}</label>
+              {{ form.name }}
+              {% if form.name.errors %}<div class="invalid-feedback d-block">{{ form.name.errors }}</div>{% endif %}
+              <div class="form-text">For example: Kids Fundamentals or Adult No-Gi.</div>
+            </div>
+            <div class="col-12 col-lg-6">
+              <label class="form-label" for="{{ form.type.id_for_label }}">Class type{% if form.type.field.required %} <span class="text-danger">*</span>{% endif %}</label>
+              {{ form.type }}
+              {% if form.type.errors %}<div class="invalid-feedback d-block">{{ form.type.errors }}</div>{% endif %}
+            </div>
+            <div class="col-12">
+              <label class="form-label" for="{{ form.instructor.id_for_label }}">Instructor{% if form.instructor.field.required %} <span class="text-danger">*</span>{% endif %}</label>
+              {{ form.instructor }}
+              {% if form.instructor.errors %}<div class="invalid-feedback d-block">{{ form.instructor.errors }}</div>{% endif %}
+            </div>
+          </div>
+        </div>
+
+        <div class="crm-class-section">
+          <div class="crm-class-section-title">
+            <span class="crm-class-section-icon"><i class="fa-regular fa-clock" aria-hidden="true"></i></span>
+            <div><h2>Class time</h2><p>Choose when the class begins and ends.</p></div>
+          </div>
+          <div class="row g-4">
+            <div class="col-12 col-md-6">
+              <label class="form-label" for="{{ form.start_time.id_for_label }}">Start time{% if form.start_time.field.required %} <span class="text-danger">*</span>{% endif %}</label>
+              {{ form.start_time }}
+              {% if form.start_time.errors %}<div class="invalid-feedback d-block">{{ form.start_time.errors }}</div>{% endif %}
+            </div>
+            <div class="col-12 col-md-6">
+              <label class="form-label" for="{{ form.end_time.id_for_label }}">End time{% if form.end_time.field.required %} <span class="text-danger">*</span>{% endif %}</label>
+              {{ form.end_time }}
+              {% if form.end_time.errors %}<div class="invalid-feedback d-block">{{ form.end_time.errors }}</div>{% endif %}
+            </div>
+          </div>
+        </div>
+
+        <div class="crm-class-section">
+          <div class="crm-class-section-title">
+            <span class="crm-class-section-icon"><i class="fa-solid fa-repeat" aria-hidden="true"></i></span>
+            <div><h2>Repeat on</h2><p>Select all weekdays on which this class takes place.</p></div>
+          </div>
+          <fieldset class="crm-weekday-fieldset">
+          <legend class="visually-hidden">Days of week</legend>
+          <div class="crm-weekday-grid" id="crm-class-weekdays">
+            {% for choice in form.days_of_week %}
+              <label class="crm-weekday-option">
+                {{ choice.tag }}
+                <span>{{ choice.choice_label }}</span>
+              </label>
+            {% endfor %}
+          </div>
+          </fieldset>
+          {% if form.days_of_week.errors %}<div class="invalid-feedback d-block">{{ form.days_of_week.errors }}</div>{% endif %}
+          <p class="form-text mb-0 mt-3">You can select more than one day.</p>
+        </div>
+
+        <div class="crm-form-actions crm-class-actions">
+          <a href="{% url 'classes' %}" class="btn btn-outline-secondary">Cancel</a>
+          <button type="submit" class="btn btn-primary"><i class="fa-solid fa-check me-2" aria-hidden="true"></i>Save Class</button>
+        </div>
+      </form>
     </div>
-</div>
+  </div>
+</section>
 {% endblock %}

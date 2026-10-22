@@ -10,10 +10,17 @@ from .models import Notification
 from asgiref.sync import async_to_sync   
 import json
 
+
+def refresh_operational_alerts(user):
+    if user.is_staff or user.is_superuser or user.is_coach:
+        from .action_required import reconcile_action_required_notifications
+        reconcile_action_required_notifications()
+
 @login_required
 @ensure_csrf_cookie
 def notification_list(request):
-    qs = Notification.objects.filter(user=request.user).order_by('-created_at', '-pk')
+    refresh_operational_alerts(request.user)
+    qs = Notification.objects.filter(user=request.user).order_by('-requires_action', '-created_at', '-pk')
     total = qs.count()
     unread = qs.filter(is_read=False).count()
     status = request.GET.get('status', 'all')
@@ -65,6 +72,9 @@ def mark_notification_read(request, pk):
 
     n = get_object_or_404(Notification, pk=pk, user=request.user)
 
+    if n.requires_action:
+        return JsonResponse({'error': 'Resolve the underlying issue to clear this alert.'}, status=409)
+
     if not n.is_read:
         n.is_read = True
         n.save(update_fields=['is_read'])
@@ -79,6 +89,8 @@ def delete_notification(request, pk):
     """Delete a notification permanently"""
 
     n = get_object_or_404(Notification, pk=pk, user=request.user)
+    if n.requires_action:
+        return JsonResponse({'error': 'Resolve the underlying issue to clear this alert.'}, status=409)
 
     notification_id = n.id
     n.delete()
@@ -91,27 +103,30 @@ def delete_notification(request, pk):
 @require_POST
 def mark_all_read(request):
 
-    Notification.objects.filter(user=request.user, is_read=False).update(is_read=True)
-    return JsonResponse({"status": "ok", "unread": 0})
+    Notification.objects.filter(user=request.user, is_read=False, requires_action=False).update(is_read=True)
+    return JsonResponse({"status": "ok", "unread": Notification.objects.filter(user=request.user, is_read=False).count()})
 
 @login_required
 @require_POST
 def delete_all_notifications(request):
     """Delete all notifications for the user"""
 
-    Notification.objects.filter(user=request.user).delete()
-    return JsonResponse({"status": "ok", "unread": 0})
+    Notification.objects.filter(user=request.user, requires_action=False).delete()
+    return JsonResponse({"status": "ok", "unread": Notification.objects.filter(user=request.user, is_read=False).count()})
 
 # Optional: JSON for the 5 most recent (for repopulating dropdown if you want)
 @login_required
 @ensure_csrf_cookie
 def recent_notifications_api(request):
-    qs = Notification.objects.filter(user=request.user).order_by('-created_at')[:10]
+    refresh_operational_alerts(request.user)
+    qs = Notification.objects.filter(user=request.user).order_by('-requires_action', '-created_at')[:10]
     data = [
         {
             "id": n.id,
             "message": n.message,
             "is_read": n.is_read,
+            "requires_action": n.requires_action,
+            "action_url": n.action_url if n.requires_action else '',
             "created_at": n.created_at.isoformat() if n.created_at else None,
         }
         for n in qs

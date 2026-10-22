@@ -1,0 +1,26 @@
+{% comment %}Same image-backed component markup for standalone Django admin.{% endcomment %}
+<div class="lzbjj-belt-picker" data-belt-image-picker>
+  <div class="lzbjj-belt-native">{{ select_html }}</div>
+  <div class="dropdown lzbjj-belt-ui" hidden>
+    <button type="button" class="lzbjj-belt-trigger btn btn-outline-secondary w-100"
+            aria-expanded="false" aria-haspopup="listbox" aria-label="Belt rank">
+      <span class="lzbjj-belt-preview"><span class="lzbjj-belt-empty">Choose a belt</span></span>
+      <span aria-hidden="true">▾</span>
+    </button>
+    <div class="dropdown-menu lzbjj-belt-menu shadow-lg p-2 w-100" hidden role="listbox" aria-label="Belt rank">
+      {% for option in options %}
+      <button type="button" role="option" aria-selected="false" class="dropdown-item lzbjj-belt-option"
+              data-value="{{ option.value }}" data-label="{{ option.label }}" data-image="{{ option.image_url }}" data-rank="{{ option.rank }}">
+        {% if option.image_url %}
+          <img src="{{ option.image_url }}" alt="" width="105" height="34" loading="lazy">
+        {% elif option.rank %}
+          <span class="lzbjj-belt-art-fallback" data-rank="{{ option.rank }}" aria-hidden="true"><span class="lzbjj-belt-stripes">{% for stripe in "1234" %}{% if forloop.counter <= option.stripes %}<span></span>{% endif %}{% endfor %}</span></span>
+        {% else %}
+          <span class="lzbjj-belt-art-placeholder" aria-hidden="true"></span>
+        {% endif %}
+        <span class="lzbjj-belt-option-label">{{ option.label }}</span>
+      </button>
+      {% endfor %}
+    </div>
+  </div>
+</div>

@@ -8,6 +8,20 @@ from django.utils import timezone
 from crm.models import ClassSession, Member, SessionAttendance
 
 
+@transaction.atomic
+def mark_attendance_reported(session):
+    """Explicit submission also supports an all-absent or empty roster."""
+    if session.is_canceled:
+        raise ValidationError('This class is canceled.')
+    if session.date > timezone.localdate():
+        raise ValidationError('Future class attendance cannot be reported yet.')
+    reported_at = timezone.now()
+    ClassSession.objects.filter(pk=session.pk, attendance_reported_at__isnull=True).update(
+        attendance_reported_at=reported_at)
+    from notifications.action_required import resolve_alert, ATTENDANCE_PREFIX
+    resolve_alert(f'{ATTENDANCE_PREFIX}{session.pk}')
+
+
 def eligible_for_session(member, session):
     kind = session.class_template.type
     if kind == "open":
@@ -59,6 +73,7 @@ def set_member_attendance(session, member, present=True, *, allow_past=False):
     if not created and attendance.present != present:
         attendance.present = present
         attendance.save(update_fields=["present"])
+    mark_attendance_reported(session)
     return attendance
 
 
