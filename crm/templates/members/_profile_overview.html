@@ -1,0 +1,49 @@
+{% load belt_images %}
+<div class="mp-overview">
+  <div class="mp-main">
+    <section class="mp-section" aria-labelledby="mp-personal-heading">
+      <h2 id="mp-personal-heading"><i class="far fa-address-card" aria-hidden="true"></i>Personal information</h2>
+      <dl class="mp-fields">
+        <div><dt>Email</dt><dd>{% if member.email %}<a href="mailto:{{ member.email }}">{{ member.email }}</a>{% else %}Not recorded{% endif %}</dd></div>
+        <div><dt>Phone</dt><dd>{% if member.phone %}<a href="tel:{{ member.phone }}">{{ member.phone }}</a>{% else %}Not recorded{% endif %}</dd></div>
+        <div><dt>Date of birth</dt><dd>{{ member.date_of_birth|date:"M j, Y"|default:"Not recorded" }}{% if age != None %} · {{ age }} years{% endif %}</dd></div>
+        <div><dt>Gender</dt><dd>{{ member.get_gender_display|default:"Not recorded" }}</dd></div>
+        <div><dt>Member type</dt><dd>{{ member.get_member_type_display }}</dd></div>
+        <div><dt>Linked account</dt><dd>{{ member.user.username|default:"Not linked" }}</dd></div>
+        <div class="mp-full"><dt>Home address</dt><dd>{% if member.address or member.city or member.state or member.zip_code %}{{ member.address }}<br>{{ member.city }}{% if member.city and member.state %}, {% endif %}{{ member.state }} {{ member.zip_code }}{% else %}Not recorded{% endif %}</dd></div>
+      </dl>
+    </section>
+    <section class="mp-section" aria-labelledby="mp-training-heading">
+      <h2 id="mp-training-heading"><i class="fas fa-medal" aria-hidden="true"></i>Training &amp; rank</h2>
+      <div class="mp-rank">{% belt_image member.belt_rank member.stripes member.member_type 140 %}<strong>{{ member.get_belt_rank_display }} · {{ member.stripes }} stripe{{ member.stripes|pluralize }}</strong></div>
+      <dl class="mp-fields">
+        <div><dt>Current belt started</dt><dd>{{ member.current_belt_started_on|date:"M j, Y"|default:"Not recorded" }}</dd></div>
+        <div><dt>IBJJF rank registered</dt><dd>{{ member.ibjjf_rank_registered_on|date:"M j, Y"|default:"Not recorded" }}</dd></div>
+      </dl>
+      <a class="mp-section-link" href="{% url 'studentJourney' member.id %}">Explore student journey <span aria-hidden="true">→</span></a>
+    </section>
+    <div class="mp-contact-grid">
+      <section class="mp-section" aria-labelledby="mp-responsible-heading"><h2 id="mp-responsible-heading"><i class="fas fa-user-shield" aria-hidden="true"></i>Responsible party</h2>{% include "members/_profile_contacts.html" with contacts=responsible contact_label="responsible contacts" %}</section>
+      <section class="mp-section" aria-labelledby="mp-emergency-heading"><h2 id="mp-emergency-heading"><i class="fas fa-phone" aria-hidden="true"></i>Emergency contacts</h2>{% include "members/_profile_contacts.html" with contacts=emergency contact_label="emergency contacts" %}</section>
+    </div>
+  </div>
+  <aside class="mp-side" aria-label="Membership and account">
+    <section class="mp-section" aria-labelledby="mp-membership-heading">
+      <h2 id="mp-membership-heading"><i class="fas fa-id-card-alt" aria-hidden="true"></i>Membership</h2>
+      {% if not member.plan %}<p class="mp-notice">Membership plan not assigned.</p>{% endif %}
+      <dl class="mp-fields mp-single">
+        <div><dt>Plan</dt><dd>{{ member.plan.name|default:"Not assigned" }}</dd></div>
+        {% if member.plan %}<div><dt>Monthly plan price</dt><dd>${{ member.plan.membership_price|floatformat:2 }}</dd></div><div><dt>Plan duration</dt><dd>{{ member.plan.duration_months }} month{{ member.plan.duration_months|pluralize }}</dd></div>{% endif %}
+        <div><dt>Payment method</dt><dd>{{ member.get_membership_payment_method_display }}</dd></div>
+        <div><dt>Membership starts</dt><dd>{{ member.membership_start_date|date:"M j, Y"|default:"Not recorded" }}</dd></div>
+        <div><dt>Membership ends</dt><dd>{{ member.membership_end_date|date:"M j, Y"|default:"Not recorded" }}</dd></div>
+        <div><dt>Lifecycle status</dt><dd>{{ member.get_lifecycle_status_display }}</dd></div>
+        <div><dt>Account active</dt><dd>{{ member.is_active|yesno:"Yes,No" }}</dd></div>
+        <div><dt>Required waiver</dt><dd>{% if member.has_valid_waiver %}Signed waiver on file{% else %}No valid signed waiver{% endif %}</dd></div>
+      </dl>
+      <a class="mp-section-link" href="{% url 'editMember' member.id %}#membership">Edit membership <span aria-hidden="true">→</span></a>
+    </section>
+    <section class="mp-section" aria-labelledby="mp-notes-heading"><h2 id="mp-notes-heading"><i class="far fa-file-alt" aria-hidden="true"></i>Member notes</h2><div class="mp-notes">{{ member.notes|default:"No notes recorded."|linebreaksbr }}</div></section>
+    <section class="mp-section" aria-labelledby="mp-actions-heading"><h2 id="mp-actions-heading">Account actions</h2><div class="mp-account-actions"><a href="{% url 'attendance_enroll' member.id %}" class="btn btn-sm btn-outline-secondary">Enroll face for attendance</a><button type="button" data-id="{{ member.id }}" data-type="Member" class="toggle-status btn btn-sm {% if member.is_active %}btn-outline-danger{% else %}btn-outline-success{% endif %}">{% if member.is_active %}Deactivate member{% else %}Activate member{% endif %}</button></div></section>
+  </aside>
+</div>

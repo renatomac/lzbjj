@@ -806,7 +806,9 @@ class ClassSessionForm(forms.ModelForm):
 class SessionAttendanceForm(forms.ModelForm):
     class Meta:
         model = SessionAttendance
-        fields = ['member', 'present']
+        # Existing roster records already identify the member. Only attendance
+        # is editable here; never require or accept a replacement member ID.
+        fields = ['present']
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

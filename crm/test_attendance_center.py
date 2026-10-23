@@ -27,6 +27,41 @@ class AttendanceCenterTests(TestCase):
             address="123 Main St", city="Lake Zurich", zip_code="60047",
         )
 
+    def test_session_editor_saves_checked_and_unchecked_without_member_field(self):
+        from crm.formsets import SessionAttendanceFormSet
+        attendance, _ = SessionAttendance.objects.update_or_create(
+            session=self.session, member=self.member, defaults={'present': False})
+        prefix = SessionAttendanceFormSet(instance=self.session).prefix
+        data = {
+            f'{prefix}-TOTAL_FORMS': '1', f'{prefix}-INITIAL_FORMS': '1',
+            f'{prefix}-MIN_NUM_FORMS': '0', f'{prefix}-MAX_NUM_FORMS': '1000',
+            f'{prefix}-0-id': str(attendance.pk),
+        }
+        for present in (True, False):
+            with self.subTest(present=present):
+                submitted = dict(data)
+                if present:
+                    submitted[f'{prefix}-0-present'] = 'on'
+                formset = SessionAttendanceFormSet(submitted, instance=self.session)
+                self.assertTrue(formset.is_valid(), formset.errors)
+                self.assertNotIn('member', formset.forms[0].fields)
+                formset.save()
+                attendance.refresh_from_db()
+                self.assertEqual(attendance.present, present)
+                self.assertEqual(attendance.member_id, self.member.pk)
+
+    def test_session_editor_cannot_reassign_attendance_member(self):
+        from crm.forms import SessionAttendanceForm
+        attendance, _ = SessionAttendance.objects.update_or_create(
+            session=self.session, member=self.member, defaults={'present': False})
+        form = SessionAttendanceForm(
+            {'present': 'on', 'member': '999999'}, instance=attendance)
+        self.assertTrue(form.is_valid(), form.errors)
+        form.save()
+        attendance.refresh_from_db()
+        self.assertEqual(attendance.member_id, self.member.pk)
+        self.assertTrue(attendance.present)
+
     def test_checkin_is_idempotent(self):
         record_member_attendance(self.session, self.member)
         record_member_attendance(self.session, self.member)
