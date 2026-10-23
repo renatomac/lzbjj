@@ -1,26 +1,23 @@
 {% extends "layout.html" %}
+{% load static %}
 
-{% block title %}All Scheduled Classes{% endblock %}
+{% block title %}Class sessions{% endblock %}
 
-{% block header_title %}All Scheduled Classes{% endblock %}
+{% block header_title %}Class sessions{% endblock %}
 
+{% block extra_head %}<link rel="stylesheet" href="{% static 'crm/css/sessions.css' %}">{% endblock %}
 {% block content %}
-<div class="container-fluid py-4">
-    <div class="row justify-content-center">
-        <div class="col-12 col-lg-10">
-            <div class="card shadow-sm rounded-4 p-0 mb-3">
-                <div class="card-body">
-                    <a href="{% url 'dashboard' %}" class="btn btn-custom-ghost ms-auto mb-3">
-                        <i class="fa-solid fa-arrow-left me-2"></i> Back to Dashboard
-                    </a>
+<div class="sessions-page">
+  <header class="sessions-heading"><div><p class="sessions-eyebrow">CLASS MANAGEMENT</p><h1>Class sessions</h1><p class="text-muted mb-0">Review the schedule, attendance reports, and session details.</p></div><a href="{% url 'dashboard' %}" class="btn btn-sm btn-outline-secondary">Back to Dashboard</a></header>
+  <section class="card sessions-filters" aria-label="Filter class sessions">
+                    <form method="GET" id="filterForm" class="sessions-filter-grid">
 
-                    <form method="GET" id="filterForm" class="row g-3">
-                        <div class="d-flex flex-wrap gap-2 mb-3 align-items-end">
 
                             <!-- Year -->
-                            <div class="p-2 flex-fill">
-                                <select name="filterYear" class="form-select filter-input">
-                                    <option value="">Year</option>
+                            <div class="sessions-filter">
+                                <label class="form-label" for="filterYear">Year</label>
+                                <select id="filterYear" name="filterYear" class="form-select filter-input">
+                                    <option value="">All years</option>
                                     {% for year in years %}
                                         <option value="{{ year }}" {% if year == selected_year %}selected{% endif %}>
                                             {{ year }}
@@ -30,9 +27,10 @@
                             </div>
 
                             <!-- Month -->
-                            <div class="p-2 flex-fill">
-                                <select name="filterMonth" class="form-select filter-input">
-                                    <option value="">Month</option>
+                            <div class="sessions-filter">
+                                <label class="form-label" for="filterMonth">Month</label>
+                                <select id="filterMonth" name="filterMonth" class="form-select filter-input">
+                                    <option value="">All months</option>
                                     {% for month_num, month_name in months %}
                                         <option value="{{ month_num }}" {% if month_num == selected_month %}selected{% endif %}>
                                             {{ month_name }}
@@ -42,9 +40,10 @@
                             </div>
 
                             <!-- Class -->
-                            <div class="p-2 flex-fill">
-                                <select name="filterClass" class="form-select filter-input">
-                                    <option value="">Class name</option>
+                            <div class="sessions-filter">
+                                <label class="form-label" for="filterClass">Class</label>
+                                <select id="filterClass" name="filterClass" class="form-select filter-input">
+                                    <option value="">All classes</option>
                                     {% for class_name in classes %}
                                         <option value="{{ class_name }}" {% if class_name == selected_class %}selected{% endif %}>
                                             {{ class_name }}
@@ -54,8 +53,9 @@
                             </div>
 
                             <!-- Instructor -->
-                            <div class="p-2 flex-fill">
-                                <select name="filterInstructor" class="form-select filter-input">
+                            <div class="sessions-filter">
+                                <label class="form-label" for="filterInstructor">Instructor</label>
+                                <select id="filterInstructor" name="filterInstructor" class="form-select filter-input">
                                     <option value="">All Instructors</option>
                                     {% for instructor in instructors %}
                                         <option value="{{ instructor.id }}" {% if instructor.id|stringformat:"s" == selected_instructor|stringformat:"s" %}selected{% endif %}>
@@ -65,22 +65,24 @@
                                 </select>
                             </div>
 
-                        </div>
+                        <div class="sessions-filter-actions"><button class="btn btn-primary" type="submit">Apply filters</button><a class="btn btn-outline-secondary" href="{% url 'sessions' %}">Clear</a></div>
                     </form>
-
-                    <div class="card p-4 mt-3">
-                        <div class="table-responsive">
+  </section>
+  <section class="card sessions-results" aria-labelledby="sessions-results-heading">
+    <div class="sessions-results-heading"><h2 id="sessions-results-heading">Session directory</h2><span class="sessions-count">{{ sessions|length }} session{{ sessions|length|pluralize }}</span></div>
+    <div class="table-responsive">
                             <table class="table table-hover align-middle px-3 py-2">
                                 <thead>
                                     <tr>
-                                        <th>Date</th>
+                                        <th scope="col">Date</th>
                                         <th>Weekday</th>
                                         <th>Start</th>
                                         <th>End</th>
                                         <th>Class</th>
                                         <th>Instructor</th>
-                                        <th>Canceled?</th>
-                                        <th>Notes</th>
+                                        <th>Status</th>
+                                        <th>Reported</th>
+                                        <th>Notes</th><th class="text-end">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -92,31 +94,40 @@
                                             <td>{{ s.effective_end_time|time:"g:i a" }}</td>
                                             <td>{{ s.class_template.name }}</td>
                                             <td>{{ s.effective_instructor|default:"—" }}</td>
-                                            <td>{{ s.is_canceled|yesno:"Yes,No" }}</td>
-                                            <td>{{ s.notes|default_if_none:""|linebreaksbr }}</td>
+                                            <td><span class="sessions-status {% if s.is_canceled %}sessions-status-canceled{% endif %}">{% if s.is_canceled %}Cancelled{% else %}Scheduled{% endif %}</span></td>
+                                            <td class="text-center">
+                                                {% if s.has_reported_attendance %}
+                                                <span class="text-success" title="One or more members marked present"><i class="fa-solid fa-circle-check" aria-hidden="true"></i><span class="visually-hidden">Attendance reported</span></span>
+                                                {% else %}
+                                                <span class="text-danger" title="No members marked present"><i class="fa-solid fa-circle-xmark" aria-hidden="true"></i><span class="visually-hidden">No attendance reported</span></span>
+                                                {% endif %}
+                                            </td>
+                                            <td class="sessions-notes">{{ s.notes|default:"—"|linebreaksbr }}</td>
+                                            <td><div class="sessions-row-actions"><a class="btn btn-sm btn-outline-primary" href="{% url 'session_edit' s.id %}" aria-label="Edit {{ s.class_template.name }} on {{ s.date|date:'Y-m-d' }}">Edit</a><button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteSessionModal" data-delete-url="{% url 'session_delete' s.id %}" data-session-label="{{ s.class_template.name }} — {{ s.date|date:'M j, Y' }}" aria-label="Delete {{ s.class_template.name }} on {{ s.date|date:'Y-m-d' }}"><i class="fa-solid fa-trash-can me-1" aria-hidden="true"></i>Delete</button></div></td>
                                         </tr>
                                     {% empty %}
                                         <tr>
-                                            <td colspan="8" class="text-muted">No sessions found.</td>
+                                            <td colspan="10" class="text-muted">No sessions found.</td>
                                         </tr>
                                     {% endfor %}
                                 </tbody>
                             </table>
-                        </div>
-                    </div>
-
-                </div>
-            </div>
-        </div>
     </div>
+  </section>
 </div>
-
-<!-- Auto-submit JS -->
-<script>
-document.querySelectorAll('.filter-input').forEach(el => {
-    el.addEventListener('change', () => {
-        document.getElementById('filterForm').submit();
-    });
-});
-</script>
+<div class="modal fade" id="deleteSessionModal" tabindex="-1" aria-labelledby="deleteSessionTitle" aria-describedby="deleteSessionDescription" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
+    <form method="post" id="deleteSessionForm">
+      {% csrf_token %}<input type="hidden" name="mode" value="one"><input type="hidden" name="return_to" value="sessions">
+      <input type="hidden" name="filterYear" value="{{ selected_year|default_if_none:'' }}">
+      <input type="hidden" name="filterMonth" value="{{ selected_month|default_if_none:'' }}">
+      <input type="hidden" name="filterClass" value="{{ selected_class|default_if_none:'' }}">
+      <input type="hidden" name="filterInstructor" value="{{ selected_instructor|default_if_none:'' }}">
+      <div class="modal-header"><h2 class="modal-title fs-5" id="deleteSessionTitle">Delete this session?</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+      <div class="modal-body"><p class="fw-semibold" id="deleteSessionLabel"></p><p id="deleteSessionDescription">This permanently deletes this session and its attendance and technique records. Other sessions and the class schedule will remain unchanged.</p></div>
+      <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Keep session</button><button type="submit" class="btn btn-danger" id="confirmDeleteSession" disabled>Delete session</button></div>
+    </form>
+  </div></div>
+</div>
+<script src="{% static 'crm/js/sessions.js' %}" defer></script>
 {% endblock %}

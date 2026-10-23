@@ -1,0 +1,25 @@
+.sessions-page { max-width: 1440px; margin: 0 auto 2rem; color: var(--crm-ink, #17283d); }
+.sessions-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1.5rem; }
+.sessions-heading h1 { font-size: clamp(1.5rem, 3vw, 2rem); font-weight: 700; }
+.sessions-eyebrow { font-size: .7rem; color: #1765d1; font-weight: 700; letter-spacing: .1em; margin-bottom: .4rem; }
+.sessions-filters { padding: 1.25rem; margin-bottom: 1.25rem; }
+.sessions-filter-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; align-items: end; }
+.sessions-filter { min-width: 0; }
+.sessions-filter .form-label { display: block; font-size: .8rem; font-weight: 600; margin-bottom: .5rem; }
+.sessions-filter .form-select { width: 100%; min-height: 44px; margin: 0; border-radius: 8px; }
+.sessions-filter-actions { grid-column: 1 / -1; display: flex; justify-content: flex-end; gap: .6rem; }
+.sessions-results { overflow: hidden; }
+.sessions-results-heading { display: flex; align-items: center; justify-content: space-between; padding: 1.25rem; border-bottom: 1px solid #e2e8f0; }
+.sessions-results-heading h2 { font-size: 1rem; font-weight: 700; margin: 0; }
+.sessions-count { font-size: .8rem; color: #1765d1; background: #edf4ff; padding: .3rem .65rem; border-radius: 6px; }
+.sessions-results .table { margin: 0; font-size: .85rem; }
+.sessions-results th { padding: 1rem; font-size: .72rem; letter-spacing: .03em; color: #64748b; background: #f8fafc; white-space: nowrap; }
+.sessions-results td { padding: 1rem; border-color: #edf0f5; }
+.sessions-results td:first-child { white-space: nowrap; }
+.sessions-results td a { text-decoration: none; }
+.sessions-row-actions { display: flex; gap: .5rem; justify-content: flex-end; white-space: nowrap; }
+.sessions-status { display: inline-block; font-size: .7rem; font-weight: 600; padding: .3rem .5rem; border-radius: 5px; color: #1765d1; background: #edf4ff; }
+.sessions-status-canceled { color: #64748b; background: #f1f3f5; }
+.sessions-notes { min-width: 140px; max-width: 260px; overflow-wrap: anywhere; }
+@media (max-width: 900px) { .sessions-filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .sessions-heading { align-items: flex-start; flex-wrap: wrap; } }
+@media (max-width: 480px) { .sessions-filter-grid { grid-template-columns: minmax(0, 1fr); } .sessions-filter-actions .btn { flex: 1; } }

@@ -1883,8 +1883,10 @@ def create_sessions(request):
 
 @crm_staff_required
 def sessions(request):
-    today = timezone.localdate()
-    sessions_qs = ClassSession.objects.select_related("class_template", "instructor")
+    from django.db.models import Exists, OuterRef
+    sessions_qs = ClassSession.objects.select_related("class_template__instructor", "instructor").annotate(
+        has_reported_attendance=Exists(SessionAttendance.objects.filter(
+            session_id=OuterRef('pk'), present=True)))
 
     # GET filters
     filter_year = request.GET.get("filterYear")
@@ -1892,19 +1894,28 @@ def sessions(request):
     filter_class = request.GET.get("filterClass")
     filter_instructor = request.GET.get("filterInstructor")
 
-    # Defaults to current year/month if not provided
-    filter_year = int(filter_year) if filter_year else today.year
-    filter_month = int(filter_month) if filter_month else today.month
+    # The default is all stored sessions; date filters are opt-in.
+    def optional_number(value, minimum, maximum):
+        try:
+            number = int(value)
+        except (TypeError, ValueError):
+            return None
+        return number if minimum <= number <= maximum else None
 
-    # Apply year/month filter
-    sessions_qs = sessions_qs.filter(date__year=filter_year, date__month=filter_month)
+    filter_year = optional_number(filter_year, 1, 9999)
+    filter_month = optional_number(filter_month, 1, 12)
+    if filter_year:
+        sessions_qs = sessions_qs.filter(date__year=filter_year)
+    if filter_month:
+        sessions_qs = sessions_qs.filter(date__month=filter_month)
 
     if filter_class:
         sessions_qs = sessions_qs.filter(class_template__name=filter_class)
-    if filter_instructor:
+    instructor_id = optional_number(filter_instructor, 1, 2147483647)
+    if instructor_id:
         sessions_qs = sessions_qs.annotate(
             effective_instructor_id=Coalesce("instructor_id", "class_template__instructor_id")
-        ).filter(effective_instructor_id=int(filter_instructor))
+        ).filter(effective_instructor_id=instructor_id)
 
     sessions_qs = sessions_qs.annotate(
         effective_start_time_db=Coalesce("start_time", "class_template__start_time")
@@ -1917,10 +1928,11 @@ def sessions(request):
     months = [(i, calendar.month_name[i]) for i in range(1, 13)]
     
     classes = ClassSession.objects.select_related("class_template").values_list("class_template__name", flat=True).distinct().order_by("class_template__name")
+    # Keep selected options visible even after deleting the last matching session.
+    years = sorted(set(years) | ({filter_year} if filter_year else set()), reverse=True)
+    classes = sorted(set(classes) | ({filter_class} if filter_class else set()))
     
     instructors = Staff.objects.order_by("first_name", "last_name")
-
-    print("Filtered sessions count:", sessions_qs.count())
 
     return render(request, "attendance/sessions.html", {
         "sessions": sessions_qs,   # rename page_obj → sessions
@@ -2106,8 +2118,18 @@ def session_delete(request, session_id ):
             i.delete()
     elif mode == "one":
         session.delete()
+        messages.success(request, "Session deleted successfully.")
     else:
         print ("No mode selectrion was made.")
+    if request.POST.get("return_to") == "sessions":
+        from urllib.parse import urlencode
+        filters = {key: request.POST[key] for key in (
+            "filterYear", "filterMonth", "filterClass", "filterInstructor"
+        ) if request.POST.get(key)}
+        target = reverse("sessions")
+        if filters:
+            target += "?" + urlencode(filters)
+        return HttpResponseRedirect(target)
     return HttpResponseRedirect(reverse("attendance"))
 
 @require_POST
