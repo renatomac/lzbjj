@@ -1,0 +1,10 @@
+{% for contact in contacts %}
+<article class="mp-contact">
+  <h3>{{ contact.name|default:"Name not recorded" }}</h3>
+  <p class="mp-muted">{{ contact.get_relationship_display|default:contact.relationship|default:"Relationship not recorded" }}</p>
+  <dl class="mp-fields">
+    <div><dt>Phone</dt><dd>{% if contact.phone %}<a href="tel:{{ contact.phone }}">{{ contact.phone }}</a>{% else %}Not recorded{% endif %}</dd></div>
+    <div><dt>Email</dt><dd>{% if contact.email %}<a href="mailto:{{ contact.email }}">{{ contact.email }}</a>{% else %}Not recorded{% endif %}</dd></div>
+  </dl>
+</article>
+{% empty %}<p class="mp-empty">No {{ contact_label }} on file. Add a contact in Edit profile.</p>{% endfor %}
