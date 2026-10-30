@@ -775,8 +775,11 @@ def addPromotion(request, member_id):
             promotion.member = member
             promotion.promoted_by = request.user.staff
             promotion.save()
-            member.belt_rank = promotion.new_rank
-            member.stripes = promotion.new_stripes
+            # A historical entry must not replace a newer recorded award.
+            latest_promotion = BeltPromotion.objects.filter(member=member).order_by(
+                '-promotion_date', '-created_at', '-pk').first()
+            member.belt_rank = latest_promotion.new_rank
+            member.stripes = latest_promotion.new_stripes
             member.save()
             
             # Generate notification for promotion
