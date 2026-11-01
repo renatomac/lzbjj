@@ -1,10 +1,12 @@
 {% extends 'layout.html' %}
+{% load static %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'crm/css/timer_coaching.css' %}">{% endblock %}
 
 {% block title %}Timers{% endblock %}
 {% block header_title %}Timers{% endblock %}
 
 {% block content %}
-<div class="card shadow-sm">
+<div class="card shadow-sm timer-library">
     <div class="card-header d-flex justify-content-between align-items-center">
         <h5 class="mb-0">Your Timers</h5>
         <div class="d-flex gap-2">
@@ -22,22 +24,22 @@
                         <th>Name</th>
                         <th>Rounds</th>
                         <th>Duration</th>
-                        <th>Interval</th>
+                        <th>Rest</th><th>Total workout</th><th>Status</th>
                         <th>Direction</th>
                         <th class="text-end">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for timer in timers %}
-                    <tr style="cursor: pointer;" data-href="{% url 'timers:run' timer.pk %}" onclick="window.location.href=this.dataset.href">
+                    <tr>
                         <td><strong>{{ timer.name }}</strong></td>
                         <td>{{ timer.rounds }}</td>
-                        <td>{{ timer.duration }}s</td>
-                        <td>{{ timer.interval }}s</td>
-                        <td>{{ timer.get_direction_display }}</td>
-                        <td class="text-end">
-                            <a href="{% url 'timers:edit' timer.pk %}" class="btn btn-outline-secondary btn-sm me-1" onclick="event.stopPropagation();"><i class="fas fa-edit"></i></a>
-                            <a href="{% url 'timers:delete' timer.pk %}" class="btn btn-outline-danger btn-sm" onclick="event.stopPropagation();"><i class="fas fa-trash"></i></a>
+                        <td>{{ timer.work_label }}</td>
+                        <td>{{ timer.rest_label }}</td>
+                        <td>{{ timer.total_label }}</td><td>{{ timer.get_status_display }}</td><td>{{ timer.get_direction_display }}</td>
+                        <td class="text-end"><a href="{% url 'timers:run' timer.pk %}" class="btn btn-primary btn-sm me-1">Open timer</a>
+                            <a href="{% url 'timers:edit' timer.pk %}" class="btn btn-outline-secondary btn-sm me-1" aria-label="Edit {{ timer.name }}" onclick="event.stopPropagation();"><i class="fas fa-edit"></i></a>
+                            <a href="{% url 'timers:delete' timer.pk %}" class="btn btn-outline-danger btn-sm" aria-label="Delete {{ timer.name }}" onclick="event.stopPropagation();"><i class="fas fa-trash"></i></a>
                         </td>
                     </tr>
                     {% endfor %}

@@ -56,6 +56,7 @@ class TimerRunView(LoginRequiredMixin, DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['spotify_configured'] = spotify_client.is_configured()
+        context['available_timers'] = Timer.objects.filter(user=self.request.user).order_by('name', 'pk')
         return context
 
 from django.http import JsonResponse
@@ -97,14 +98,31 @@ def timer_action(request, pk):
         data = json.loads(request.body)
         action = data.get('action')
     except (json.JSONDecodeError, TypeError):
+        data = request.POST
         action = request.POST.get('action')
         
-    if not action or action not in ['start', 'pause', 'reset']:
+    if not action or action not in ['start', 'pause', 'reset', 'complete']:
         return JsonResponse({'error': 'Invalid or missing action'}, status=400)
+
+    if action == 'complete':
+        # Another screen may already have reset or restarted this workout.
+        if timer.status == 'READY':
+            return JsonResponse(timer.to_dict())
+        if timer.get_current_timer_state()[0] != 'DONE':
+            return JsonResponse({'error': 'This workout has not finished.'}, status=409)
+        action = 'reset'
+        data = dict(data, confirmed_reset=True)
         
     if action == 'start':
         # Pause/Reset other active timers for this user
-        other_timers = Timer.objects.filter(user=request.user, status__in=['RUNNING', 'PAUSED']).exclude(id=timer.id)
+        other_timers = list(Timer.objects.filter(user=request.user, status__in=['RUNNING', 'PAUSED']).exclude(id=timer.id).order_by('pk'))
+        other_ids = [other.pk for other in other_timers]
+        if other_ids and data.get('confirmed_reset_timer_ids') != other_ids:
+            return JsonResponse({
+                'confirmation_required': True,
+                'message': 'Starting this timer will reset these active timers and erase their progress: ' + ', '.join(other.name for other in other_timers) + '. Continue?',
+                'confirmation': {'confirmed_reset_timer_ids': other_ids},
+            }, status=409)
         for ot in other_timers:
             ot.status = 'READY'
             ot.time_remaining = ot.duration
@@ -138,6 +156,12 @@ def timer_action(request, pk):
             timer.last_started_at = None
             
     elif action == 'reset':
+        if timer.status in ('RUNNING', 'PAUSED') and data.get('confirmed_reset') is not True:
+            return JsonResponse({
+                'confirmation_required': True,
+                'message': 'Reset this timer? Current workout progress will be lost.',
+                'confirmation': {'confirmed_reset': True},
+            }, status=409)
         timer.status = 'READY'
         timer.current_round = 1
         timer.current_state = 'WORK'

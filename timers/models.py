@@ -1,5 +1,6 @@
 from django.db import models
 from django.conf import settings
+from .time_utils import seconds_to_hms
 
 class Timer(models.Model):
     DIRECTION_CHOICES = [
@@ -39,6 +40,18 @@ class Timer(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.rounds}x{self.duration}s)"
+
+    @property
+    def work_label(self):
+        return seconds_to_hms(self.duration)
+
+    @property
+    def rest_label(self):
+        return seconds_to_hms(self.interval)
+
+    @property
+    def total_label(self):
+        return seconds_to_hms(self.rounds * self.duration + max(0, self.rounds - 1) * self.interval)
 
     def save(self, *args, **kwargs):
         # Initialize time_remaining to duration if not set

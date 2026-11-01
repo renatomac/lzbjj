@@ -14,6 +14,7 @@
       <form method="post" enctype="multipart/form-data">
         {% csrf_token %}
         {% include "components/pro_form_fields.html" %}
+        <p class="timer-editor-summary bg-light rounded p-3 mt-3" id="timerWorkoutPreview" aria-live="polite">Enter rounds, work time and rest time to preview the workout.</p>
         <div class="crm-form-actions">
           <a href="{% url 'timers:list' %}" class="btn btn-outline-secondary">Cancel</a>
           <button type="submit" class="btn btn-primary"><i class="fa-solid fa-check me-2" aria-hidden="true"></i>Save Timer</button>
@@ -22,4 +23,5 @@
     </div>
   </div>
 </section>
+<script src="{% static 'crm/js/timer_editor_summary.js' %}" defer></script>
 {% endblock %}

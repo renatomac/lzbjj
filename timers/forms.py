@@ -1,14 +1,7 @@
 from django import forms
 from .models import Timer
 import re
-
-def seconds_to_hms(seconds):
-    h = seconds // 3600
-    m = (seconds % 3600) // 60
-    s = seconds % 60
-    if h > 0:
-        return f"{h}:{m:02d}:{s:02d}"
-    return f"{m}:{s:02d}"
+from .time_utils import seconds_to_hms
 
 def hms_to_seconds(hms_str):
     parts = hms_str.split(':')

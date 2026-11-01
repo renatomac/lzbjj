@@ -1,9 +1,11 @@
 {% extends 'layout.html' %}
+{% load static %}
 
 {% block title %}{{ timer.name }} · Timer{% endblock %}
 {% block header_title %}{{ timer.name }}{% endblock %}
 
 {% block extra_head %}
+<link rel="stylesheet" href="{% static 'crm/css/timer_coaching.css' %}">
 <!-- High-contrast athletic & digital fonts -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -719,21 +721,23 @@
 
             <div class="toolbar-tools">
                 <!-- Screen Wake Lock Status Indicator -->
-                <div id="wakeLockBadge" class="wakelock-badge" title="Tap to toggle screen wake lock (keeps device screen on)">
+                <button type="button" id="wakeLockBadge" class="wakelock-badge" aria-pressed="false" title="Tap to toggle screen wake lock (keeps device screen on)">
                     <span class="wakelock-dot"></span>
                     <i class="fas fa-sun"></i>
-                    <span class="d-none d-md-inline" id="wakeLockStatusText">Screen Awake</span>
-                </div>
+                    <span class="d-none d-md-inline" id="wakeLockStatusText">Screen Normal</span>
+                </button>
 
+                <button type="button" id="btnMusicToggle" class="tool-btn" aria-controls="timerSidePanel" aria-expanded="true" title="Show or hide music and timer selection"><i class="fas fa-music" aria-hidden="true"></i><span class="d-none d-sm-inline">Music</span></button>
+                <button type="button" id="btnTestSound" class="tool-btn" title="Test timer sound">Test sound</button>
                 <!-- Sound Toggle -->
-                <button type="button" id="btnSoundToggle" class="tool-btn" title="Toggle Sound / Audio Chime (M)">
+                <button type="button" id="btnSoundToggle" class="tool-btn" title="Toggle Sound / Audio Chime (M)" aria-label="Toggle timer sound" aria-pressed="true">
                     <i id="soundIcon" class="fas fa-volume-up"></i>
                 </button>
 
                 <!-- Fullscreen Toggle Button -->
                 <button type="button" id="btnFullscreenToggle" class="tool-btn" title="Toggle Fullscreen Mode (F)">
                     <i id="fsIcon" class="fas fa-expand"></i>
-                    <span class="d-none d-sm-inline" id="fsText">Fullscreen</span>
+                    <span class="d-none d-sm-inline" id="fsText">Coaching mode</span>
                 </button>
             </div>
         </div>
@@ -794,6 +798,7 @@
         </div>
 
             <!-- Spotify Music Controls -->
+            <div id="timerSidePanel" class="timer-side-panel">
             <div class="spotify-panel" id="spotifyPanel">
                 <div class="spotify-panel-header">
                     <div class="spotify-brand"><i class="fab fa-spotify"></i> Spotify</div>
@@ -845,16 +850,27 @@
                 {% endif %}
             </div>
 
+            <section class="timer-switch-card" aria-labelledby="timerSwitchHeading">
+                <h2 id="timerSwitchHeading">Choose a timer</h2>
+                <label class="visually-hidden" for="timerQuickSelect">Timer name</label>
+                <select id="timerQuickSelect" class="spotify-select" aria-describedby="timerSwitchHelp">
+                    {% for choice in available_timers %}<option value="{% url 'timers:run' choice.pk %}" {% if choice.pk == timer.pk %}selected{% endif %}>{{ choice.name }}</option>{% endfor %}
+                </select>
+                <p id="timerSwitchHelp">Opening another timer does not stop the current workout.</p>
+            </section>
+            </div>
         </div>
 
+        <p class="timer-workout-summary">{{ timer.rounds }} rounds · {{ timer.work_label }} work · {{ timer.rest_label }} rest · {{ timer.total_label }} total</p>
+        <p id="timerActionError" class="timer-action-error" role="alert" hidden></p>
         <!-- Footer Bar with Keyboard Hints -->
         <div class="timer-footer">
             <div class="d-flex align-items-center gap-3">
                 <span><i class="fas fa-info-circle me-1"></i> Direction: <strong>{{ timer.get_direction_display }}</strong></span>
                 <span class="d-none d-sm-inline">|</span>
-                <span class="d-none d-sm-inline">Round: <strong>{{ timer.duration }}s</strong></span>
+                <span class="d-none d-sm-inline">Round: <strong>{{ timer.work_label }}</strong></span>
                 <span class="d-none d-sm-inline">|</span>
-                <span class="d-none d-sm-inline">Rest: <strong>{{ timer.interval }}s</strong></span>
+                <span class="d-none d-sm-inline">Rest: <strong>{{ timer.rest_label }}</strong></span>
             </div>
             <div class="shortcut-hints d-none d-md-flex align-items-center">
                 <span><span class="shortcut-kbd">Space</span> Play/Pause</span>
@@ -1055,7 +1071,29 @@
         window.localTimerState = localTimerState;
         let timerInterval = null;
         window.lastRenderedState = null;
-        let soundEnabled = true;
+        function readPreference(key, fallback) {
+            try { const value = localStorage.getItem('lzbjj.timer.' + key); return value === null ? fallback : JSON.parse(value); } catch (_) { return fallback; }
+        }
+        function savePreference(key, value) {
+            try { localStorage.setItem('lzbjj.timer.' + key, JSON.stringify(value)); } catch (_) { /* Private browsing may disable storage. */ }
+        }
+        let soundEnabled = readPreference('sound', true);
+        const musicToggle = document.getElementById('btnMusicToggle');
+        const musicPanel = document.getElementById('timerSidePanel');
+        function updateMusicPanel() {
+            const open = readPreference('music', window.innerWidth >= 900);
+            musicPanel.hidden = !open;
+            musicToggle.setAttribute('aria-expanded', String(open));
+            if (!open) document.getElementById('timerPlayerLayout').style.setProperty('grid-template-columns', 'minmax(0, 1fr)', 'important');
+            window.dispatchEvent(new Event('timer:layoutchange'));
+        }
+        document.getElementById('timerQuickSelect').addEventListener('change', event => {
+            if (event.target.value) window.location.assign(event.target.value);
+        });
+        musicToggle.addEventListener('click', () => { savePreference('music', musicPanel.hidden); updateMusicPanel(); });
+        updateMusicPanel();
+        if (!soundEnabled) { soundIcon.className = 'fas fa-volume-mute'; btnSoundToggle.classList.add('muted'); }
+        btnSoundToggle.setAttribute('aria-pressed', String(soundEnabled));
 
         // =========================================================================
         // Robust CSRF Helper
@@ -1089,7 +1127,7 @@
         // Screen Wake Lock API Management
         // =========================================================================
         let wakeLockSentinel = null;
-        let wakeLockUserDisabled = false;
+        let wakeLockUserDisabled = !readPreference('awake', true);
 
         async function acquireWakeLock() {
             if ('wakeLock' in navigator) {
@@ -1127,9 +1165,11 @@
             if (!wakeLockBadge) return;
             if (isActive) {
                 wakeLockBadge.classList.add('active');
+                wakeLockBadge.setAttribute('aria-pressed', 'true');
                 if (wakeLockStatusText) wakeLockStatusText.textContent = 'Screen Awake';
             } else {
                 wakeLockBadge.classList.remove('active');
+                wakeLockBadge.setAttribute('aria-pressed', 'false');
                 if (wakeLockStatusText) wakeLockStatusText.textContent = 'Screen Normal';
             }
         }
@@ -1138,9 +1178,11 @@
             wakeLockBadge.addEventListener('click', () => {
                 if (wakeLockSentinel) {
                     wakeLockUserDisabled = true;
+                    savePreference('awake', false);
                     releaseWakeLock();
                 } else {
                     wakeLockUserDisabled = false;
+                    savePreference('awake', true);
                     acquireWakeLock();
                 }
             });
@@ -1208,6 +1250,7 @@
         }
 
         function toggleFullscreen() {
+            savePreference('coaching', !isFullscreenActive());
             if (isFullscreenActive()) {
                 exitFullscreen();
             } else {
@@ -1222,7 +1265,7 @@
                 if (btnFullscreenToggle) btnFullscreenToggle.classList.add('active');
             } else {
                 if (fsIcon) fsIcon.className = 'fas fa-expand';
-                if (fsText) fsText.textContent = 'Fullscreen';
+                if (fsText) fsText.textContent = 'Coaching mode';
                 if (btnFullscreenToggle) btnFullscreenToggle.classList.remove('active');
             }
         }
@@ -1295,6 +1338,8 @@
         function toggleSound() {
             initAudio();
             soundEnabled = !soundEnabled;
+            savePreference('sound', soundEnabled);
+            btnSoundToggle.setAttribute('aria-pressed', String(soundEnabled));
             if (soundEnabled) {
                 if (soundIcon) soundIcon.className = 'fas fa-volume-up';
                 if (btnSoundToggle) {
@@ -1396,7 +1441,19 @@
         // =========================================================================
         // Timer Engine
         // =========================================================================
+        let completionReset = null;
+        function scheduleCompletionReset() {
+            if (completionReset !== null) return;
+            completionReset = setTimeout(() => {
+                completionReset = null;
+                if (localTimerState.status === 'DONE') sendAction('complete');
+            }, 1500);
+        }
         function updateLocalTimerState(timer) {
+            if (completionReset !== null && timer.status !== 'DONE') {
+                clearTimeout(completionReset);
+                completionReset = null;
+            }
             if (timer.server_time) {
                 const serverTime = new Date(timer.server_time);
                 window.timerSkewOffset = serverTime.getTime() - Date.now();
@@ -1416,6 +1473,7 @@
                 acquireWakeLock();
             }
             renderLocalState();
+            if (timer.status === 'DONE') scheduleCompletionReset();
         }
 
         function tick() {
@@ -1443,6 +1501,7 @@
                 clearInterval(timerInterval);
                 timerInterval = null;
                 localTimerState.status = 'DONE';
+                scheduleCompletionReset();
                 localTimerState.time_remaining = 0;
             }
             
@@ -1558,7 +1617,16 @@
             }
         }
 
-        async function sendAction(actionName) {
+        let actionPending = false;
+        async function sendAction(actionName, confirmation = {}) {
+            if (actionPending) {
+                if (actionName === 'complete') scheduleCompletionReset();
+                return;
+            }
+            actionPending = true;
+            const actionError = document.getElementById('timerActionError');
+            actionError.hidden = true;
+            if (actionName === 'start' && readPreference('coaching', false) && !isFullscreenActive()) enterFullscreen();
             initAudio();
             const token = getCsrfToken();
             try {
@@ -1569,20 +1637,24 @@
                         'X-CSRFToken': token,
                         'X-Requested-With': 'XMLHttpRequest'
                     },
-                    body: JSON.stringify({ action: actionName })
+                    body: JSON.stringify({ action: actionName, ...confirmation })
                 });
                 
-                if (!res.ok) {
-                    const text = await res.text();
-                    console.error(`Action ${actionName} failed (${res.status}):`, text);
+                const data = await res.json();
+                if (res.status === 409 && data.confirmation_required) {
+                    if (window.confirm(data.message)) {
+                        actionPending = false;
+                        return await sendAction(actionName, data.confirmation);
+                    }
                     return;
                 }
-                
-                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || `Timer action failed (${res.status})`);
                 updateLocalTimerState(data);
             } catch (e) {
+                actionError.textContent = 'Could not update timer. Please try again.';
+                actionError.hidden = false;
                 console.error(`Error sending action ${actionName}:`, e);
-            }
+            } finally { actionPending = false; }
         }
 
         // =========================================================================
@@ -1594,7 +1666,7 @@
 
         // Keyboard Shortcuts
         document.addEventListener('keydown', (e) => {
-            if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
+            if (e.repeat || e.ctrlKey || e.metaKey || e.altKey || e.target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON', 'A'].includes(e.target.tagName)) return;
 
             if (e.code === 'Space') {
                 e.preventDefault();
@@ -1631,22 +1703,19 @@
         // Initial setup
         updateLocalTimerState(localTimerState);
 
-        // Auto-activate Fullscreen and Screen Wake Lock as soon as the timer opens.
-        // Browsers often require a user gesture to grant fullscreen, so we also
-        // retry on the very first click/keypress/touch if the initial attempt is blocked.
-        acquireWakeLock();
-        enterFullscreen();
-        if (!isFullscreenActive()) {
-            const autoFullscreenRetry = () => {
-                if (!isFullscreenActive()) enterFullscreen();
-                document.removeEventListener('click', autoFullscreenRetry);
-                document.removeEventListener('keydown', autoFullscreenRetry);
-                document.removeEventListener('touchstart', autoFullscreenRetry);
-            };
-            document.addEventListener('click', autoFullscreenRetry, { once: true });
-            document.addEventListener('keydown', autoFullscreenRetry, { once: true });
-            document.addEventListener('touchstart', autoFullscreenRetry, { once: true });
+        // Fullscreen is explicit; a remembered preference applies on Start only.
+        if (!wakeLockUserDisabled) acquireWakeLock();
+        document.getElementById('btnTestSound').addEventListener('click', () => {
+            if (!soundEnabled) { showAudioNotice('Enable timer sound to test it.'); return; }
+            initAudio();
+            playTestChirp();
+        });
+        function showAudioNotice(message) {
+            const notice = document.getElementById('timerActionError');
+            notice.textContent = message;
+            notice.hidden = false;
         }
+
     });
 </script>
 
@@ -1654,13 +1723,13 @@
 {% if spotify_configured %}
 <script>
     document.addEventListener('DOMContentLoaded', () => {
-        const panel = document.getElementById('spotifyPanel');
+        const panel = document.getElementById('timerSidePanel');
         if (!panel) return;
 
         const layout = document.getElementById('timerPlayerLayout');
         const stage = layout.querySelector('.timer-core-section');
         function applyMusicLayout() {
-            const wide = window.innerWidth >= 900;
+            const wide = window.innerWidth >= 900 && !panel.hidden;
             const card = document.getElementById('timerCard');
             const fullscreen = card.classList.contains('is-fullscreen') ||
                 document.fullscreenElement === card || document.webkitFullscreenElement === card;
@@ -1692,6 +1761,7 @@
         }
         applyMusicLayout();
         window.addEventListener('resize', applyMusicLayout);
+        window.addEventListener('timer:layoutchange', applyMusicLayout);
         document.addEventListener('fullscreenchange', applyMusicLayout);
         document.addEventListener('webkitfullscreenchange', applyMusicLayout);
         new MutationObserver(applyMusicLayout).observe(document.getElementById('timerCard'), {
