@@ -304,7 +304,7 @@ def spotify_control(request):
     playlist_uri = data.get('playlist_uri')
     device_id = data.get('device_id')
 
-    if action not in ('play', 'resume', 'pause', 'stop', 'next', 'previous', 'shuffle', 'repeat', 'seek'):
+    if action not in ('play', 'resume', 'pause', 'stop', 'next', 'previous', 'shuffle', 'repeat', 'seek', 'volume'):
         return JsonResponse({'error': 'Invalid or missing action'}, status=400)
 
     if action == 'shuffle' and not isinstance(data.get('state'), bool):
@@ -315,6 +315,10 @@ def spotify_control(request):
         position = data.get('position_ms')
         if isinstance(position, bool) or not isinstance(position, int) or position < 0:
             return JsonResponse({'error': 'Seek position must be a nonnegative integer'}, status=400)
+    if action == 'volume':
+        volume = data.get('volume_percent')
+        if type(volume) is not int or not 0 <= volume <= 100:
+            return JsonResponse({'error': 'Volume must be an integer between 0 and 100'}, status=400)
 
     if playlist_uri:
         account.last_playlist_uri = playlist_uri
@@ -343,6 +347,8 @@ def spotify_control(request):
             spotify_client.set_repeat(account, data['state'], device_id=device_id)
         elif action == 'seek':
             spotify_client.seek_playback(account, data['position_ms'], device_id=device_id)
+        elif action == 'volume':
+            spotify_client.set_volume(account, volume, device_id=device_id)
     except SpotifyPlaybackError as exc:
         return JsonResponse({'error': str(exc)}, status=409)
     except Exception as exc:

@@ -193,6 +193,7 @@ def get_playback_state(account) -> Dict[str, Any]:
         return {"active": False}
     body = response.json()
     item = body.get("item") or {}
+    device = body.get("device") or {}
     return {
         "active": bool(item), "is_playing": body.get("is_playing", False),
         "progress_ms": body.get("progress_ms") or 0,
@@ -202,7 +203,9 @@ def get_playback_state(account) -> Dict[str, Any]:
         "shuffle_state": body.get("shuffle_state", False),
         "repeat_state": body.get("repeat_state", "off"),
         "context_uri": (body.get("context") or {}).get("uri"),
-        "device_id": (body.get("device") or {}).get("id"),
+        "device_id": device.get("id"),
+        "volume_percent": device.get("volume_percent"),
+        "supports_volume": device.get("supports_volume", False) and not device.get("is_restricted", False),
         "disallows": (body.get("actions") or {}).get("disallows", {}),
     }
 
@@ -230,5 +233,14 @@ def seek_playback(account, position_ms: int, device_id: Optional[str] = None) ->
     if device_id:
         params["device_id"] = device_id
     response = requests.put(f"{API_BASE_URL}/me/player/seek", params=params,
+                            headers=_auth_headers(account), timeout=15)
+    _raise_for_playback_error(response)
+
+
+def set_volume(account, volume_percent: int, device_id: Optional[str] = None) -> None:
+    params = {"volume_percent": volume_percent}
+    if device_id:
+        params["device_id"] = device_id
+    response = requests.put(f"{API_BASE_URL}/me/player/volume", params=params,
                             headers=_auth_headers(account), timeout=15)
     _raise_for_playback_error(response)

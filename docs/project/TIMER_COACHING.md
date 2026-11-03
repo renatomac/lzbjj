@@ -8,8 +8,11 @@
 - Device-local preferences for music visibility, sound, screen awake and coaching
   mode. Storage failures fall back safely. Preferences are independent of Spotify
   account/device authorization, which remains unchanged.
-- Opening a timer no longer forces fullscreen. Coaching mode enters fullscreen
-  explicitly; a saved preference may enter it on Start (a user gesture).
+- Coaching mode defaults off and is enabled explicitly. Once enabled, it is
+  restored on page load and timer selection. Native fullscreen exits caused by
+  navigation or reset confirmation retain the full-window coaching layout.
+  Only explicitly disabling coaching mode clears the saved preference. Browsers
+  that block native fullscreen after navigation use the existing CSS fallback.
 - Test sound button; sound enabled does not guarantee browser audio permission.
 - Keyboard controls ignore focused interactive fields/links/buttons, modifiers,
   editable content and repeated keydown events.
@@ -50,3 +53,8 @@ Additional validation: 27 timer/template tests and Django checks pass; no model
 drift. Tests cover selector ownership, finished and elapsed completion, duplicate
 completion, and rejection of unfinished/restarted timer resets. Rendered timer
 JavaScript syntax passed with Spotify configured. No new schema migration.
+
+Reset/switch confirmation now uses an in-page HTML dialog within the timer
+card. Browser-native confirm popups were removed because they can exit native
+fullscreen. Confirmation uses the same server-side safeguards. Targeted tests
+pass; physical-device native-fullscreen verification remains manual.

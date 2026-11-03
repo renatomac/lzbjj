@@ -635,6 +635,7 @@
     /* Timer and music share the fullscreen card, with independent columns. */
     .timer-app-wrapper { max-width: 1440px; }
     .timer-player-layout {
+        position: relative;
         display: grid;
         grid-template-columns: minmax(0, 1fr) minmax(290px, 360px);
         align-items: center;
@@ -643,6 +644,21 @@
         min-height: 0;
     }
     .timer-player-layout .timer-core-section { min-width: 0; padding: 12px; }
+    .timer-checkmat-logo {
+        display: block;
+        width: clamp(56px, 10vw, 96px);
+        height: auto;
+        margin: 0 auto 8px;
+    }
+    @media (min-width: 1200px) and (min-height: 650px) {
+        .timer-checkmat-logo {
+            position: absolute;
+            top: 30px;
+            left: 6%;
+            width: clamp(150px, 14vw, 224px);
+            margin: 0;
+        }
+    }
     .timer-player-layout .spotify-panel { margin: 0; width: 100%; min-width: 0; }
     .spotify-selectors { flex-direction: column; align-items: stretch; }
     .spotify-selectors .spotify-select { width: 100%; min-width: 0; }
@@ -745,6 +761,7 @@
         <div id="timerPlayerLayout" class="timer-player-layout" style="display:grid; grid-template-columns:minmax(0,1fr) 340px; align-items:center; gap:20px; padding:16px; min-height:0;" data-layout-version="spotify-side-v2">
         <!-- Core Display Stage -->
         <div class="timer-core-section">
+            <img class="timer-checkmat-logo" src="{% static 'crm/img/checkmat200x200.png' %}" alt="Checkmat" width="200" height="200">
 
             <!-- Live Wall Clock -->
             <div id="wallClock" class="wall-clock" title="Current time">
@@ -843,6 +860,11 @@
                         <input id="spotifySeek" type="range" min="0" max="0" value="0" step="1000" aria-label="Song position" disabled>
                         <span id="spotifyDuration">0:00</span>
                     </div>
+                    <div class="spotify-seek-row mt-2">
+                        <label for="spotifyVolume">Spotify volume</label>
+                        <input id="spotifyVolume" type="range" min="0" max="100" value="0" disabled>
+                        <span id="spotifyVolumeValue">—</span>
+                    </div>
                 </div>
                 <p id="spotifyErrorText" role="alert" class="spotify-status-text text-danger mt-2 mb-0 d-none"></p>
                 {% else %}
@@ -863,6 +885,16 @@
 
         <p class="timer-workout-summary">{{ timer.rounds }} rounds · {{ timer.work_label }} work · {{ timer.rest_label }} rest · {{ timer.total_label }} total</p>
         <p id="timerActionError" class="timer-action-error" role="alert" hidden></p>
+        <dialog id="timerConfirmation" class="timer-confirmation" aria-labelledby="timerConfirmationTitle" aria-describedby="timerConfirmationMessage">
+            <form method="dialog">
+                <h2 id="timerConfirmationTitle">Confirm timer action</h2>
+                <p id="timerConfirmationMessage"></p>
+                <div class="timer-confirmation-actions">
+                    <button type="submit" value="cancel" class="btn btn-outline-secondary" autofocus>Keep current workout</button>
+                    <button type="submit" value="confirm" class="btn btn-danger">Confirm</button>
+                </div>
+            </form>
+        </dialog>
         <!-- Footer Bar with Keyboard Hints -->
         <div class="timer-footer">
             <div class="d-flex align-items-center gap-3">
@@ -1271,7 +1303,9 @@
         }
 
         function handleFullscreenChange() {
-            const active = isNativeFullscreen();
+            // Navigation and browser confirmation dialogs may end native
+            // fullscreen. Keep the coaching layout until explicitly turned off.
+            const active = isNativeFullscreen() || readPreference('coaching', false);
             if (active) {
                 timerCard.classList.add('is-fullscreen');
                 document.body.classList.add('timer-in-fullscreen');
@@ -1361,15 +1395,36 @@
             btnSoundToggle.addEventListener('click', toggleSound);
         }
 
+        {# Round bell: SFXMint Double Strike Boxing Round Bell 05 (CC0 1.0). #}
+        const finishBell = new Audio('{% static "crm/boxing-finish-bell.wav" %}');
+        finishBell.preload = 'auto';
+
         function playBeep(type) {
             if (!soundEnabled) return;
 
-            if (type === 'end' && localTimerState.sound_file_url) {
-                const audio = new Audio(localTimerState.sound_file_url);
-                audio.play().catch(e => console.error("Error playing custom audio", e));
+            if (type === 'end' || type === 'rest') {
+                const customSound = type === 'end' && localTimerState.sound_file_url;
+                const audio = customSound ? new Audio(customSound) : finishBell;
+                audio.currentTime = 0;
+                audio.play().catch(async () => {
+                    if (!soundEnabled) return;
+                    if (customSound) {
+                        try {
+                            finishBell.currentTime = 0;
+                            await finishBell.play();
+                            return;
+                        } catch {
+                            // Fall back to the synthesized cue if the file cannot play.
+                        }
+                    }
+                    if (soundEnabled) playSynthesizedBeep(type);
+                });
                 return;
             }
+            playSynthesizedBeep(type);
+        }
 
+        function playSynthesizedBeep(type) {
             initAudio();
             if (!audioCtx) return;
 
@@ -1618,6 +1673,15 @@
         }
 
         let actionPending = false;
+        function confirmTimerAction(message) {
+            const dialog = document.getElementById('timerConfirmation');
+            document.getElementById('timerConfirmationMessage').textContent = message;
+            dialog.returnValue = 'cancel';
+            return new Promise(resolve => {
+                dialog.addEventListener('close', () => resolve(dialog.returnValue === 'confirm'), { once: true });
+                dialog.showModal();
+            });
+        }
         async function sendAction(actionName, confirmation = {}) {
             if (actionPending) {
                 if (actionName === 'complete') scheduleCompletionReset();
@@ -1642,7 +1706,7 @@
                 
                 const data = await res.json();
                 if (res.status === 409 && data.confirmation_required) {
-                    if (window.confirm(data.message)) {
+                    if (await confirmTimerAction(data.message)) {
                         actionPending = false;
                         return await sendAction(actionName, data.confirmation);
                     }
@@ -1703,7 +1767,9 @@
         // Initial setup
         updateLocalTimerState(localTimerState);
 
-        // Fullscreen is explicit; a remembered preference applies on Start only.
+        // Restore the saved coaching layout after selecting another timer.
+        // Native fullscreen may require a gesture; enterFullscreen has a CSS fallback.
+        if (readPreference('coaching', false)) enterFullscreen();
         if (!wakeLockUserDisabled) acquireWakeLock();
         document.getElementById('btnTestSound').addEventListener('click', () => {
             if (!soundEnabled) { showAudioNotice('Enable timer sound to test it.'); return; }
@@ -1778,6 +1844,8 @@
         const btnShuffle = document.getElementById('btnSpotifyShuffle');
         const btnRepeat = document.getElementById('btnSpotifyRepeat');
         const seek = document.getElementById('spotifySeek');
+        const volume = document.getElementById('spotifyVolume');
+        const volumeValue = document.getElementById('spotifyVolumeValue');
         const elapsed = document.getElementById('spotifyElapsed');
         const duration = document.getElementById('spotifyDuration');
         const trackInfo = document.getElementById('spotifyTrackInfo');
@@ -1905,6 +1973,14 @@
                     : !!disallows[restriction]);
             });
             seek.disabled = busy || !playback.duration_ms || !!disallows.seeking;
+            const volumeAvailable = playback.supports_volume && Number.isInteger(playback.volume_percent)
+                && !!playback.device_id && (!deviceSelect.value || deviceSelect.value === playback.device_id);
+            volume.disabled = busy || !!roundVolume || !volumeAvailable;
+            if (!volumeAvailable || Number(volume.dataset.synced) !== playback.volume_percent) {
+                volume.value = volumeAvailable ? playback.volume_percent : 0;
+                volume.dataset.synced = volumeAvailable ? playback.volume_percent : '';
+                volumeValue.textContent = volumeAvailable ? `${volume.value}%` : '—';
+            }
             duration.textContent = formatMusicTime(playback.duration_ms);
             if (!dragging) {
                 seek.max = Math.max(0, playback.duration_ms - 1);
@@ -1936,6 +2012,68 @@
             finally { polling = false; }
         }
         playlistSelect.addEventListener('change', () => { playlistChanged = true; });
+        let roundVolume = null;
+        let nextVolumeAttempt = 0;
+
+        async function syncRoundVolume() {
+            const timer = window.lastRenderedState;
+            if (!timer || !connected || busy || performance.now() < nextVolumeAttempt) return;
+
+            if (roundVolume) {
+                const now = performance.now();
+                const sameInterval = timer.status === 'RUNNING' &&
+                    timer.current_round === roundVolume.round && timer.current_state === roundVolume.phase;
+                if (sameInterval) {
+                    const step = Math.max(1, Math.min(3, 4 - Math.ceil(timer.time_remaining)));
+                    await setRoundVolumeStep(roundVolume.normal - (roundVolume.normal - roundVolume.low) * step / 3);
+                    return;
+                }
+
+                if (!roundVolume.restoreAfter) {
+                    // Keep the music low through the cue at the transition.
+                    roundVolume.restoreAfter = now + (timer.status === 'DONE' ? 3000 : 2000);
+                    roundVolume.restoreFrom = roundVolume.sent;
+                }
+                if (now < roundVolume.restoreAfter) return;
+
+                const step = Math.min(3, 1 + Math.floor((now - roundVolume.restoreAfter) / 500));
+                const target = roundVolume.restoreFrom + (roundVolume.normal - roundVolume.restoreFrom) * step / 3;
+                if (await setRoundVolumeStep(target) && step === 3) {
+                    roundVolume = null;
+                }
+                return;
+            }
+
+            if (timer.status !== 'RUNNING' || !['WORK', 'REST'].includes(timer.current_state) ||
+                timer.time_remaining <= 0 || timer.time_remaining > 3 ||
+                !playback.is_playing || volume.disabled || playback.volume_percent === 0) return;
+
+            roundVolume = {
+                round: timer.current_round,
+                phase: timer.current_state,
+                device: playback.device_id,
+                normal: playback.volume_percent,
+                low: Math.floor(playback.volume_percent / 2),
+                sent: playback.volume_percent,
+                restoreAfter: 0
+            };
+            await syncRoundVolume();
+        }
+
+        async function setRoundVolumeStep(target) {
+            const volumePercent = Math.round(target);
+            if (volumePercent === roundVolume.sent) return true;
+            if (await sendSpotifyAction('volume', {
+                device_id: roundVolume.device,
+                volume_percent: volumePercent
+            })) {
+                roundVolume.sent = volumePercent;
+                return true;
+            }
+            nextVolumeAttempt = performance.now() + 2000;
+            return false;
+        }
+
         async function sendSpotifyAction(action, extra = {}) {
             if (busy) return;
             const requestAction = action === 'play' && playback.active && !playlistChanged ? 'resume' : action;
@@ -1961,10 +2099,23 @@
                 if (action === 'shuffle') playback.shuffle_state = extra.state;
                 if (action === 'repeat') playback.repeat_state = extra.state;
                 if (action === 'seek') playback.progress_ms = extra.position_ms;
-                sampledAt = performance.now();
+                if (action === 'volume') {
+                    if (extra.device_id === playback.device_id) playback.volume_percent = extra.volume_percent;
+                } else {
+                    sampledAt = performance.now();
+                }
                 settleUntil = performance.now() + 1500;
-            } catch (e) { showSpotifyError(e.message); }
-            finally { busy = false; renderPlayback(); await refreshPlayback(); }
+                return true;
+            } catch (e) {
+                showSpotifyError(e.message);
+                return false;
+            }
+            finally {
+                if (action === 'volume') delete volume.dataset.synced;
+                busy = false;
+                renderPlayback();
+                refreshPlayback();
+            }
         }
         btnPlay.addEventListener('click', () => sendSpotifyAction(playback.is_playing ? 'pause' : 'play'));
         btnNext.addEventListener('click', () => sendSpotifyAction('next'));
@@ -1975,12 +2126,23 @@
             sendSpotifyAction('repeat', { state: modes[(modes.indexOf(playback.repeat_state || 'off') + 1) % 3] });
         });
         seek.addEventListener('input', () => { dragging = true; elapsed.textContent = formatMusicTime(Number(seek.value)); });
+        volume.addEventListener('input', () => { volumeValue.textContent = `${volume.value}%`; });
+        volume.addEventListener('change', () => {
+            if (!volume.disabled) {
+                sendSpotifyAction('volume', { volume_percent: Number(volume.value), device_id: playback.device_id });
+            }
+        });
         seek.addEventListener('change', () => {
             const position_ms = Math.max(0, Math.min(playback.duration_ms - 1, Math.round(Number(seek.value))));
             dragging = false;
             sendSpotifyAction('seek', { position_ms });
         });
-        setInterval(() => { if (connected && !document.hidden) renderPlayback(); }, 250);
+        setInterval(() => {
+            if (connected) {
+                if (!document.hidden) renderPlayback();
+                syncRoundVolume();
+            }
+        }, 250);
         setInterval(refreshPlayback, 5000);
         document.addEventListener('visibilitychange', () => {
             if (!document.hidden && connected) { refreshPlayback(); loadSpotifyDevices(); }

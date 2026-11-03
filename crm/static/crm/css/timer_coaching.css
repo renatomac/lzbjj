@@ -21,6 +21,12 @@
 .timer-switch-card p { font-size: .72rem; line-height: 1.5; color: #aebccd; margin: .65rem 0 0; }
 .timer-app-wrapper .timer-workout-summary { color: #aebccd; text-align: center; margin: .5rem 1rem 1rem; font-size: .85rem; }
 .timer-app-wrapper .timer-action-error { margin: .5rem 1rem; padding: .75rem; border: 1px solid #d89191; color: #ffe1e1; background: #4a2020; border-radius: 8px; }
+.timer-confirmation { width: min(460px, calc(100vw - 2rem)); padding: 1.5rem; border: 1px solid #425066; border-radius: 14px; background: #17202c; color: #f1f5f9; box-shadow: 0 20px 60px #0008; }
+.timer-confirmation::backdrop { background: #0009; }
+.timer-confirmation h2 { font: 700 1.15rem system-ui, sans-serif; margin: 0 0 1rem; }
+.timer-confirmation p { font: .95rem/1.6 system-ui, sans-serif; }
+.timer-confirmation-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .75rem; margin-top: 1.5rem; }
+.timer-confirmation .btn-outline-secondary { color: #e2e8f0; border-color: #64748b; }
 .timer-app-wrapper .controls-wrapper .btn-timer { min-height: 52px; }
 @media (max-width: 575px) {
   .timer-app-wrapper .timer-toolbar { padding: 1rem; }
