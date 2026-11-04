@@ -69,15 +69,37 @@ class VisitorRosterLifecycleTests(TestCase):
         self.visitor.sync_future_sessions()
         self.assertTrue(SessionAttendance.objects.filter(pk=checked.pk, present=True).exists())
 
-    def test_inactive_sync_preserves_manual_future_visit(self):
-        future = self.sessions[8]
+    def test_deactivation_clears_today_and_future_rosters_until_reactivation(self):
+        past_session = ClassSession.objects.create(
+            class_template=self.sessions[0].class_template,
+            date=self.today - timedelta(days=1),
+        )
+        past_attendance = SessionAttendance.objects.create(
+            session=past_session, member=self.visitor, present=True
+        )
         manual = SessionAttendance.objects.create(
-            session=future, member=self.visitor, present=False, is_automatic=False
+            session=self.sessions[8], member=self.visitor, present=False, is_automatic=False
         )
         self.visitor.is_active = False
         self.visitor.save(update_fields=["is_active"])
-        self.visitor.sync_future_sessions()
-        self.assertTrue(SessionAttendance.objects.filter(pk=manual.pk).exists())
+        self.assertFalse(SessionAttendance.objects.filter(pk=manual.pk).exists())
+        self.assertEqual(
+            list(SessionAttendance.objects.filter(member=self.visitor)),
+            [past_attendance],
+        )
+
+        from crm.utils import create_attendance_for_session
+        create_attendance_for_session(self.sessions[0])
+        self.assertFalse(SessionAttendance.objects.filter(
+            member=self.visitor, session=self.sessions[0]
+        ).exists())
+
+        self.visitor.is_active = True
+        self.visitor.lifecycle_status = Member.LifecycleStatus.TRIAL
+        self.visitor.save(update_fields=["is_active", "lifecycle_status"])
+        self.assertEqual(set(SessionAttendance.objects.filter(
+            member=self.visitor, session__date__gte=self.today
+        ).values_list("session_id", flat=True)), {self.sessions[0].pk, self.sessions[6].pk})
 
     def test_expired_auto_entry_is_removed(self):
         future = self.sessions[8]
@@ -95,6 +117,7 @@ class VisitorRosterLifecycleTests(TestCase):
             with self.assertRaises(ValidationError):
                 record_member_attendance(session, self.visitor)
             SessionAttendance.objects.create(session=session, member=self.visitor, present=False)
+            self.visitor.sync_future_sessions()
             record_member_attendance(session, self.visitor)
             record_member_attendance(session, self.visitor)
         self.assertEqual(SessionAttendance.objects.filter(

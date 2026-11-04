@@ -226,6 +226,7 @@ class Member(models.Model):
     def __str__(self):
         return f"{self.first_name} {self.last_name} ({self.belt_rank})"
 
+    @transaction.atomic
     def save(self, *args, **kwargs):
         if self.pk:
             previous = type(self).objects.filter(pk=self.pk).values('belt_rank').first()
@@ -426,7 +427,7 @@ class Member(models.Model):
         """
         return self.age is not None and self.age < 16
     
-    def sync_future_sessions(self):
+    def sync_future_sessions(self, *, deactivated=False):
         """
         Ensure this member is enrolled ONLY in the future sessions
         they are allowed to attend based on member_type and membership dates.
@@ -435,19 +436,19 @@ class Member(models.Model):
         # Trial visitors are automatically listed only during the free-trial period.
         visitor_until = self.trial_expires_on if not self.plan_id else None
 
-        # Optional: handle inactive members
         if not self.is_active:
-            removed = SessionAttendance.objects.filter(
+            attendance = SessionAttendance.objects.filter(
                 member=self,
-                is_automatic=True,
-                present=False,
                 session__date__gte=today,
-            ).delete()[0]
+            )
+            if not deactivated:
+                attendance = attendance.filter(is_automatic=True, present=False)
+            removed = attendance.delete()[0]
             return {"added": 0, "removed": removed}
 
         # Determine allowed class types
         if self.member_type == "child":
-            allowed_types = ["kids"]
+            allowed_types = ["kids", "open"]
         elif self.member_type == self.TRANSITIONING:
             allowed_types = ["kids", "adult", "open"]
         else:

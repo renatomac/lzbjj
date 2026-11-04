@@ -33,7 +33,9 @@ def member_post_save(sender, instance, created, **kwargs):
         or instance.membership_start_date != instance._old_start_date
         or instance.membership_end_date != instance._old_end_date
     ):
-        instance.sync_future_sessions()
+        instance.sync_future_sessions(
+            deactivated=instance._old_is_active and not instance.is_active,
+        )
 
 
 

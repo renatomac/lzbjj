@@ -88,6 +88,7 @@ def dedupe_session_attendance(session):
     return len(delete_ids)
 
 
+@transaction.atomic
 def create_attendance_for_session(session):
     dedupe_session_attendance(session)
 
@@ -109,7 +110,8 @@ def create_attendance_for_session(session):
         Q(plan__isnull=False) | Q(trial_expires_on__isnull=True) | Q(trial_expires_on__gt=session.date),
     )
 
-    for member in active_members:
+    # Serialize roster creation with changes to member status.
+    for member in active_members.order_by("pk").select_for_update():
         SessionAttendance.objects.get_or_create(
             session=session,
             member=member,
