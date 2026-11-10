@@ -13,7 +13,7 @@
             --gold:    #c8960c;
             --white:   #f0ece4;
             --dark:    #080608;
-            --mid:     #110d10;
+            --mid:     #b63195;
         }
 
         * {
@@ -37,27 +37,14 @@
             position: relative;
         }
 
-        /* ── LOGO WATERMARK ─────────────────────────────────────── */
-        .bg-logo {
+        .receiver-logo {
             position: absolute;
-            inset: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            pointer-events: none;
-            z-index: 0;
-        }
-        .bg-logo img {
-            width: min(72vw, 72vh);
+            top: 5vh;
+            left: 5vw;
+            width: min(14vw, 24vh);
             height: auto;
-            opacity: 0.07;
-            filter: grayscale(1) brightness(2);
-            /* subtle slow pulse so the logo feels alive */
-            animation: logoPulse 8s ease-in-out infinite alternate;
-        }
-        @keyframes logoPulse {
-            0%   { opacity: 0.05; transform: scale(1); }
-            100% { opacity: 0.11; transform: scale(1.03); }
+            pointer-events: none;
+            z-index: 5;
         }
 
         /* ── VIGNETTE ───────────────────────────────────────────── */
@@ -279,7 +266,7 @@
             font-size: clamp(4.6rem, 8.6vw, 9.3rem);
             letter-spacing: 0.08em;
             color: var(--gold);
-            text-shadow: 0 0 24px rgba(200, 150, 12, 0.5);
+            text-shadow: 0 0 24px rgba(247, 246, 243, 0.99);
             font-variant-numeric: tabular-nums;
             margin-bottom: 0.1em;
             line-height: 1;
@@ -302,12 +289,7 @@
 </head>
 <body>
 
-    <!-- Logo watermark -->
-    <div class="bg-logo">
-        <img src="{% static 'crm/img/LZBJJ_White.png' %}"
-             alt=""
-             onerror="this.style.display='none'">
-    </div>
+    <img class="receiver-logo" src="{% static 'crm/img/checkmat200x200.png' %}" alt="Checkmat">
 
     <!-- Atmosphere layers -->
     <div class="vignette"></div>

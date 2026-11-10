@@ -1,6 +1,6 @@
 {% load static %}
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
@@ -122,7 +122,7 @@
         /* ── PHASE LABEL (WORK / REST / READY) ──────────────────── */
         .phase-label {
             font-family: 'Oswald', sans-serif;
-            font-size: clamp(1.8rem, 5vw, 4.5rem);
+            font-size: clamp(1.26rem, 3.5vw, 3.15rem);
             font-weight: 700;
             letter-spacing: 0.35em;
             text-transform: uppercase;
@@ -285,11 +285,50 @@
             from { background-position: 200% center; }
             to   { background-position: -200% center; }
         }
+
+        /* Keep content inside a TV's overscan-safe area at 720p through 4K. */
+        body { padding: 5vh 5vw; }
+        .stage { height: 100%; padding: 0; gap: 2vh; min-width: 0; }
+        .receiver-logo { top: 5vh; left: 5vw; width: min(12vw, 19vh); }
+        .wall-clock {
+            font-size: min(5vw, 8vh);
+            letter-spacing: .025em;
+            white-space: nowrap;
+            margin: 0 0 1vh;
+            text-shadow: 0 0 12px rgba(200,150,12,.3);
+        }
+        .phase-label { flex-shrink: 0; margin: 0; letter-spacing: .22em; text-align: center; max-width: 85%; }
+        .timer-digits {
+            font-size: min(27vw, 43vh);
+            line-height: 1;
+            letter-spacing: .025em;
+            white-space: nowrap;
+            font-variant-numeric: tabular-nums;
+        }
+        .round-info { font-size: min(2.8vw, 4.5vh); margin: 0; color: #a5a0a5; text-align: center; }
+        .status-bar {
+            bottom: 5vh; left: 5vw; right: 5vw;
+            height: 3vh; min-height: 18px; padding: 0;
+            background: transparent; border: 0;
+        }
+        .status-bar .label { font-size: clamp(8px, .8vw, 18px); color: #aaa; }
+        .status-bar .brand { font-size: clamp(12px, 1.2vw, 26px); }
+        .bracket { width: 3vw; height: 5vh; }
+        .bracket.tl { top: 3vh; left: 3vw; }
+        .bracket.tr { top: 3vh; right: 3vw; }
+        .bracket.bl { bottom: 3vh; left: 3vw; }
+        .bracket.br { bottom: 3vh; right: 3vw; }
+        .h-line.top { top: 3vh; }
+        .h-line.bottom { bottom: 3vh; }
+        @media (max-aspect-ratio: 4/3) {
+            .receiver-logo { width: min(14vw, 14vh); }
+            .timer-digits { font-size: min(27vw, 38vh); }
+        }
     </style>
 </head>
 <body>
 
-    <img class="receiver-logo" src="{% static 'crm/img/checkmat200x200.png' %}" alt="Checkmat">
+    <img class="receiver-logo" src="{% static 'timerapp/checkmat200x200.png' %}" alt="Checkmat">
 
     <!-- Atmosphere layers -->
     <div class="vignette"></div>
@@ -307,7 +346,7 @@
 
     <!-- Main display -->
     <div class="stage">
-        <div class="wall-clock" id="wallClock">00:00:00</div>
+        <div class="wall-clock" id="wallClock">12:00:00 AM</div>
         <div class="phase-label phase-ready" id="timerLabel">READY</div>
         <div class="timer-digits" id="timerDisplay">00:00</div>
         <div class="round-info" id="roundInfo">ROUND &nbsp;<span>—</span>&nbsp;/&nbsp;<span>—</span></div>
@@ -340,10 +379,11 @@
         function updateWallClock() {
             if (!clockEl) return;
             const now = new Date();
-            const h = now.getHours().toString().padStart(2, '0');
+            const hours = now.getHours();
+            const h = (hours % 12 || 12).toString().padStart(2, '0');
             const m = now.getMinutes().toString().padStart(2, '0');
             const s = now.getSeconds().toString().padStart(2, '0');
-            clockEl.textContent = `${h}:${m}:${s}`;
+            clockEl.textContent = `${h}:${m}:${s} ${hours >= 12 ? 'PM' : 'AM'}`;
         }
         updateWallClock();
         setInterval(updateWallClock, 1000);
