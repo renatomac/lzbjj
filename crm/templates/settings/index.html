@@ -4,19 +4,15 @@
 {% block content %}
 <div class="container-xl px-0">
     <h1 class="h3 mb-4">Settings</h1>
-    <section class="card mb-4" aria-labelledby="appearance-title">
-        <div class="card-body p-4">
-            <h2 class="h5" id="appearance-title">Appearance</h2>
-            <p class="text-body-secondary" id="theme-help">Choose a theme for the entire app. Your preference is saved in this browser.</p>
-            <label for="theme-select" class="form-label">Theme</label>
-            <select id="theme-select" class="form-select" style="max-width: 20rem" data-theme-select aria-describedby="theme-help">
-                <option value="light">Light</option>
-                <option value="dark">Dark</option>
-            </select>
-            <p class="small text-body-secondary mt-2 mb-0" data-theme-status role="status" aria-live="polite"></p>
-        </div>
-    </section>
     <div class="row g-3">
+        <div class="col-md-6 col-xl-4">
+            <button type="button" class="card h-100 w-100 text-start text-body settings-link" data-theme-toggle aria-pressed="false" aria-label="Dark mode">
+                <span class="card-body p-4">
+                    <span class="h5 d-block"><i class="fas fa-moon me-2 text-primary" aria-hidden="true"></i>Dark mode</span>
+                    <span class="text-body-secondary" data-theme-description>Turn on dark mode.</span>
+                </span>
+            </button>
+        </div>
         <div class="col-md-6 col-xl-4">
             <a href="{% url 'classes' %}" class="card h-100 text-decoration-none text-body settings-link">
                 <div class="card-body p-4">
@@ -68,5 +64,6 @@
             </a>
         </div>
     </div>
+    <p class="small text-body-secondary mt-2 mb-0" data-theme-status role="status" aria-live="polite"></p>
 </div>
 {% endblock %}

@@ -9,17 +9,21 @@
   function apply(theme) {
     document.documentElement.dataset.bsTheme = theme;
     document.documentElement.style.colorScheme = theme;
-    document.querySelectorAll('[data-theme-select]').forEach(select => { select.value = theme; });
+    document.querySelectorAll('[data-theme-toggle]').forEach(button => {
+      button.setAttribute('aria-pressed', String(theme === 'dark'));
+      const description = button.querySelector('[data-theme-description]');
+      if (description) description.textContent = theme === 'dark' ? 'Turn off dark mode.' : 'Turn on dark mode.';
+    });
   }
   apply(savedTheme());
   document.addEventListener('DOMContentLoaded', () => {
     apply(document.documentElement.dataset.bsTheme);
-    document.querySelectorAll('[data-theme-select]').forEach(select => {
-      select.addEventListener('change', () => {
-        if (!valid(select.value)) return;
-        apply(select.value);
+    document.querySelectorAll('[data-theme-toggle]').forEach(button => {
+      button.addEventListener('click', () => {
+        const theme = document.documentElement.dataset.bsTheme === 'dark' ? 'light' : 'dark';
+        apply(theme);
         let message = 'Theme saved.';
-        try { localStorage.setItem(key, select.value); }
+        try { localStorage.setItem(key, theme); }
         catch (_) { message = 'Theme applied. Browser storage is unavailable, so it may reset when you leave this page.'; }
         document.querySelectorAll('[data-theme-status]').forEach(status => { status.textContent = message; });
       });
