@@ -1024,6 +1024,7 @@
                 if (event.sessionState === cast.framework.SessionState.SESSION_STARTED ||
                     event.sessionState === cast.framework.SessionState.SESSION_RESUMED) {
                     castSession = context.getCurrentSession();
+                    attachCastClockListener();
                     sendTimerUpdate();
                 } else if (event.sessionState === cast.framework.SessionState.SESSION_ENDED) {
                     castSession = null;
@@ -1033,10 +1034,28 @@
 
         castSession = context.getCurrentSession();
         if (castSession) {
+            attachCastClockListener();
             sendTimerUpdate();
         }
     }
     
+    let clockListenerSession = null;
+    function attachCastClockListener() {
+        if (!castSession || clockListenerSession === castSession) return;
+        clockListenerSession = castSession;
+        castSession.addMessageListener(CUSTOM_NAMESPACE, (namespace, message) => {
+            const received = Date.now() + (window.timerSkewOffset || 0);
+            let data;
+            try { data = typeof message === 'string' ? JSON.parse(message) : message; }
+            catch (error) { return; }
+            if (data.type !== 'clock-request' || !Number.isFinite(data.sent)) return;
+            castSession.sendMessage(CUSTOM_NAMESPACE, {
+                type: 'clock-response', sent: data.sent, received,
+                serverSent: Date.now() + (window.timerSkewOffset || 0)
+            }).catch(error => console.error('Cast clock response failed:', error));
+        });
+    }
+
     function sendTimerUpdate() {
         if (!castSession || !window.localTimerState) return;
         
@@ -1398,11 +1417,31 @@
         {# Round bell: SFXMint Double Strike Boxing Round Bell 05 (CC0 1.0). #}
         const finishBell = new Audio('{% static "crm/boxing-finish-bell.wav" %}');
         finishBell.preload = 'auto';
+        let bellSource = null;
+        function boostFinishBell() {
+            initAudio();
+            if (!audioCtx || bellSource) return;
+            // Boost perceived loudness while controlling peaks in the recorded bell.
+            const boost = audioCtx.createGain();
+            boost.gain.value = 1.5;
+            const limiter = audioCtx.createDynamicsCompressor();
+            limiter.threshold.value = -3;
+            limiter.knee.value = 0;
+            limiter.ratio.value = 20;
+            limiter.attack.value = 0.003;
+            limiter.release.value = 0.1;
+            bellSource = audioCtx.createMediaElementSource(finishBell);
+            bellSource.connect(boost);
+            boost.connect(limiter);
+            limiter.connect(audioCtx.destination);
+        }
 
         function playBeep(type) {
             if (!soundEnabled) return;
 
             if (type === 'end' || type === 'rest') {
+                try { boostFinishBell(); }
+                catch (error) { console.warn('Bell amplification unavailable:', error); }
                 const customSound = type === 'end' && localTimerState.sound_file_url;
                 const audio = customSound ? new Audio(customSound) : finishBell;
                 audio.currentTime = 0;
@@ -1509,10 +1548,6 @@
                 clearTimeout(completionReset);
                 completionReset = null;
             }
-            if (timer.server_time) {
-                const serverTime = new Date(timer.server_time);
-                window.timerSkewOffset = serverTime.getTime() - Date.now();
-            }
             localTimerState = timer;
             window.localTimerState = timer;
             if (timerInterval) {
@@ -1570,6 +1605,7 @@
         }
 
         function renderLocalStateWithValues(current) {
+            const previousStatus = window.lastRenderedState?.status;
             window.lastRenderedState = {
                 status: current.status,
                 current_state: current.current_state,
@@ -1577,6 +1613,11 @@
                 time_remaining: current.time_remaining
             };
             
+            if (previousStatus !== current.status) {
+                window.dispatchEvent(new CustomEvent('timer-status-change', {
+                    detail: { ...current, previousStatus }
+                }));
+            }
             window.currentRound = current.current_round;
             
             let displayTime = current.time_remaining;
@@ -1673,6 +1714,21 @@
         }
 
         let actionPending = false;
+        let syncRevision = 0;
+        let stateRequest = false;
+        async function refreshTimerState() {
+            if (stateRequest || actionPending) return;
+            stateRequest = true;
+            const revision = syncRevision;
+            try {
+                const { res, data } = await window.timerClockFetch(`/timers/${localTimerState.id}/state/`);
+                if (res.ok && revision === syncRevision && !actionPending) updateLocalTimerState(data);
+            } catch (error) {
+                console.error('Timer synchronization failed:', error);
+            } finally { stateRequest = false; }
+        }
+        setInterval(() => { if (!document.hidden) refreshTimerState(); }, 15000);
+        document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshTimerState(); });
         function confirmTimerAction(message) {
             const dialog = document.getElementById('timerConfirmation');
             document.getElementById('timerConfirmationMessage').textContent = message;
@@ -1694,7 +1750,8 @@
             initAudio();
             const token = getCsrfToken();
             try {
-                const res = await fetch(`/timers/${localTimerState.id}/action/`, {
+                syncRevision++;
+                const { res, data } = await window.timerClockFetch(`/timers/${localTimerState.id}/action/`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -1704,7 +1761,6 @@
                     body: JSON.stringify({ action: actionName, ...confirmation })
                 });
                 
-                const data = await res.json();
                 if (res.status === 409 && data.confirmation_required) {
                     if (await confirmTimerAction(data.message)) {
                         actionPending = false;
@@ -1754,18 +1810,19 @@
         // Ably Real-time Sync
         if (window.__ablyInstance) {
             const ably = window.__ablyInstance;
+            ably.connection.on('connected', refreshTimerState);
             const channel = ably.channels.get("user-{{ request.user.id }}-timer");
             channel.subscribe('update', (msg) => {
                 const timer = msg.data;
                 if (timer.id === localTimerState.id) {
-                    console.log("Ably received update for this timer", timer);
-                    updateLocalTimerState(timer);
+                    refreshTimerState();
                 }
             });
         }
 
         // Initial setup
         updateLocalTimerState(localTimerState);
+        refreshTimerState();
 
         // Restore the saved coaching layout after selecting another timer.
         // Native fullscreen may require a gesture; enterFullscreen has a CSS fallback.
@@ -1943,6 +2000,24 @@
         let connected = false;
         let commandRevision = 0;
         let settleUntil = 0;
+        let pendingTimerPlayback = null;
+        async function flushTimerPlayback() {
+            if (!connected || busy || !pendingTimerPlayback) return;
+            const action = pendingTimerPlayback;
+            pendingTimerPlayback = null;
+            await sendSpotifyAction(action);
+        }
+        window.addEventListener('timer-status-change', event => {
+            const timer = event.detail;
+            if (timer.status === 'PAUSED' || timer.status === 'DONE') {
+                pendingTimerPlayback = 'pause';
+            } else if (timer.status === 'RUNNING' &&
+                (timer.previousStatus === 'PAUSED' ||
+                 (timer.current_round === 1 && timer.current_state === 'WORK'))) {
+                pendingTimerPlayback = 'play';
+            }
+            flushTimerPlayback();
+        });
         const buttons = [btnPlay, btnNext, btnPrev, btnShuffle, btnRepeat];
         const formatMusicTime = ms => {
             const seconds = Math.floor(Math.max(0, Number(ms) || 0) / 1000);
@@ -2014,6 +2089,7 @@
         playlistSelect.addEventListener('change', () => { playlistChanged = true; });
         let roundVolume = null;
         let nextVolumeAttempt = 0;
+        const volumeFadeSeconds = 5;
 
         async function syncRoundVolume() {
             const timer = window.lastRenderedState;
@@ -2024,8 +2100,8 @@
                 const sameInterval = timer.status === 'RUNNING' &&
                     timer.current_round === roundVolume.round && timer.current_state === roundVolume.phase;
                 if (sameInterval) {
-                    const step = Math.max(1, Math.min(3, 4 - Math.ceil(timer.time_remaining)));
-                    await setRoundVolumeStep(roundVolume.normal - (roundVolume.normal - roundVolume.low) * step / 3);
+                    const step = Math.max(1, Math.min(volumeFadeSeconds, volumeFadeSeconds + 1 - Math.ceil(timer.time_remaining)));
+                    await setRoundVolumeStep(roundVolume.normal - (roundVolume.normal - roundVolume.low) * step / volumeFadeSeconds);
                     return;
                 }
 
@@ -2045,7 +2121,7 @@
             }
 
             if (timer.status !== 'RUNNING' || !['WORK', 'REST'].includes(timer.current_state) ||
-                timer.time_remaining <= 0 || timer.time_remaining > 3 ||
+                timer.time_remaining <= 0 || timer.time_remaining > volumeFadeSeconds ||
                 !playback.is_playing || volume.disabled || playback.volume_percent === 0) return;
 
             roundVolume = {
@@ -2115,6 +2191,7 @@
                 busy = false;
                 renderPlayback();
                 refreshPlayback();
+                flushTimerPlayback();
             }
         }
         btnPlay.addEventListener('click', () => sendSpotifyAction(playback.is_playing ? 'pause' : 'play'));
@@ -2171,6 +2248,7 @@
                     loadSpotifyDevices(data.last_device_id)
                 ]);
                 await refreshPlayback();
+                flushTimerPlayback();
             } catch (e) {
                 showSpotifyError(`Unable to check Spotify connection: ${e.message}`);
             }

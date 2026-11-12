@@ -452,6 +452,24 @@
         let localTimerState = null;
         let receiverInterval = null;
         let receiverSkewOffset = 0;
+        let clockSynchronized = false;
+        let senderId = null;
+        let clockRequest = null;
+        function requestClock() {
+            if (!senderId) return;
+            clockRequest = Date.now();
+            context.sendCustomMessage(CUSTOM_NAMESPACE, senderId, {
+                type: 'clock-request', sent: clockRequest
+            });
+        }
+        function applyClockResponse(data) {
+            if (data.sent !== clockRequest || !Number.isFinite(data.received) ||
+                !Number.isFinite(data.serverSent)) return;
+            receiverSkewOffset = ((data.received - data.sent) + (data.serverSent - Date.now())) / 2;
+            clockSynchronized = true;
+            clockRequest = null;
+            renderReceiver();
+        }
 
         function parseDate(dateStr) {
             if (!dateStr) return null;
@@ -531,8 +549,11 @@
         }
 
         function updateReceiverTimer(timer) {
-            if (timer.server_time) {
-                receiverSkewOffset = timer.server_time - Date.now();
+            // Initial fallback for older senders. Never overwrite a measured clock.
+            if (!clockSynchronized && timer.server_time) {
+                const timestamp = typeof timer.server_time === 'number'
+                    ? timer.server_time : Date.parse(timer.server_time);
+                if (Number.isFinite(timestamp)) receiverSkewOffset = timestamp - Date.now();
             }
             localTimerState = timer;
             if (receiverInterval) {
@@ -584,6 +605,8 @@
                 labelText = 'READY';
             } else if (current.status === 'DONE') {
                 labelText = 'DONE';
+            } else if (current.status === 'PAUSED') {
+                labelText = 'PAUSED';
             } else {
                 labelText = `${current.current_state} - Round ${current.current_round}/${localTimerState.rounds}`;
             }
@@ -591,7 +614,8 @@
             const renderData = {
                 time: timeStr,
                 label: labelText,
-                warning: isWarning
+                warning: isWarning,
+                roundText: `ROUND ${current.current_round}/${localTimerState.rounds}`
             };
             
             applyState(renderData);
@@ -612,16 +636,25 @@
                     d = JSON.parse(d);
                 } catch (e) {
                     console.error("Error parsing custom message JSON", e);
+                    return;
                 }
             }
             
+            if (!d || typeof d !== 'object') return;
+            if (event.senderId !== senderId) {
+                senderId = event.senderId;
+                clockSynchronized = false;
+                requestClock();
+            }
+            if (d.type === 'clock-response') {
+                applyClockResponse(d);
+                return;
+            }
+            if (clockRequest === null && !clockSynchronized) requestClock();
             if (d && d.status !== undefined && d.duration !== undefined) {
                 updateReceiverTimer(d);
                 setStatus('LIVE · SYNCED', true);
             } else {
-                if (d && d.server_time) {
-                    receiverSkewOffset = d.server_time - Date.now();
-                }
                 applyState(d);
                 setStatus('LIVE · RECEIVING', true);
             }
@@ -633,6 +666,7 @@
         });
 
         context.addEventListener(cast.framework.system.EventType.SENDER_CONNECTED, () => {
+            clockSynchronized = false;
             setStatus('SENDER CONNECTED', true);
         });
 
@@ -640,6 +674,7 @@
             setStatus('SENDER DISCONNECTED', false);
         });
 
+        setInterval(requestClock, 15000);
         context.start(options);
 
         // Debug hook

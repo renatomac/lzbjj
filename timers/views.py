@@ -65,7 +65,26 @@ from django.views.decorators.http import require_POST
 from django.utils import timezone
 import json
 
+def timer_clock_response(view):
+    """Measure server processing separately from network transit time."""
+    from functools import wraps
+
+    @wraps(view)
+    def wrapped(request, *args, **kwargs):
+        received = timezone.now().isoformat()
+        response = view(request, *args, **kwargs)
+        if isinstance(response, JsonResponse):
+            payload = json.loads(response.content)
+            payload['server_received_at'] = received
+            payload['server_time'] = timezone.now().isoformat()
+            response.content = json.dumps(payload)
+            response['Cache-Control'] = 'no-store'
+        return response
+    return wrapped
+
+
 @login_required
+@timer_clock_response
 def active_timer_state(request):
     timer = Timer.objects.filter(user=request.user, status__in=['RUNNING', 'PAUSED']).first()
     if not timer:
@@ -77,6 +96,7 @@ def active_timer_state(request):
     return JsonResponse(data)
 
 @login_required
+@timer_clock_response
 def timer_state(request, pk):
     try:
         timer = Timer.objects.get(pk=pk, user=request.user)
@@ -88,6 +108,7 @@ def timer_state(request, pk):
 
 @login_required
 @require_POST
+@timer_clock_response
 def timer_action(request, pk):
     try:
         timer = Timer.objects.get(pk=pk, user=request.user)

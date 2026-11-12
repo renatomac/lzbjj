@@ -44,6 +44,7 @@
 
 <!-- Ably client library (load once, before your code) -->
 <script src="https://cdn.ably.com/lib/ably.min-1.js"></script>
+<script src="{% static 'crm/js/timer_sync.js' %}"></script>
 
 <script>
 // --- CSRF helper for fetch ---
@@ -84,12 +85,14 @@ function markItemReadInDOM(id) { window.refreshNotifications?.(); }
 // --- Global Timer Javascript Helpers ---
 let activeTimerState = null;
 let globalTimerInterval = null;
-let globalTimerSkewOffset = 0;
+let activeTimerRequest = false;
 
 async function checkActiveTimer() {
+  if (activeTimerRequest) return;
+  activeTimerRequest = true;
   try {
-    const res = await fetch("/timers/active-state/");
-    const data = await res.json();
+    const { res, data } = await window.timerClockFetch("/timers/active-state/");
+    if (!res.ok) return;
     if (data.active) {
       updateGlobalTimerState(data);
     } else {
@@ -97,14 +100,10 @@ async function checkActiveTimer() {
     }
   } catch (e) {
     console.error("Error checking active timer", e);
-  }
+  } finally { activeTimerRequest = false; }
 }
 
 function updateGlobalTimerState(timer) {
-  if (timer.server_time) {
-    const serverTime = new Date(timer.server_time);
-    globalTimerSkewOffset = serverTime.getTime() - Date.now();
-  }
   activeTimerState = timer;
   if (globalTimerInterval) {
     clearInterval(globalTimerInterval);
@@ -219,7 +218,7 @@ function getGlobalTimerStateAt(state, targetTime) {
 
 function tickGlobalTimer() {
   if (!activeTimerState) return;
-  const current = getGlobalTimerStateAt(activeTimerState, new Date(Date.now() + globalTimerSkewOffset));
+  const current = getGlobalTimerStateAt(activeTimerState, new Date(Date.now() + (window.timerSkewOffset || 0)));
   
   if (current.status === 'DONE') {
     hideGlobalTimer();
@@ -235,7 +234,7 @@ function tickGlobalTimer() {
 
 function renderGlobalTimer() {
   if (!activeTimerState) return;
-  const current = getGlobalTimerStateAt(activeTimerState, new Date(Date.now() + globalTimerSkewOffset));
+  const current = getGlobalTimerStateAt(activeTimerState, new Date(Date.now() + (window.timerSkewOffset || 0)));
   renderGlobalTimerWithValues(current);
 }
 
@@ -277,6 +276,9 @@ function renderGlobalTimerWithValues(current) {
 // --- Ably realtime subscription (single instance & single subscription) ---
 document.addEventListener('DOMContentLoaded', async () => {
   {% if user.is_authenticated %}
+  checkActiveTimer();
+  setInterval(() => { if (!document.hidden) checkActiveTimer(); }, 15000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) checkActiveTimer(); });
   try {
     // Create a single Ably instance per page
     if (!window.__ablyInstance) {
@@ -288,6 +290,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     const ably = window.__ablyInstance;
+    ably.connection.on('connected', checkActiveTimer);
     const channelName = "user-{{ request.user.id }}-notifications";
     const channel = ably.channels.get(channelName);
 
@@ -302,13 +305,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const timerChannel = ably.channels.get(timerChannelName);
       
       timerChannel.subscribe('update', (msg) => {
-        console.log('Ably timer update received:', msg.data);
-        const timer = msg.data;
-        if (timer.status === 'READY' || timer.status === 'DONE') {
-          hideGlobalTimer();
-        } else {
-          updateGlobalTimerState(timer);
-        }
+        checkActiveTimer();
       });
       
       // Check initial active timer
